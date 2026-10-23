@@ -2859,7 +2859,7 @@ border-radius: 0px;
 <h3 class="subtitle">PCA y métodos alternativos de reducción de
 dimensionalidad — Coffee Quality Institute</h3>
 <h4 class="author">Juan Sebastian</h4>
-<h4 class="date">27 de septiembre de 2026</h4>
+<h4 class="date">22 de octubre de 2026</h4>
 
 </div>
 
@@ -3410,9 +3410,17 @@ round(lambdas_todas, 3)</code></pre>
 <p>Las variables sensoriales (Aroma, Flavor, Aftertaste, Acidity, Body,
 Balance, Sweetness, Clean.Cup, Uniformity, Cupper.Points) obtienen
 lambdas cercanos a 1 — lo que equivale prácticamente a no transformar —
-lo que confirma que su distribución ya es razonablemente simétrica. El
-análisis se concentra entonces en las tres variables con lambda alejado
-de 1:</p>
+lo que confirma que su distribución es más simétrica que las variables
+de defectos o humedad. Sin embargo, <strong>lambda ≈ 1 no significa
+lambda = 1 exactamente</strong>: incluso una ligera asimetría residual
+puede generar patrones no elípticos en la matriz de dispersión de scores
+que el profesor identificó en la revisión del análisis. Por eso, en el
+análisis principal (sección 5), se aplica YJ <strong>a todas las 11
+variables</strong> con su lambda óptimo individual — incluyendo las
+sensoriales — como medida preventiva para obtener una nube de dispersión
+lo más limpia posible. El análisis se concentra primero en las tres
+variables con lambda más alejado de 1, que son las más
+problemáticas:</p>
 <pre class="r"><code>lambdas &lt;- sapply(datos[c(&quot;Moisture&quot;, &quot;Category.One.Defects&quot;, &quot;Category.Two.Defects&quot;)], yeojohnson_fit)
 round(lambdas, 3)</code></pre>
 <pre><code>##             Moisture Category.One.Defects Category.Two.Defects 
@@ -3500,42 +3508,35 @@ siendo igual de extremo</strong> (PC1 ≈ 56 en ambas versiones): es un
 error evidente de captura de datos (todos los puntajes en 0 es
 físicamente imposible para un lote calificado), no una variable sesgada
 corrigiéndose.</p>
-<p><strong>Decisión: se adopta como análisis oficial el PCA con
-<code>Category.Two.Defects</code> transformada</strong> (desde la
-sección 5 todo el informe usa esa versión), por estas razones:</p>
+<p><strong>Decisión de esta sección:</strong> se adopta
+<code>Category.Two.Defects</code> transformada con <span class="math inline">\(\lambda \approx -0.22\)</span> en
+<code>datos_transformados</code>, que sirve como punto de referencia
+para los antes/después de secciones posteriores. El análisis principal
+(sección 5) va un paso más allá y aplica YJ a las 11 variables del
+conjunto reducido, por las razones expuestas al inicio de esta
+sección.</p>
 <ol style="list-style-type: decimal">
-<li>PC1 — el eje de calidad sensorial general (47.6 % de la varianza,
-sección 7), la conclusión más importante del informe — es
-<strong>completamente insensible</strong> a la corrección; adoptarla no
-cambia el hallazgo principal.</li>
-<li>La corrección elimina un artefacto real (el lote de 45 defectos
-secundarios deja de aparecer como atípico) y reduce la influencia del
-sesgo en el eje de defectos, que pasa a ser PC3. Los atípicos que
-persisten (lote con todo en cero; lotes con 31 defectos primarios) son
-atípicos <strong>genuinos</strong>, ahora identificados con más
-seguridad porque sobreviven a la corrección.</li>
+<li>PC1 — el eje de calidad sensorial general, la conclusión más
+importante del informe — es <strong>completamente insensible</strong> a
+la corrección de <code>Category.Two.Defects</code>; adoptarla no cambia
+el hallazgo principal.</li>
+<li>La corrección de Cat2 elimina un artefacto real (el lote de 45
+defectos secundarios deja de aparecer como atípico) y reduce la
+influencia del sesgo en el eje de defectos. Los atípicos que persisten
+(lote con todo en cero; lote con 31 defectos primarios) son atípicos
+<strong>genuinos</strong> que sobreviven a la corrección.</li>
 <li><code>Moisture</code> y <code>Category.One.Defects</code> no se
-transforman porque, según la propia prueba de Yeo-Johnson, no son
-variables “sesgadas” en el sentido que una transformación de potencia
-pueda corregir — están infladas en cero, un problema de calidad de datos
-(ya tratado en la sección 13) y no de asimetría.</li>
-<li>La versión sin transformar queda como respaldo de sensibilidad en el
-historial de git (etiqueta <code>pca-sin-transformar</code>): tiene el
-mismo PC1 y las mismas cuatro historias (calidad sensorial, defectos,
-consistencia/dulzura, altitud) en otro orden (defectos como PC2 y
-consistencia/dulzura como PC3).</li>
-<li><strong>Limitación reconocida:</strong> a pesar de la
-transformación, la matriz de dispersión de la sección 7 aún muestra
-atípicos muy marcados (el lote con puntajes en cero y los lotes con 31
-defectos primarios). Transformar solo <code>Category.Two.Defects</code>
-<strong>no resuelve completamente</strong> los problemas de los
-componentes — los atípicos genuinos persisten porque provienen de
-<code>Category.One.Defects</code> y de errores de captura en las
-variables sensoriales, que no se pueden corregir con una transformación
-de potencia. Si el objetivo fuera limpiar por completo la nube de
-dispersión, habría que filtrar también esas filas problemáticas, con el
-consecuente análisis de por qué son atípicas y si su exclusión está
-justificada.</li>
+transforman en ninguna versión porque están <strong>infladas en
+cero</strong> — un problema de calidad de datos que Yeo-Johnson no puede
+resolver (la optimización no converge a un óptimo interior, como se
+mostró arriba). Por eso estas dos variables se excluyen del análisis
+principal.</li>
+<li><strong>Limitación reconocida:</strong> incluso con YJ en las 11
+variables del análisis principal, los atípicos genuinos (lote con
+puntajes en cero, lotes con defectos primarios extremos) persisten
+porque vienen de errores de captura, no de sesgo distribucional. La
+transformación mejora la forma general de la nube de dispersión pero no
+elimina estos casos extremos.</li>
 </ol>
 <hr />
 </div>
@@ -4173,10 +4174,13 @@ dm2_14 &lt;- mahalanobis(datos_transformados,
                       cov(datos_transformados))
 umbral_14 &lt;- qchisq(0.975, df = ncol(datos_transformados))
 
-# DESPUES: 11 variables YJ
-# La transformación YJ genera alta colinealidad entre variables sensoriales (covarianza casi singular).
-# Se usa la equivalencia PCA–Mahalanobis: d²_M = sum_k (z_ik / sdev_k)²
-# (ver nota teórica abajo), que evita invertir S directamente.
+# DESPUES: 11 variables con YJ
+# YJ acerca las distribuciones sensoriales entre sí, generando alta colinealidad post-transformación
+# y haciendo que cov(datos_t) sea computacionalmente singular (rcond ≈ 8e-210).
+# Se usa la equivalencia matemática demostrada en la nota teórica debajo:
+#   d²_M(xᵢ) = Σₖ (zᵢₖ / sdevₖ)²   donde zᵢₖ = pca$x[i,k] y sdevₖ = pca$sdev[k]
+# Esto es idéntico a la distancia de Mahalanobis clásica pero numéricamente estable
+# porque opera en el espacio de componentes ortogonales (ya decorrelacionadas).
 dm2 &lt;- rowSums((pca$x / pca$sdev)^2)
 umbral &lt;- qchisq(0.975, df = ncol(datos_t))
 
