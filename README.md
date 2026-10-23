@@ -19,25 +19,97 @@ Este repositorio contiene el taller de reducción de dimensionalidad desarrollad
 
 **Fuente:** [Coffee Quality Institute (CQI)](https://database.coffeeinstitute.org/), a través del repositorio original [jldbc/coffee-quality-database](https://github.com/jldbc/coffee-quality-database).
 
-**Conjunto activo:** 1.070 lotes de café arábica evaluados por catadores certificados (Q Graders), con 11 variables cuantitativas tras el tratamiento de datos.
+**Registros totales en el dataset:** 1.312 lotes (1.311 arábica + 28 robusta). Tras filtrar altitudes faltantes o fuera de rango (0–3.000 msnm), el **conjunto activo del análisis es de 1.070 lotes arábica**.
 
-### Variables del análisis principal (11 variables)
+El dataset original contiene **43 columnas** (más el índice de fila), divididas en variables cualitativas y cuantitativas:
+
+---
+
+### Variables cualitativas (categóricas)
+
+| Variable | Descripción |
+|---|---|
+| `Species` | Especie del café (Arabica / Robusta) |
+| `Owner` | Propietario del lote |
+| `Country.of.Origin` | País de origen de la finca |
+| `Farm.Name` | Nombre de la finca |
+| `Lot.Number` | Número de lote asignado por el productor |
+| `Mill` | Nombre del beneficio/molino donde se procesó |
+| `ICO.Number` | Número de registro ICO (International Coffee Organization) |
+| `Company` | Empresa exportadora o comercializadora |
+| `Altitude` | Altitud declarada por el productor (campo de texto libre, sin estandarizar) |
+| `Region` | Región geográfica dentro del país de origen |
+| `Producer` | Nombre del productor |
+| `Bag.Weight` | Peso del saco (texto, p.ej. "60 kg") |
+| `In.Country.Partner` | Socio local del CQI en el país de origen |
+| `Harvest.Year` | Año de cosecha (campo de texto, no siempre numérico) |
+| `Grading.Date` | Fecha de evaluación por el catador |
+| `Owner.1` | Campo alternativo de propietario (duplicado parcial de `Owner`) |
+| `Variety` | Variedad botánica del grano (Bourbon, Typica, Caturra, etc.) |
+| `Processing.Method` | Método de beneficio (Washed, Natural, Honey, etc.) |
+| `Color` | Color del grano en pergamino (Green, Blue-Green, etc.) |
+| `Expiration` | Fecha de vencimiento de la certificación |
+| `Certification.Body` | Organismo certificador que avaló la cata |
+| `Certification.Address` | Dirección del organismo certificador |
+| `Certification.Contact` | Contacto del organismo certificador |
+| `unit_of_measurement` | Unidad de medida de altitud reportada (m / ft) |
+
+---
+
+### Variables cuantitativas
+
+#### Puntajes de catación — escala 0 a 10
+
+Evaluados por Q Graders certificados por el CQI. Las 10 variables de intensidad sensorial más el puntaje global del catador.
+
+| Variable | Descripción |
+|---|---|
+| `Aroma` | Intensidad y calidad del aroma del café preparado |
+| `Flavor` | Sabor percibido durante la degustación |
+| `Aftertaste` | Persistencia y calidad del retrogusto |
+| `Acidity` | Viveza y brillo de la acidez |
+| `Body` | Sensación de cuerpo o peso en boca |
+| `Balance` | Armonía entre todos los atributos sensoriales |
+| `Uniformity` | Consistencia entre las 5 tazas evaluadas del mismo lote |
+| `Clean.Cup` | Ausencia de sabores extraños o defectos en taza |
+| `Sweetness` | Presencia de dulzura natural |
+| `Cupper.Points` | Puntaje holístico asignado por el catador |
+| `Total.Cup.Points` | **Suma** de los 10 puntajes anteriores *(excluida del PCA por colinealidad perfecta)* |
+
+#### Variables de calidad física del grano
 
 | Variable | Descripción | Unidad |
 |---|---|---|
-| Aroma | Puntaje de aroma | 0–10 |
-| Flavor | Puntaje de sabor | 0–10 |
-| Aftertaste | Puntaje de retrogusto | 0–10 |
-| Acidity | Puntaje de acidez | 0–10 |
-| Body | Puntaje de cuerpo | 0–10 |
-| Balance | Puntaje de balance | 0–10 |
-| Uniformity | Puntaje de uniformidad taza a taza | 0–10 |
-| Clean.Cup | Puntaje de limpieza de taza | 0–10 |
-| Sweetness | Puntaje de dulzura | 0–10 |
-| Cupper.Points | Puntaje global del catador | 0–10 |
-| altitude_mean_meters | Altitud media de la finca | metros |
+| `Moisture` | Humedad del grano al momento de la cata | % |
+| `Category.One.Defects` | Conteo de defectos primarios (granos negros, vinagres, etc.) | unidades |
+| `Category.Two.Defects` | Conteo de defectos secundarios (granos partidos, conchas, etc.) | unidades |
+| `Quakers` | Conteo de granos inmaduros (no oscurecen al tostar) | unidades |
 
-> **Variables excluidas del análisis principal:** `Category.One.Defects`, `Category.Two.Defects` y `Moisture` presentan inflación de ceros que Yeo-Johnson no puede corregir (la optimización no converge). Se mantienen en la sección de análisis de sensibilidad (sección 18.1 del informe) como evidencia del antes/después.
+#### Variables logísticas y agroclimáticas
+
+| Variable | Descripción | Unidad |
+|---|---|---|
+| `Number.of.Bags` | Número de sacos del lote | sacos |
+| `altitude_low_meters` | Límite inferior del rango de altitud de la finca | metros |
+| `altitude_high_meters` | Límite superior del rango de altitud de la finca | metros |
+| `altitude_mean_meters` | Altitud media de la finca *(usada en el análisis)* | metros |
+
+---
+
+### Variables del análisis principal (11)
+
+Del total de variables cuantitativas, el análisis PCA usa las siguientes 11, tras excluir las que presentan problemas de calidad de datos no corregibles:
+
+| Variable | Rol en el PCA |
+|---|---|
+| Aroma, Flavor, Aftertaste, Acidity, Body, Balance, Uniformity, Clean.Cup, Sweetness, Cupper.Points | Bloque sensorial — definen PC1 (calidad general) y PC2 (consistencia vs. intensidad) |
+| `altitude_mean_meters` | Variable agroclimática — define PC3 (altitud de producción) |
+
+> **Variables cuantitativas excluidas del análisis principal:**
+> - `Total.Cup.Points`: suma exacta de los 10 puntajes → colinealidad perfecta con el bloque sensorial.
+> - `Moisture`, `Category.One.Defects`: inflación de ceros (la mayoría de lotes tiene valor 0); Yeo-Johnson no converge para estas variables.
+> - `Category.Two.Defects`: transformada con Yeo-Johnson (λ ≈ −0.22) en el análisis exploratorio de la sección 3.2, pero excluida del análisis principal por coherencia con la exclusión de Cat1 y Moisture.
+> - `Quakers`, `Number.of.Bags`, `altitude_low_meters`, `altitude_high_meters`: redundantes o con alta proporción de datos faltantes.
 
 ---
 
