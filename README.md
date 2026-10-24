@@ -1,8 +1,8 @@
 # Análisis Multivariado — Reducción de Dimensionalidad en Datos de Calidad de Café
 
 **Curso:** Análisis Multivariado y Métodos de Visualización (AMMV)  
-**Autor:** Juan Sebastian Guayazan  
-**Institución:** Universidad EAN  
+**Integrantes:** Juan Sebastián Guayazán · Esteban Valente · Diego Nocua  
+**Institución:** Escuela Colombiana de Ingeniería Julio Garavito  
 **Año:** 2026
 
 ---
@@ -58,23 +58,23 @@ El dataset original contiene **43 columnas** (más el índice de fila), dividida
 
 ### Variables cuantitativas
 
-#### Puntajes de catación — escala 0 a 10
+#### Puntajes de catación
 
 Evaluados por Q Graders certificados por el CQI. Las 10 variables de intensidad sensorial más el puntaje global del catador.
 
-| Variable | Descripción |
-|---|---|
-| `Aroma` | Intensidad y calidad del aroma del café preparado |
-| `Flavor` | Sabor percibido durante la degustación |
-| `Aftertaste` | Persistencia y calidad del retrogusto |
-| `Acidity` | Viveza y brillo de la acidez |
-| `Body` | Sensación de cuerpo o peso en boca |
-| `Balance` | Armonía entre todos los atributos sensoriales |
-| `Uniformity` | Consistencia entre las 5 tazas evaluadas del mismo lote |
-| `Clean.Cup` | Ausencia de sabores extraños o defectos en taza |
-| `Sweetness` | Presencia de dulzura natural |
-| `Cupper.Points` | Puntaje holístico asignado por el catador |
-| `Total.Cup.Points` | **Suma** de los 10 puntajes anteriores *(excluida del PCA por colinealidad perfecta)* |
+| Variable | Descripción | Unidad |
+|---|---|---|
+| `Aroma` | Intensidad y calidad del aroma del café preparado | 0 – 10 |
+| `Flavor` | Sabor percibido durante la degustación | 0 – 10 |
+| `Aftertaste` | Persistencia y calidad del retrogusto | 0 – 10 |
+| `Acidity` | Viveza y brillo de la acidez | 0 – 10 |
+| `Body` | Sensación de cuerpo o peso en boca | 0 – 10 |
+| `Balance` | Armonía entre todos los atributos sensoriales | 0 – 10 |
+| `Uniformity` | Consistencia entre las 5 tazas evaluadas del mismo lote | 0 – 10 |
+| `Clean.Cup` | Ausencia de sabores extraños o defectos en taza | 0 – 10 |
+| `Sweetness` | Presencia de dulzura natural | 0 – 10 |
+| `Cupper.Points` | Puntaje holístico asignado por el catador | 0 – 10 |
+| `Total.Cup.Points` | **Suma** de los 10 puntajes anteriores *(excluida del PCA por colinealidad perfecta)* | 0 – 100 |
 
 #### Variables de calidad física del grano
 
