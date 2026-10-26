@@ -1,0 +1,239 @@
+---
+title: "Taller PCA — ANTES de las correcciones"
+subtitle: "Análisis con 14 variables sin transformación completa — Coffee Quality Institute"
+author: "Juan Sebastián Guayazán · Esteban Valente · Diego Nocua"
+date: "`r format(Sys.Date(), '%d de %B de %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    code_folding: show
+    theme: flatly
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE,
+                       fig.align = "center", fig.width = 8, fig.height = 7)
+```
+
+> **Propósito de este documento:** muestra el análisis en su estado **antes** de las correcciones pedidas por el profesor. Se usan las 14 variables originales con transformación Yeo-Johnson **solo** en `Category.Two.Defects`. Sirve como referencia para comparar y evidenciar los problemas (patrones en la matriz de dispersión, outliers de defectos físicos) que motivaron la transformación completa.
+
+---
+
+# 1. Objetivo
+
+Se aplica PCA sobre 1.070 lotes de café arábica con las 14 variables cuantitativas disponibles, transformando únicamente `Category.Two.Defects` con Yeo-Johnson (λ ≈ −0.22).
+
+---
+
+# 2. Datos
+
+```{r datos}
+library(dplyr)
+
+data <- read.csv("../data/arabica_data_cleaned.csv")
+
+vars_cuantitativas <- c("Aroma", "Flavor", "Aftertaste", "Acidity", "Body",
+                         "Balance", "Uniformity", "Clean.Cup", "Sweetness",
+                         "Cupper.Points", "Moisture", "Category.One.Defects",
+                         "Category.Two.Defects", "altitude_mean_meters")
+
+data_f <- data %>%
+  filter(is.na(altitude_mean_meters) | (altitude_mean_meters > 0 & altitude_mean_meters <= 3000)) %>%
+  filter(!is.na(altitude_mean_meters))
+
+datos <- data_f %>% select(all_of(vars_cuantitativas))
+```
+
+Tras el tratamiento: **`r nrow(datos)` observaciones**, **14 variables**, sin datos faltantes.
+
+---
+
+# 3. Exploración inicial
+
+```{r exploracion}
+str(datos)
+dim(datos)
+summary(datos)
+```
+
+## 3.1. Detección de valores atípicos univariados
+
+```{r medcouple}
+library(robustbase)
+mc_vars <- sapply(datos, mc)
+round(mc_vars, 3)
+```
+
+```{r pearson-skewness}
+asimetria_pearson <- sapply(datos, function(x) {
+  3 * (mean(x) - median(x)) / sd(x)
+})
+round(asimetria_pearson, 3)
+```
+
+```{r cajas-ajustadas}
+comparar_outliers <- function(x) {
+  clasico  <- sum(x < quantile(x, .25) - 1.5 * IQR(x) |
+                  x > quantile(x, .75) + 1.5 * IQR(x))
+  ab       <- adjboxStats(x)
+  ajustado <- sum(x < ab$fence[1] | x > ab$fence[2])
+  c(clasico = clasico, ajustado = ajustado)
+}
+tabla_outliers <- t(sapply(datos, comparar_outliers))
+tabla_outliers
+```
+
+```{r boxplots-todas-variables, fig.height=10, fig.width=12}
+par(mfrow = c(3, 5), mar = c(3, 2, 3, 1))
+nombres_cortos <- c("Aroma","Flavor","Aftertaste","Acidity","Body",
+                    "Balance","Uniformity","Clean.Cup","Sweetness",
+                    "Cupper.Points","Moisture","Cat1.Defects","Cat2.Defects","Altitude")
+for (i in seq_along(datos)) {
+  n_out <- sum({ ab <- adjboxStats(datos[[i]]); datos[[i]] < ab$fence[1] | datos[[i]] > ab$fence[2] })
+  adjbox(datos[[i]], main = paste0(nombres_cortos[i], "\n(", n_out, " atípicos)"),
+         col = "lightblue", cex.main = 0.9, ylab = "")
+}
+```
+
+## 3.2. Transformación Yeo-Johnson — solo Category.Two.Defects
+
+Las tres variables con mayor sesgo son `Moisture`, `Category.One.Defects` y `Category.Two.Defects`. Sin embargo, `Moisture` y `Category.One.Defects` tienen inflación de ceros — la optimización de lambda no converge a un óptimo interior. Solo `Category.Two.Defects` obtiene un ajuste estable (λ ≈ −0.22).
+
+```{r yeojohnson-funciones}
+yeojohnson_transform <- function(x, lambda) {
+  if (lambda != 0) ((x + 1)^lambda - 1) / lambda else log(x + 1)
+}
+yeojohnson_loglik <- function(lambda, x) {
+  y <- yeojohnson_transform(x, lambda)
+  -length(x) / 2 * log(var(y)) + (lambda - 1) * sum(log(x + 1))
+}
+yeojohnson_fit <- function(x) {
+  optimize(yeojohnson_loglik, interval = c(-5, 5), x = x, maximum = TRUE)$maximum
+}
+
+lambdas <- sapply(datos[c("Moisture", "Category.One.Defects", "Category.Two.Defects")],
+                  yeojohnson_fit)
+round(lambdas, 3)
+```
+
+```{r yeojohnson-aplicar}
+datos_transformados <- datos
+datos_transformados$Category.Two.Defects <-
+  yeojohnson_transform(datos$Category.Two.Defects, lambdas["Category.Two.Defects"])
+```
+
+---
+
+# 4. Matriz de covarianza
+
+```{r covarianza}
+S <- cov(datos_transformados)
+signif(S, 3)
+```
+
+```{r var-total}
+varianza_total <- sum(diag(S))
+cat("Varianza total (traza de S):", varianza_total, "\n")
+cat("Dominada por altitude_mean_meters:", round(S["altitude_mean_meters","altitude_mean_meters"],0), "\n")
+```
+
+La varianza total está dominada por `altitude_mean_meters` — artefacto de unidades. Por eso el PCA se hace sobre datos estandarizados (R, no S).
+
+---
+
+# 5. PCA — 14 variables
+
+```{r pca-14}
+pca <- prcomp(datos_transformados, center = TRUE, scale. = TRUE)
+summary(pca)
+pca$sdev^2
+```
+
+```{r kaiser}
+cat("Componentes con lambda > 1 (Kaiser):", sum(pca$sdev^2 > 1), "\n")
+```
+
+---
+
+# 6. Screeplot
+
+```{r screeplot, fig.width=8, fig.height=5}
+screeplot(pca, type = "lines",
+          main = paste0("Screeplot — 14 variables\n(PC1 = ",
+                        round(pca$sdev[1]^2 / sum(pca$sdev^2) * 100, 1), " %)"))
+abline(h = 1, lty = 2, col = "red")
+```
+
+---
+
+# 7. Matriz de dispersión de scores
+
+> **PROBLEMA VISIBLE:** el panel con `Category.One.Defects` y `Category.Two.Defects` muestra puntos extremos muy alejados de la nube principal (lotes con 23–31 defectos primarios). Estos outliers de defectos dominan ejes enteros (PC3 en las cargas) y son los "patrones" que el profesor identificó como problemáticos.
+
+```{r pairs-pca, fig.height=8}
+k <- 4
+pairs(pca$x[, 1:k],
+      main = "ANTES: Matriz de dispersión — 14 variables (con Cat1/Cat2/Moisture)",
+      pch = 19,
+      col = adjustcolor("salmon", alpha.f = 0.35),
+      labels = paste0("PC", 1:k, "\n",
+                      round(pca$sdev[1:k]^2 / sum(pca$sdev^2) * 100, 1), "%"))
+```
+
+```{r outliers}
+idx_pc1 <- order(pca$x[, 1], decreasing = TRUE)[1:2]
+idx_pc3 <- order(pca$x[, 3], decreasing = TRUE)[1:2]
+datos[unique(c(idx_pc1, idx_pc3)), ]
+```
+
+---
+
+# 8. Distancia de Mahalanobis — 14 variables
+
+```{r mahalanobis}
+dm2_14 <- mahalanobis(datos_transformados,
+                      colMeans(datos_transformados),
+                      cov(datos_transformados))
+umbral_14 <- qchisq(0.975, df = ncol(datos_transformados))
+
+cat("Umbral chi2_14 al 97.5%:", round(umbral_14, 1), "\n")
+cat("Atípicos marcados:", sum(dm2_14 > umbral_14), "\n")
+cat("\nTop 6 distancias:\n")
+print(sort(dm2_14, decreasing = TRUE)[1:6])
+```
+
+Con 14 variables se marcan **`r sum(dm2_14 > umbral_14)`** lotes como atípicos. Las distancias extremas (≈ 654, 410, 300) son muy altas porque Cat1/Cat2 con valores 31–47 generan distancias enormes en esas dimensiones.
+
+---
+
+# 9. Cargas — 14 variables
+
+```{r cargas}
+cat("=== Cargas de las 4 primeras componentes (14 variables) ===\n")
+round(pca$rotation[, 1:4], 3)
+```
+
+**PC3 es el "eje de defectos"** (Cat1 ≈ 0.54, Cat2 ≈ 0.65) y **PC4 es "altitud vs. defectos primarios"** (altitude ≈ 0.75, Cat1 ≈ −0.59). Estas dimensiones son artefactos de las variables problemáticas, no estructura real del café.
+
+---
+
+# 10. Biplot — 14 variables
+
+```{r biplot, fig.width=10, fig.height=8}
+biplot(pca, scale = 0, cex = 0.45,
+       col = c("gray70", "firebrick"),
+       main = "ANTES: Biplot — 14 variables (con Cat1/Cat2/Moisture)")
+```
+
+**Problemas visibles:**
+
+- Los vectores de Cat1/Cat2 dominan el biplot y apuntan en dirección diferente al bloque sensorial.
+- Puntos extremos (lotes con 31+ defectos primarios) distorsionan el espacio.
+- La interpretación de los ejes es difícil porque Cat1/Cat2 "roban" componentes enteras.
+
+---
+
+> **Conclusión del análisis ANTES:** los problemas identificados por el profesor (patrones en la matriz de dispersión, outliers extremos) son directamente causados por incluir `Category.One.Defects`, `Category.Two.Defects` y `Moisture` — variables con inflación de ceros que no se pueden normalizar con Yeo-Johnson. El análisis DESPUÉS (ver `informe_despues.Rmd`) excluye estas tres variables, aplica YJ a todas las 11 restantes y resuelve estos problemas.

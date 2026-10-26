@@ -1,0 +1,682 @@
+---
+title: "Taller PCA — DESPUÉS de las correcciones"
+subtitle: "11 variables + Yeo-Johnson en todas — Coffee Quality Institute"
+author: "Juan Sebastián Guayazán · Esteban Valente · Diego Nocua"
+date: "`r format(Sys.Date(), '%d de %B de %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    code_folding: show
+    theme: flatly
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE,
+                       fig.align = "center", fig.width = 8, fig.height = 7)
+```
+
+> **Propósito de este documento:** análisis corregido. Se excluyen `Category.One.Defects`, `Category.Two.Defects` y `Moisture` (inflación de ceros, no normalizables), y se aplica Yeo-Johnson a **todas** las 11 variables restantes con lambda óptimo individual, atendiendo la retroalimentación del profesor sobre patrones en la matriz de dispersión y outliers.
+
+> **Notación del curso.** $X$: matriz $n \times p$; $\bar{x}$: media por columna; $P = I_n - \frac{1}{n}\mathbf{1}\mathbf{1}^\top$: centrado; $S = \frac{1}{n}\tilde{X}^\top\tilde{X}$: covarianza; $R = D^{-1/2}SD^{-1/2}$: correlación. `pca$rotation` = $A$ (vectores propios); `pca$x` = $Z = X^*A$ (scores).
+
+---
+
+# 1. Objetivo
+
+Comparar cuatro métodos de reducción de dimensionalidad — **PCA**, **Kernel PCA**, **t-SNE** y **UMAP** — sobre 1.070 lotes de café arábica, respondiendo:
+
+> ¿Qué información intenta preservar cada método y qué se puede interpretar a partir de la representación obtenida?
+
+---
+
+# 2. Datos
+
+```{r datos}
+library(dplyr)
+
+data <- read.csv("../data/arabica_data_cleaned.csv")
+
+vars_cuantitativas <- c("Aroma", "Flavor", "Aftertaste", "Acidity", "Body",
+                         "Balance", "Uniformity", "Clean.Cup", "Sweetness",
+                         "Cupper.Points", "Moisture", "Category.One.Defects",
+                         "Category.Two.Defects", "altitude_mean_meters")
+
+data_f <- data %>%
+  filter(is.na(altitude_mean_meters) | (altitude_mean_meters > 0 & altitude_mean_meters <= 3000)) %>%
+  filter(!is.na(altitude_mean_meters))
+
+datos <- data_f %>% select(all_of(vars_cuantitativas))
+```
+
+Tras el tratamiento: **`r nrow(datos)` observaciones**, **14 variables** de partida.
+
+---
+
+# 3. Exploración inicial
+
+> **Teoría.** Todo el análisis multivariado parte de una matriz $X_{n \times p}$ con $n = 1070$ filas (lotes) y $p$ columnas (variables).
+
+```{r exploracion}
+str(datos)
+dim(datos)
+summary(datos)
+colSums(is.na(datos))
+```
+
+```{r correlacion}
+cor(datos)
+```
+
+**Hallazgos principales:** correlaciones altas entre puntajes sensoriales (Flavor–Aftertaste ≈ 0.90); `altitude_mean_meters` con correlación baja-positiva (~0.15–0.20); `Moisture`/`Category.One/Two.Defects` débil o negativamente correlacionadas con el bloque sensorial.
+
+## 3.1. Detección de valores atípicos univariados: diagramas de cajas ajustados
+
+> **Teoría.** La regla de Tukey asume simetría. El diagrama de cajas ajustado (Hubert & Vandervieren, 2008) corrige esto usando el *medcouple* $MC$:
+> $$ \big[\, Q_1 - 1.5\,e^{-4MC}\,\text{RIC},\;\; Q_3 + 1.5\,e^{3MC}\,\text{RIC} \,\big] \quad (MC \geq 0) $$
+
+```{r medcouple}
+library(robustbase)
+mc_vars <- sapply(datos, mc)
+round(mc_vars, 3)
+```
+
+```{r pearson-skewness}
+asimetria_pearson <- sapply(datos, function(x) {
+  3 * (mean(x) - median(x)) / sd(x)
+})
+round(asimetria_pearson, 3)
+```
+
+```{r cajas-ajustadas}
+comparar_outliers <- function(x) {
+  clasico  <- sum(x < quantile(x, .25) - 1.5 * IQR(x) |
+                  x > quantile(x, .75) + 1.5 * IQR(x))
+  ab       <- adjboxStats(x)
+  ajustado <- sum(x < ab$fence[1] | x > ab$fence[2])
+  c(clasico = clasico, ajustado = ajustado)
+}
+tabla_outliers <- t(sapply(datos, comparar_outliers))
+tabla_outliers
+```
+
+```{r boxplots-todas-variables, fig.height=10, fig.width=12}
+par(mfrow = c(3, 5), mar = c(3, 2, 3, 1))
+nombres_cortos <- c("Aroma","Flavor","Aftertaste","Acidity","Body",
+                    "Balance","Uniformity","Clean.Cup","Sweetness",
+                    "Cupper.Points","Moisture","Cat1.Defects","Cat2.Defects","Altitude")
+for (i in seq_along(datos)) {
+  n_out <- sum({ ab <- adjboxStats(datos[[i]]); datos[[i]] < ab$fence[1] | datos[[i]] > ab$fence[2] })
+  adjbox(datos[[i]], main = paste0(nombres_cortos[i], "\n(", n_out, " atípicos)"),
+         col = "lightblue", cex.main = 0.9, ylab = "")
+}
+```
+
+## 3.2. ¿Amerita transformar variables antes de PCA?
+
+> **Teoría — transformación de Yeo-Johnson.** Generaliza Box-Cox para valores ≥ 0:
+> $$ y(\lambda) = \begin{cases} \dfrac{(x+1)^{\lambda}-1}{\lambda}, & \lambda \neq 0 \\ \ln(x+1), & \lambda = 0 \end{cases} $$
+> $\lambda = 1$ equivale a no transformar; se estima por máxima verosimilitud.
+
+```{r yeojohnson-funciones}
+yeojohnson_transform <- function(x, lambda) {
+  if (lambda != 0) ((x + 1)^lambda - 1) / lambda else log(x + 1)
+}
+yeojohnson_loglik <- function(lambda, x) {
+  y <- yeojohnson_transform(x, lambda)
+  -length(x) / 2 * log(var(y)) + (lambda - 1) * sum(log(x + 1))
+}
+yeojohnson_fit <- function(x) {
+  optimize(yeojohnson_loglik, interval = c(-5, 5), x = x, maximum = TRUE)$maximum
+}
+
+lambdas_todas <- sapply(datos, yeojohnson_fit)
+round(lambdas_todas, 3)
+```
+
+```{r yeojohnson-tres-problematicas}
+lambdas <- sapply(datos[c("Moisture", "Category.One.Defects", "Category.Two.Defects")],
+                  yeojohnson_fit)
+round(lambdas, 3)
+```
+
+`Moisture` y `Category.One.Defects` empujan $\lambda$ hasta el borde del intervalo ($\pm 5$): no convergen. Son **infladas en cero** y se excluyen del análisis principal. Solo `Category.Two.Defects` tiene un ajuste estable (λ ≈ −0.22).
+
+```{r yeojohnson-aplicar}
+pca_referencia <- prcomp(datos, center = TRUE, scale. = TRUE)
+
+datos_transformados <- datos
+datos_transformados$Category.Two.Defects <-
+  yeojohnson_transform(datos$Category.Two.Defects, lambdas["Category.Two.Defects"])
+```
+
+Las variables sensoriales obtienen lambdas cercanos a 1, pero **lambda ≈ 1 no significa lambda = 1 exactamente**: incluso una ligera asimetría residual puede generar patrones no elípticos en la matriz de dispersión que el profesor identificó. Por eso el análisis principal aplica YJ **a todas las 11 variables** con lambda óptimo individual.
+
+---
+
+# 4. Matriz de covarianza
+
+```{r covarianza}
+S <- cov(datos_transformados)
+signif(S, 3)
+```
+
+```{r var-total}
+varianza_total <- sum(diag(S))
+cat("Varianza total (traza de S):", varianza_total, "\n")
+cat("  -> dominada por altitude_mean_meters:", round(S["altitude_mean_meters","altitude_mean_meters"], 0), "\n")
+cat("  -> razón para estandarizar antes de PCA.\n")
+```
+
+---
+
+# 5. PCA — 11 variables + YJ en todas
+
+**Decisión: ESTANDARIZAR** (`prcomp(datos_t, center=TRUE, scale.=TRUE)`). Justificación:
+
+- `altitude_mean_meters` en metros vs. puntajes en 0–10: distintas unidades.
+- $\operatorname{Var}(\texttt{altitude}) \approx 174\,656$ vs. $0.13$–$0.63$ en puntajes: 8 órdenes de magnitud.
+- Sin estandarizar, PC1 = altitud, por artefacto de unidades, no por relevancia.
+
+```{r datos-oficiales}
+vars_11 <- setdiff(names(datos_transformados),
+                   c("Category.One.Defects", "Category.Two.Defects", "Moisture"))
+datos_t <- datos_transformados[, vars_11]
+```
+
+```{r yj-todas-variables}
+library(car)
+datos_t_sin_yj <- datos_t
+
+pt_11 <- powerTransform(datos_t, family = "yjPower")
+lambdas_11 <- coef(pt_11, round = FALSE)
+cat("Lambdas Yeo-Johnson por variable:\n")
+print(round(lambdas_11, 3))
+
+datos_t_yj <- datos_t
+for (v in names(datos_t)) {
+  datos_t_yj[[v]] <- yjPower(datos_t[[v]], lambdas_11[v])
+}
+datos_t <- datos_t_yj
+
+skew <- function(x) mean((x - mean(x))^3) / sd(x)^3
+cat("\nSkewness ANTES de YJ:\n")
+print(round(sapply(datos_t_sin_yj, skew), 3))
+cat("\nSkewness DESPUES de YJ:\n")
+print(round(sapply(datos_t, skew), 3))
+```
+
+```{r antes-despues-comparacion, fig.width=12, fig.height=5}
+pca_14 <- prcomp(datos_transformados, center = TRUE, scale. = TRUE)
+
+var14 <- round(summary(pca_14)$importance[2, 1:2] * 100, 1)
+var11 <- round(summary(prcomp(datos_t, center=TRUE, scale.=TRUE))$importance[2, 1:2] * 100, 1)
+
+par(mfrow = c(1, 2), mar = c(4, 4, 3, 1))
+biplot(pca_14, scale = 0, cex = 0.45, col = c("gray70", "firebrick"),
+       xlab = paste0("PC1 (", var14[1], " %)"),
+       ylab = paste0("PC2 (", var14[2], " %)"),
+       main = "ANTES: 14 variables (con Cat1/Cat2/Moisture)")
+biplot(prcomp(datos_t, center=TRUE, scale.=TRUE), scale = 0, cex = 0.45, col = c("gray70", "steelblue"),
+       xlab = paste0("PC1 (", var11[1], " %)"),
+       ylab = paste0("PC2 (", var11[2], " %)"),
+       main = "DESPUES: 11 variables + YJ en todas")
+```
+
+```{r estandarizacion-explicita}
+Z <- scale(datos_t)
+round(colMeans(Z), 12)
+round(apply(Z, 2, var), 3)
+```
+
+```{r pca}
+pca <- prcomp(datos_t, center = TRUE, scale. = TRUE)
+```
+
+---
+
+# 6. Selección del número de componentes
+
+> **Criterio de Kaiser:** retener componentes con $\lambda_i > 1$ (explican más que una variable sola). La suma de todos los $\lambda_i = p = 11$ (datos estandarizados).
+
+```{r resumen-pca}
+summary(pca)
+pca$sdev^2
+```
+
+```{r kaiser}
+cat("Componentes con lambda > 1 (Kaiser):", sum(pca$sdev^2 > 1), "\n")
+```
+
+```{r screeplot, fig.width=12, fig.height=5}
+par(mfrow = c(1, 2))
+screeplot(pca_14, type = "lines",
+          main = paste0("ANTES: 14 variables\n(PC1 = ",
+                        round(pca_14$sdev[1]^2 / sum(pca_14$sdev^2) * 100, 1), " %)"))
+abline(h = 1, lty = 2, col = "red")
+
+screeplot(pca, type = "lines",
+          main = paste0("DESPUES: 11 variables\n(PC1 = ",
+                        round(pca$sdev[1]^2 / sum(pca$sdev^2) * 100, 1), " %)"))
+abline(h = 1, lty = 2, col = "red")
+```
+
+**Decisión: k = 4 componentes.** Cuatro criterios convergen:
+
+- **Kaiser:** exactamente `r sum(pca$sdev^2 > 1)` componentes con $\lambda_i > 1$.
+- **Varianza acumulada:** k = 4 acumula **`r round(sum(pca$sdev[1:4]^2)/sum(pca$sdev^2)*100,1)` %**.
+- **Gráfico de codo:** caída pronunciada hasta PC4, meseta a partir de PC5.
+- **Interpretabilidad:** las 4 componentes tienen lectura sustantiva clara (sección 8).
+
+---
+
+# 7. Verificación: matriz de dispersión de scores
+
+> **Teoría.** $\operatorname{Cov}(Z_i, Z_j) = 0$ para $i \neq j$: en la matriz de dispersión **no debe verse correlación lineal**. Lo que se busca es: agrupamientos, patrones y atípicos.
+
+```{r coordenadas}
+head(pca$x)
+```
+
+```{r pairs-pca-antes, fig.height=8}
+k <- 4
+pairs(pca_14$x[, 1:k],
+      main = "ANTES: 14 variables (con Cat1/Cat2/Moisture)",
+      pch = 19,
+      col = adjustcolor("salmon", alpha.f = 0.35),
+      labels = paste0("PC", 1:k, "\n",
+                      round(pca_14$sdev[1:k]^2/sum(pca_14$sdev^2)*100,1), "%"))
+```
+
+```{r pairs-pca, fig.height=8}
+k <- 4
+pairs(pca$x[, 1:k],
+      main = "DESPUES: 11 variables + YJ en todas",
+      pch = 19,
+      col = adjustcolor("steelblue", alpha.f = 0.4),
+      labels = paste0("PC", 1:k, "\n",
+                      round(pca$sdev[1:k]^2/sum(pca$sdev^2)*100,1), "%"))
+```
+
+**Comparación:** ANTES, PC3 muestra puntos extremos muy alejados (lotes con 23–31 defectos primarios). DESPUÉS, la nube es compacta y sin tendencias lineales en ningún par. **Verificación superada.**
+
+```{r outliers}
+idx_pc1 <- order(pca$x[, 1], decreasing = TRUE)[1:2]
+idx_pc3 <- order(pca$x[, 3], decreasing = TRUE)[1:2]
+idx_pc4 <- order(pca$x[, 4])[1:2]
+datos[unique(c(idx_pc1, idx_pc3, idx_pc4)), ]
+```
+
+```{r pairs-pca-color, fig.height=8, message=FALSE}
+library(GGally)
+
+pca_scores <- as.data.frame(pca$x[, 1:k])
+pca_scores$Processing.Method <- data_f$Processing.Method
+
+ggpairs(pca_scores,
+        columns = 1:k,
+        aes(color = Processing.Method, alpha = 0.5)) +
+  ggtitle("Matriz de dispersión de PC (color = método de proceso)")
+```
+
+---
+
+# 8. Distancia de Mahalanobis
+
+> **Teoría.**
+> $$ d_M^2(x_i) = (x_i - \bar{x})^\top S^{-1} (x_i - \bar{x}) \;\sim\; \chi^2_p $$
+> Equivalente via scores PCA: $d_M^2(x_i) = \sum_k (z_{ik}/\sqrt{\lambda_k})^2$
+
+```{r mahalanobis}
+# ANTES: 14 variables
+dm2_14 <- mahalanobis(datos_transformados,
+                      colMeans(datos_transformados),
+                      cov(datos_transformados))
+umbral_14 <- qchisq(0.975, df = ncol(datos_transformados))
+
+# DESPUES: 11 variables con YJ
+# YJ genera alta colinealidad post-transformación; cov(datos_t) es singular (rcond ≈ 8e-210).
+# Se usa la equivalencia: d²_M(xᵢ) = Σₖ (zᵢₖ / sdevₖ)² — numéricamente estable via scores PCA.
+dm2 <- rowSums((pca$x / pca$sdev)^2)
+umbral <- qchisq(0.975, df = ncol(datos_t))
+
+cat("ANTES (14 vars) — umbral chi2_14 =", round(umbral_14, 1),
+    "| atípicos:", sum(dm2_14 > umbral_14), "\n")
+cat("DESPUES (11 vars) — umbral chi2_11 =", round(umbral, 1),
+    "| atípicos:", sum(dm2 > umbral), "\n")
+
+cat("\nTop 6 distancias ANTES:\n"); print(sort(dm2_14, decreasing=TRUE)[1:6])
+cat("\nTop 6 distancias DESPUES:\n"); print(sort(dm2, decreasing=TRUE)[1:6])
+```
+
+Con 11 variables se marcan **`r sum(dm2 > umbral)`** lotes como atípicos (vs. `r sum(dm2_14 > umbral_14)` con 14). La reducción confirma que los casos más problemáticos eran impulsados por Cat1/Cat2/Moisture.
+
+---
+
+# 9. Interpretación de las componentes: cargas
+
+> **Teoría.** Carga $a_{ik}$ = peso de la variable $X_i$ en la componente $k$. Mismo signo → variables se mueven juntas; signo opuesto → se oponen.
+
+```{r cargas}
+cat("=== ANTES: Cargas con 14 variables ===\n")
+round(pca_14$rotation[, 1:4], 3)
+```
+
+```{r cargas-despues}
+cat("=== DESPUES: Cargas con 11 variables + YJ en todas ===\n")
+round(pca$rotation[, 1:4], 3)
+```
+
+**Diferencia clave:** con 14 variables, PC3 era el "eje de defectos" (Cat1 ≈ 0.54, Cat2 ≈ 0.65). Con 11 variables esas dimensiones desaparecen y los ejes secundarios reflejan exclusivamente contrastes dentro de los atributos sensoriales y la altitud.
+
+### PC1 (`r round(pca$sdev[1]^2/sum(pca$sdev^2)*100,1)` %) — "calidad sensorial general"
+
+Flavor, Aftertaste, Balance, Acidity, Cupper.Points, Body, Aroma — todos con cargas de magnitud similar (~0.33–0.36), mismo signo. PC1 es un **ranking de calidad sensorial general**: los 1.070 lotes ordenados de peor a mejor café en una sola cifra.
+
+### PC2 (`r round(pca$sdev[2]^2/sum(pca$sdev^2)*100,1)` %) — "consistencia y dulzura vs. intensidad sensorial"
+
+Sweetness, Clean.Cup y Uniformity (cargas positivas altas) vs. Flavor, Aroma, Acidity (cargas negativas moderadas). Distingue lotes que destacan en consistencia/dulzura de los que destacan en intensidad.
+
+### PC3 (`r round(pca$sdev[3]^2/sum(pca$sdev^2)*100,1)` %) — "altitud de producción"
+
+`altitude_mean_meters` con carga alta; los diez puntajes sensoriales casi nulos (< 0.15). Eje agroclimático casi ortogonal al bloque sensorial. **Efecto más claro de excluir las variables problemáticas:** la altitud emerge como eje propio y puro.
+
+### PC4 (`r round(pca$sdev[4]^2/sum(pca$sdev^2)*100,1)` %) — "contraste interno de calidad sensorial"
+
+Contraste entre Acidity/Flavor (un sentido) y Sweetness/Uniformity/Clean.Cup (sentido contrario). Residuo de variación sensorial fina, menos interpretable pero real.
+
+---
+
+# 10. Biplot
+
+> **Teoría.** Superpone scores (lotes, puntos) y cargas (variables, flechas). Coseno del ángulo entre flechas ≈ correlación entre variables.
+
+```{r biplot-antes, fig.height=5, fig.width=12}
+par(mfrow = c(1, 2))
+biplot(pca_14, choices = c(1,2), scale = 0, cex = 0.45,
+       col = c("gray70", "firebrick"),
+       xlab = paste0("PC1 (", round(pca_14$sdev[1]^2/sum(pca_14$sdev^2)*100,1), " %)"),
+       ylab = paste0("PC2 (", round(pca_14$sdev[2]^2/sum(pca_14$sdev^2)*100,1), " %)"),
+       main = "ANTES: 14 variables (con Cat1/Cat2/Moisture)")
+biplot(pca, choices = c(1,2), scale = 0, cex = 0.45,
+       col = c("gray70", "steelblue"),
+       xlab = paste0("PC1 (", round(pca$sdev[1]^2/sum(pca$sdev^2)*100,1), " %)"),
+       ylab = paste0("PC2 (", round(pca$sdev[2]^2/sum(pca$sdev^2)*100,1), " %)"),
+       main = "DESPUES: 11 variables + YJ en todas")
+```
+
+```{r biplot, fig.height=8}
+biplot(pca, choices = c(1,2), cex = 0.6,
+       main = "Biplot PCA — Componentes 1 y 2 (11 variables)")
+```
+
+```{r biplot-pc3, fig.height=8}
+biplot(pca, choices = c(1,3), cex = 0.6,
+       main = "Biplot PCA — Componentes 1 y 3 (altitud)")
+```
+
+---
+
+# 11. Kernel PCA
+
+> **Teoría.** Kernel PCA diagonaliza la matriz de Gram $K_{ij} = k(x_i, x_j)$. Con el kernel RBF:
+> $k(x,y) = \exp(-\sigma \lVert x-y\rVert^2)$
+> Captura similitudes no lineales sin construir explícitamente el espacio transformado (truco del kernel).
+
+```{r kpca}
+library(kernlab)
+
+datos_esc <- as.data.frame(scale(datos_t))
+
+kp <- kpca(~.,
+           data    = datos_esc,
+           kernel  = "rbfdot",
+           kpar    = list(sigma = 0.05),
+           features = 5)
+
+eig <- kp@eig
+var_exp <- eig / sum(eig)
+round(var_exp, 3)
+round(cumsum(var_exp), 3)
+```
+
+```{r kpca-sigma-justificacion, fig.height=4.5}
+par(mfrow = c(1, 3))
+for (s in c(0.05, 0.1, 1)) {
+  kp_s <- kpca(~., data = datos_esc, kernel = "rbfdot", kpar = list(sigma = s), features = 5)
+  plot(rotated(kp_s)[, 1:2], pch = 19, cex = 0.5, col = adjustcolor("darkorange", 0.4),
+       xlab = "KPC1", ylab = "KPC2", main = paste("sigma =", s))
+}
+```
+
+`sigma = 0.05` produce el anillo más nítido; `sigma = 1` lo rompe en forma radial. Se elige `sigma = 0.05` porque muestra con mayor claridad la estructura no lineal.
+
+## 11.1. Comparación kernel polinomial
+
+```{r kpca-polinomial, fig.height=4.5}
+par(mfrow = c(1, 3))
+plot(rotated(kp)[, 1:2], pch = 19, cex = 0.5,
+     col = adjustcolor("darkorange", 0.4),
+     xlab = "KPC1", ylab = "KPC2", main = "RBF (sigma = 0.05)")
+
+kp_poly2 <- kpca(~., data = datos_esc,
+                 kernel = "polydot",
+                 kpar = list(degree = 2, scale = 1, offset = 1),
+                 features = 5)
+plot(rotated(kp_poly2)[, 1:2], pch = 19, cex = 0.5,
+     col = adjustcolor("steelblue", 0.4),
+     xlab = "KPC1", ylab = "KPC2", main = "Polinomial grado 2")
+
+kp_poly3 <- kpca(~., data = datos_esc,
+                 kernel = "polydot",
+                 kpar = list(degree = 3, scale = 1, offset = 1),
+                 features = 5)
+plot(rotated(kp_poly3)[, 1:2], pch = 19, cex = 0.5,
+     col = adjustcolor("forestgreen", 0.4),
+     xlab = "KPC1", ylab = "KPC2", main = "Polinomial grado 3")
+```
+
+El polinomial no reproduce el anillo del RBF: la estructura circular no es un artefacto del kernel elegido.
+
+---
+
+# 12. Matriz de dispersión de Kernel PCA
+
+```{r pairs-kpca, fig.height=8}
+scores_kpca <- rotated(kp)
+pairs(scores_kpca[, 1:5],
+      main = "Matriz de dispersión — Kernel PCA (sigma = 0.05)",
+      pch = 19, col = adjustcolor("darkorange", alpha.f = 0.4))
+```
+
+```{r kpca-sigma-alto, fig.height=8}
+kp_sigma_alto <- kpca(~., data = datos_esc,
+                      kernel = "rbfdot",
+                      kpar = list(sigma = 1),
+                      features = 5)
+pairs(rotated(kp_sigma_alto)[, 1:5],
+      main = "Kernel PCA con sigma = 1",
+      pch = 19, col = adjustcolor("firebrick", alpha.f = 0.4))
+```
+
+---
+
+# 13. t-SNE
+
+> **Teoría.** Minimiza la divergencia KL entre probabilidades de vecindad en el espacio original ($p_{ij}$, gaussiana) y en 2D ($q_{ij}$, distribución $t$-Student de colas pesadas). Preserva vecindad local; distorsiona deliberadamente distancias globales.
+
+```{r tsne}
+library(Rtsne)
+
+X <- scale(datos_t)
+
+set.seed(123)
+tsne <- Rtsne(X,
+              dims = 2,
+              perplexity = 30,
+              theta = 0.5)
+
+plot(tsne$Y,
+     pch = 19, col = adjustcolor("seagreen", alpha.f = 0.5),
+     xlab = "t-SNE 1", ylab = "t-SNE 2",
+     main = "t-SNE — Café (perplexity = 30)")
+```
+
+```{r tsne-perp5}
+set.seed(123)
+tsne_perp5 <- Rtsne(X, dims = 2, perplexity = 5, theta = 0.5)
+plot(tsne_perp5$Y,
+     pch = 19, col = adjustcolor("seagreen", alpha.f = 0.5),
+     xlab = "t-SNE 1", ylab = "t-SNE 2",
+     main = "t-SNE — Café (perplexity = 5)")
+```
+
+---
+
+# 14. UMAP
+
+> **Teoría.** Construye un grafo de $k$ vecinos con pesos difusos y minimiza la entropía cruzada entre ese grafo y su equivalente en 2D. Preserva vecindad local + algo de estructura global. Más rápido y estable que t-SNE.
+
+```{r umap}
+library(uwot)
+
+X <- scale(datos_t)
+
+set.seed(123)
+um <- umap(X)
+head(um)
+
+plot(um[, 1], um[, 2],
+     pch = 19, col = adjustcolor("mediumpurple", alpha.f = 0.5),
+     xlab = "UMAP1", ylab = "UMAP2",
+     main = "UMAP — Café (parámetros por defecto)")
+```
+
+```{r umap-cluster-investigacion}
+cluster_bajo <- um[, 2] < -5
+sum(cluster_bajo)
+
+comp <- sapply(datos, function(v) c(cluster = mean(v[cluster_bajo]), resto = mean(v[!cluster_bajo])))
+round(t(comp), 3)
+```
+
+**Hallazgo:** UMAP separa con claridad los 174 lotes con `Moisture = 0` — valor físicamente implausible (faltantes codificados como 0, no café seco al 0%). UMAP funciona aquí como **herramienta de auditoría de calidad de datos**.
+
+```{r moisture-cero-vecindad}
+library(FNN)
+es_cero <- datos$Moisture == 0
+fraccion_vecinos <- function(coords, grupo) {
+  vecinos <- knnx.index(coords, coords, k = 11)[, -1]
+  mean(sapply(which(grupo), function(i) mean(grupo[vecinos[i, ]])))
+}
+round(c(azar = mean(es_cero),
+        PCA = fraccion_vecinos(pca$x[, 1:2], es_cero),
+        KernelPCA = fraccion_vecinos(rotated(kp)[, 1:2], es_cero),
+        tSNE = fraccion_vecinos(tsne$Y, es_cero),
+        UMAP = fraccion_vecinos(um, es_cero)), 2)
+```
+
+```{r umap-nn5}
+set.seed(123)
+um_vecinos <- umap(X, n_neighbors = 5)
+plot(um_vecinos[, 1], um_vecinos[, 2],
+     pch = 19, col = adjustcolor("mediumpurple", alpha.f = 0.5),
+     xlab = "UMAP1", ylab = "UMAP2",
+     main = "UMAP — Café (n_neighbors = 5)")
+```
+
+---
+
+# 15. Comparación de los cuatro métodos
+
+| Aspecto | PCA | Kernel PCA | t-SNE | UMAP |
+|---|---|---|---|---|
+| Lineal / no lineal | Lineal | No lineal (kernel RBF) | No lineal | No lineal |
+| Estructura preservada | Varianza global (covarianza) | Similitud no lineal vía kernel | Vecindad local | Vecindad local + algo global |
+| Interpretación de ejes | Directa: cargas (`pca$rotation`) | Ninguna (relacional) | Ninguna | Ninguna |
+| Patrones identificados | Un eje de calidad sensorial (PC1) + consistencia/dulzura (PC2) + altitud (PC3) + contraste sensorial (PC4) | Anillo con sigma bajo (gradiente curvado); radial con sigma alto | Nube continua; región de Moisture = 0 | Grupo claro de Moisture = 0; robusto al parámetro |
+| Grupos | Continuo, sin grupos discretos | Sin grupos claros | Sin grupos de calidad | Un "grupo" = faltantes codificados como 0 |
+| Atípicos | Claros (lote con todo en 0; lotes con 23–31 defectos primarios) | Periféricos, redistribuidos | No detecta por lejanía | Detecta subpoblación de datos faltantes |
+| Utilidad principal | Resumir varianza e interpretar ejes | Explorar estructura no lineal | Visualización de vecindades | Visualización + auditoría de datos |
+| Nuevas observaciones | Directa (multiplicar por `rotation`) | Posible, costosa | No definida | Sí, `umap_transform()` |
+
+---
+
+# 16. Visualización frente a modelamiento
+
+PCA y UMAP (via `umap_transform`) son aptos como preproceso de modelamiento. t-SNE no ofrece función de proyección para observaciones nuevas. Los tres no lineales distorsionan distancias de formas que cambian con semilla y parámetros — no deben usarse como *features* sin cuidado extra.
+
+**Relación con MDS:** PCA es un caso particular de MDS (el que preserva distancias euclídeas globales). t-SNE y UMAP resuelven el mismo problema — coordenadas de baja dimensión — pero preservando vecindad local en vez de distancia global.
+
+---
+
+# 17. Preguntas de sustentación
+
+**P1. ¿Por qué estandarizaron?**
+Unidades distintas (metros vs. 0–10). Sin estandarizar, PC1 = altitud por artefacto de unidades. Con `scale.=TRUE`, PCA trabaja sobre $R$ (correlaciones): cada variable parte con varianza 1.
+
+**P2. ¿Por qué k = 4?**
+Kaiser ($\lambda_i > 1$): exactamente 4 componentes. Varianza acumulada: `r round(sum(pca$sdev[1:4]^2)/sum(pca$sdev^2)*100,1)` % con k = 4. Gráfico de codo: meseta a partir de PC5. Las 4 componentes tienen interpretación sustantiva clara.
+
+**P3. ¿Qué es PC1?**
+`r round(pca$sdev[1]^2/sum(pca$sdev^2)*100,1)` % de la varianza. Cargas similares para todos los puntajes de intensidad. Es un **ranking de calidad sensorial general**: los lotes con score PC1 muy negativo tienen todos los puntajes altos simultáneamente.
+
+**P4. ¿PCA vs. Kernel PCA?**
+PCA: combinaciones lineales, ejes interpretables por cargas. Kernel PCA: proyecta a espacio no lineal (vía truco del kernel) para capturar estructura curvilínea. En nuestros datos la estructura es fundamentalmente lineal; Kernel PCA solo confirma que no hay no linealidades relevantes.
+
+**P5. ¿t-SNE vs. UMAP?**
+Ambos preservan vecindad local. t-SNE minimiza KL sobre probabilidades gaussianas/t-Student; UMAP minimiza entropía cruzada sobre un grafo difuso y preserva algo más de estructura global. UMAP es más rápido, estable y permite proyectar observaciones nuevas.
+
+**P6. ¿Por qué UMAP separa el grupo de Moisture = 0?**
+174 lotes con `Moisture = 0` (faltantes codificados) forman un vecindario propio — en el grafo de UMAP sus pesos de conexión con el resto son bajos. PCA los mezcla más (63 % de vecinos con Moisture = 0 vs. 88 % en UMAP) porque comprime varianza global y ese subgrupo no domina ningún eje.
+
+**P7. ¿Cuál fue el hallazgo más importante?**
+Tres hallazgos:
+1. **Calidad sensorial unidimensional:** PC1 solo resume ~50 % de la varianza — un único gradiente de calidad.
+2. **Calidad sensorial y altitud ortogonales:** PC3 es casi puro altitud, desconectado del bloque sensorial.
+3. **UMAP como auditoría de datos:** el "grupo" separado en UMAP reveló 174 faltantes codificados como 0 en `Moisture`.
+
+---
+
+# 18.1. Evidencia: comparación 14 vs. 11 variables
+
+```{r sensibilidad-14vars-setup}
+pca_14_ref  <- prcomp(datos_transformados, center = TRUE, scale. = TRUE)
+var_prop_14 <- pca_14_ref$sdev^2 / sum(pca_14_ref$sdev^2)
+var_acum_14 <- cumsum(var_prop_14)
+var_prop_11 <- pca$sdev^2 / sum(pca$sdev^2)
+
+data.frame(
+  PC       = paste0("PC", seq_along(var_prop_14)),
+  Var_prop_14 = round(var_prop_14, 3),
+  Var_acum_14 = round(var_acum_14, 3)
+)
+```
+
+```{r sensibilidad-scree-comparacion, fig.width=12, fig.height=4}
+par(mfrow = c(1, 2))
+barplot(var_prop_14 * 100, names.arg = paste0("PC", seq_along(var_prop_14)),
+        col = "salmon", ylab = "Varianza explicada (%)",
+        main = "ANTES — 14 variables", las = 2, cex.names = 0.8)
+abline(h = 100/14, lty = 2, col = "red")
+
+barplot(var_prop_11 * 100, names.arg = paste0("PC", seq_along(var_prop_11)),
+        col = "steelblue", ylab = "Varianza explicada (%)",
+        main = "DESPUES — 11 variables + YJ en todas", las = 2, cex.names = 0.8)
+abline(h = 100/11, lty = 2, col = "red")
+```
+
+---
+
+# 19. Pregunta central del taller
+
+> ¿Qué información de la estructura multivariada conserva o enfatiza cada método?
+
+- **PCA** — estructura lineal de mayor varianza; ejes interpretables. El más útil para **entender** qué variables distinguen a los lotes.
+- **Kernel PCA** — confirma que el gradiente de calidad es fundamentalmente lineal (el anillo del RBF es una curva del mismo gradiente, no una estructura nueva).
+- **t-SNE** — confirma que no hay clústeres de calidad; la región de Moisture = 0 aparece como zona aparte.
+- **UMAP** — el más útil como **auditoría de datos**: aisló con claridad los 174 lotes con faltantes codificados como 0.
+
+**Conclusión:** PCA para interpretar; UMAP para auditar. Los cuatro métodos son una misma familia (representar datos en pocas dimensiones) que solo difieren en qué noción de similitud preservan.
