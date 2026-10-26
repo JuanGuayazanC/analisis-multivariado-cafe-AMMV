@@ -1,0 +1,263 @@
+---
+title: "Clustering — Café Arábica"
+subtitle: "K-means y HDBSCAN sobre scores PCA · Coffee Quality Institute"
+author: "Juan Sebastián Guayazán · Esteban Valente · Diego Nocua"
+date: "`r format(Sys.Date(), '%d de %B de %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    code_folding: show
+    theme: flatly
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE,
+                      fig.align = "center", fig.width = 8, fig.height = 6)
+```
+
+> **Propósito:** aplicar métodos de clustering sobre los scores PCA de los 1.070 lotes
+> de café arábica. Se comparan dos enfoques: **K-means** (partición esférica, k fijo)
+> y **HDBSCAN** (densidad jerárquica, k automático, detecta ruido).
+
+---
+
+# 1. Preparación de datos
+
+El clustering se aplica sobre los **scores de las primeras componentes principales**
+(no sobre las variables originales), porque:
+
+- Ya están estandarizados y transformados (Yeo-Johnson).
+- Reducen el ruido: los últimos PCs capturan principalmente varianza residual.
+- Facilitan la visualización: los clusters se pueden graficar directamente en el biplot.
+
+```{r datos}
+library(dplyr)
+library(factoextra)
+library(dbscan)      # incluye hdbscan()
+library(ggplot2)
+library(car)
+
+# ── Pipeline idéntico al informe_despues.Rmd ──────────────────────────────────
+data_raw <- read.csv("../data/arabica_data_cleaned.csv")
+
+vars_originales <- c("Aroma", "Flavor", "Aftertaste", "Acidity", "Body",
+                     "Balance", "Uniformity", "Clean.Cup", "Sweetness",
+                     "Cupper.Points", "Moisture", "Category.One.Defects",
+                     "Category.Two.Defects", "altitude_mean_meters")
+
+datos_full <- data_raw %>%
+  filter(!is.na(altitude_mean_meters),
+         altitude_mean_meters > 0,
+         altitude_mean_meters <= 3000) %>%
+  select(all_of(vars_originales)) %>%
+  filter(complete.cases(.)) %>%
+  rename(
+    Sabor           = Flavor,
+    Retrogusto      = Aftertaste,
+    Acidez          = Acidity,
+    Cuerpo          = Body,
+    Uniformidad     = Uniformity,
+    Taza.Limpia     = Clean.Cup,
+    Dulzura         = Sweetness,
+    Puntaje.Catador = Cupper.Points,
+    Humedad         = Moisture,
+    Defectos.Cat1   = Category.One.Defects,
+    Defectos.Cat2   = Category.Two.Defects,
+    Altitud         = altitude_mean_meters
+  )
+
+yj_transform <- function(x, lambda) {
+  if (lambda != 0) ((x + 1)^lambda - 1) / lambda else log(x + 1)
+}
+datos_full$Defectos.Cat2 <- yj_transform(datos_full$Defectos.Cat2, -0.217)
+
+vars_11 <- setdiff(names(datos_full), c("Defectos.Cat1", "Defectos.Cat2", "Humedad"))
+datos_t <- datos_full[, vars_11]
+
+pt_11      <- powerTransform(datos_t, family = "yjPower")
+lambdas_11 <- pmax(pmin(coef(pt_11, round = FALSE), 3), -3)
+for (v in names(datos_t)) datos_t[[v]] <- yjPower(datos_t[[v]], lambdas_11[v])
+
+pca <- prcomp(datos_t, center = TRUE, scale. = TRUE)
+
+# Matriz de scores — se usará como X para clustering
+X <- pca$x
+cat("Dimensiones de X (scores PCA):", nrow(X), "lotes ×", ncol(X), "componentes\n")
+```
+
+---
+
+# 2. K-means
+
+## 2.1. Estandarización
+
+K-means usa distancias euclidianas, por lo que los scores ya están en escala comparable.
+Si se trabajara sobre las variables originales sería necesario `scale()`.
+
+```{r estandarizar}
+# Los scores PCA ya tienen media ≈ 0, pero se re-escalan por seguridad
+X_stand <- scale(X)
+```
+
+## 2.2. Elección de k — método WSS (codo)
+
+```{r elegir-k, fig.width=8, fig.height=5}
+fviz_nbclust(X_stand, kmeans,
+             method  = "wss",
+             k.max   = 8,
+             nstart  = 25) +
+  labs(title    = "Método del codo — suma de cuadrados intra-cluster",
+       subtitle = "Buscar el punto donde la curva pierde pendiente") +
+  theme_minimal()
+```
+
+```{r elegir-k-silhouette, fig.width=8, fig.height=5}
+fviz_nbclust(X_stand, kmeans,
+             method  = "silhouette",
+             k.max   = 8,
+             nstart  = 25) +
+  labs(title    = "Método Silhouette — cohesión vs separación",
+       subtitle = "Mayor silueta promedio = mejor k") +
+  theme_minimal()
+```
+
+## 2.3. Ajuste del modelo final
+
+```{r kmeans-modelo}
+k_optimo <- 3   # <-- ajustar según los gráficos anteriores
+
+set.seed(42)
+km <- kmeans(X_stand, centers = k_optimo, nstart = 25)
+
+cat("Tamaño de cada cluster:\n")
+print(km$size)
+
+cat("\nRatio BSS/TSS (varianza explicada por clusters):",
+    round(km$betweenss / km$totss * 100, 1), "%\n")
+```
+
+## 2.4. Visualización en el plano CP1–CP2
+
+```{r kmeans-viz, fig.width=9, fig.height=7}
+fviz_cluster(km, data = X_stand,
+             geom        = "point",
+             ellipse.type = "convex",
+             palette     = "jco",
+             alpha       = 0.4,
+             ggtheme     = theme_minimal()) +
+  labs(title    = paste0("K-means — k = ", k_optimo, " clusters"),
+       subtitle = "Proyección sobre CP1 y CP2",
+       caption  = "1.070 lotes de café arábica · CQI")
+```
+
+## 2.5. Perfil de cada cluster
+
+```{r kmeans-perfil}
+datos_t$cluster_km <- factor(km$cluster)
+
+perfil_km <- datos_t %>%
+  group_by(cluster_km) %>%
+  summarise(across(where(is.numeric), mean), .groups = "drop")
+
+perfil_km
+```
+
+---
+
+# 3. HDBSCAN
+
+HDBSCAN (*Hierarchical Density-Based Spatial Clustering of Applications with Noise*)
+identifica clusters de densidad variable sin necesidad de especificar k.
+Los puntos en zonas de baja densidad se clasifican como **ruido** (cluster 0).
+
+```{r hdbscan-modelo}
+# minPts equivale a min_cluster_size en Python's hdbscan
+hdb <- hdbscan(X_stand, minPts = 20)
+
+cat("Clusters encontrados (sin contar ruido):",
+    length(unique(hdb$cluster[hdb$cluster > 0])), "\n")
+
+cat("\nDistribución de puntos por cluster (0 = ruido):\n")
+print(table(hdb$cluster))
+```
+
+```{r hdbscan-viz, fig.width=9, fig.height=7}
+scores_plot <- as.data.frame(X_stand[, 1:2])
+colnames(scores_plot) <- c("CP1", "CP2")
+scores_plot$cluster_hdb <- factor(hdb$cluster)
+scores_plot$ruido       <- hdb$cluster == 0
+
+ggplot(scores_plot, aes(x = CP1, y = CP2, color = cluster_hdb)) +
+  geom_point(aes(alpha = ifelse(ruido, 0.2, 0.5), shape = ruido), size = 1.5) +
+  scale_alpha_identity() +
+  scale_shape_manual(values = c(`FALSE` = 16, `TRUE` = 4),
+                     labels  = c("Cluster", "Ruido"),
+                     name    = "") +
+  scale_color_brewer(palette = "Set1", name = "Cluster") +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "#ccc") +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "#ccc") +
+  labs(title    = "HDBSCAN — clustering de densidad jerárquica",
+       subtitle = paste0("minPts = 20  ·  ",
+                         sum(hdb$cluster == 0), " puntos clasificados como ruido"),
+       caption  = "1.070 lotes de café arábica · CQI",
+       x = "CP1 (Calidad sensorial general)",
+       y = "CP2 (Consistencia vs. intensidad)") +
+  theme_minimal(base_size = 13) +
+  theme(panel.grid.minor = element_blank())
+```
+
+## 3.1. Perfil de cada cluster HDBSCAN
+
+```{r hdbscan-perfil}
+datos_t$cluster_hdb <- factor(hdb$cluster)
+
+perfil_hdb <- datos_t %>%
+  filter(cluster_hdb != 0) %>%   # excluir ruido
+  group_by(cluster_hdb) %>%
+  summarise(across(where(is.numeric), mean), .groups = "drop")
+
+perfil_hdb
+```
+
+---
+
+# 4. Comparación K-means vs HDBSCAN
+
+```{r comparacion, fig.width=12, fig.height=5}
+scores_comp <- as.data.frame(X_stand[, 1:2])
+colnames(scores_comp) <- c("CP1", "CP2")
+scores_comp$kmeans  <- factor(km$cluster)
+scores_comp$hdbscan <- factor(hdb$cluster)
+
+p1 <- ggplot(scores_comp, aes(CP1, CP2, color = kmeans)) +
+  geom_point(alpha = 0.35, size = 1.2) +
+  scale_color_brewer(palette = "Set1") +
+  labs(title = paste0("K-means (k=", k_optimo, ")"), color = "Cluster") +
+  theme_minimal() + theme(panel.grid.minor = element_blank())
+
+p2 <- ggplot(scores_comp, aes(CP1, CP2, color = hdbscan)) +
+  geom_point(alpha = 0.35, size = 1.2) +
+  scale_color_brewer(palette = "Set1") +
+  labs(title = "HDBSCAN (minPts=20)",
+       subtitle = paste0(sum(hdb$cluster == 0), " puntos = ruido"),
+       color = "Cluster") +
+  theme_minimal() + theme(panel.grid.minor = element_blank())
+
+gridExtra::grid.arrange(p1, p2, ncol = 2)
+```
+
+| Criterio              | K-means                        | HDBSCAN                         |
+|-----------------------|--------------------------------|---------------------------------|
+| Nº de clusters        | Fijo (elegido por WSS)         | Automático                      |
+| Forma de clusters     | Esférica (convexos)            | Arbitraria                      |
+| Manejo de ruido       | No — todo punto pertenece a un cluster | Sí — puntos de baja densidad = ruido |
+| Sensible a outliers   | Sí                             | No                              |
+| Parámetro principal   | k                              | minPts                          |
+
+---
+
+> **Conclusión:** completar con la interpretación de los clusters en términos de
+> calidad de café una vez se ejecuten los gráficos y se observe la estructura real.
