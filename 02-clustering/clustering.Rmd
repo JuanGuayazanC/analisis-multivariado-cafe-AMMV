@@ -1,6 +1,6 @@
 ---
 title: "Clustering — Café Arábica"
-subtitle: "K-means y HDBSCAN sobre scores PCA · Coffee Quality Institute"
+subtitle: "Variables dummies, K-means, Dendrograma y HDBSCAN · Coffee Quality Institute"
 author: "Juan Sebastián Guayazán · Esteban Valente · Diego Nocua"
 date: "`r format(Sys.Date(), '%d de %B de %Y')`"
 output:
@@ -18,9 +18,16 @@ knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE,
                       fig.align = "center", fig.width = 8, fig.height = 6)
 ```
 
-> **Propósito:** aplicar métodos de clustering sobre los scores PCA de los 1.070 lotes
-> de café arábica. Se comparan dos enfoques: **K-means** (partición esférica, k fijo)
-> y **HDBSCAN** (densidad jerárquica, k automático, detecta ruido).
+> **Propósito:** aplicar métodos de clustering a los 1.070 lotes de café arábica.
+> Se incluyen variables numéricas (scores PCA) y variables categóricas convertidas a
+> **dummies**. Se comparan tres enfoques: **K-means**, **Clustering jerárquico** (dendrograma) y **HDBSCAN**.
+
+---
+
+> **Nota sobre análisis de correspondencia:** el análisis de correspondencia es una
+> técnica *diferente* — trabaja exclusivamente con tablas de frecuencias de variables
+> dummy y **no** es equivalente a PCA ni a K-means. Se desarrollará en un documento
+> aparte (`03-correspondencia/`).
 
 ---
 
@@ -90,19 +97,142 @@ cat("Dimensiones de X (scores PCA):", nrow(X), "lotes ×", ncol(X), "componentes
 
 ---
 
-# 2. K-means
+# 2. Variables categóricas → Dummies
 
-## 2.1. Estandarización
+K-means trabaja con distancias euclidianas, por lo que **no puede aplicarse
+directamente a variables de texto o factores**. La solución es convertirlas a
+variables binarias (dummies): una columna por categoría, con 1 si el lote pertenece
+a esa categoría y 0 si no.
 
-K-means usa distancias euclidianas, por lo que los scores ya están en escala comparable.
-Si se trabajara sobre las variables originales sería necesario `scale()`.
+El dataset tiene tres variables categóricas útiles con pocas categorías:
+`Processing.Method`, `Color` y `Country.of.Origin` (simplificada a los 5 países
+con más lotes para no generar decenas de columnas).
 
-```{r estandarizar}
-# Los scores PCA ya tienen media ≈ 0, pero se re-escalan por seguridad
-X_stand <- scale(X)
+```{r dummies}
+library(fastDummies)   # dummy_cols()
+
+# Seleccionar variables categóricas del CSV original
+cat_vars <- data_raw %>%
+  filter(!is.na(altitude_mean_meters),
+         altitude_mean_meters > 0,
+         altitude_mean_meters <= 3000) %>%
+  filter(complete.cases(select(., all_of(vars_originales)))) %>%
+  select(Processing.Method, Color, Country.of.Origin) %>%
+  mutate(across(everything(), ~ ifelse(. == "" | is.na(.), "Desconocido", .)))
+
+# Simplificar Country.of.Origin: top 5 países, el resto = "Otro"
+top5_paises <- names(sort(table(cat_vars$Country.of.Origin), decreasing = TRUE)[1:5])
+cat_vars$Pais <- ifelse(cat_vars$Country.of.Origin %in% top5_paises,
+                        cat_vars$Country.of.Origin, "Otro")
+cat_vars$Country.of.Origin <- NULL
+
+cat("Categorías de Processing.Method:\n")
+print(table(cat_vars$Processing.Method))
+cat("\nCategorías de Color:\n")
+print(table(cat_vars$Color))
+cat("\nTop 5 países + Otro:\n")
+print(table(cat_vars$Pais))
 ```
 
-## 2.2. Elección de k — método WSS (codo)
+```{r dummies-crear}
+# Convertir a dummies (elimina primera columna de cada variable para evitar
+# multicolinealidad perfecta — convención estándar)
+dummies <- dummy_cols(cat_vars,
+                      remove_first_dummy    = TRUE,
+                      remove_selected_columns = TRUE)
+
+cat("Dimensiones de la matriz de dummies:", nrow(dummies), "×", ncol(dummies), "\n")
+cat("Columnas creadas:\n")
+print(names(dummies))
+```
+
+```{r combinar}
+# Combinar scores PCA (variables numéricas transformadas) con dummies
+X_num    <- scale(X[, 1:4])           # primeras 4 CPs
+X_dum    <- scale(as.matrix(dummies)) # dummies escaladas
+X_combinado <- cbind(X_num, X_dum)
+cat("Matriz final para clustering:", nrow(X_combinado), "×", ncol(X_combinado),
+    "(4 CPs + dummies)\n")
+
+# Calcular k_codo aquí (necesario para el dendrograma que viene a continuación)
+set.seed(42)
+k_max <- 10
+wss_tmp        <- sapply(1:k_max, function(k) kmeans(X_combinado, centers=k, nstart=15)$tot.withinss)
+caidas_tmp     <- -diff(wss_tmp)
+caidas_rel_tmp <- caidas_tmp / wss_tmp[-length(wss_tmp)]
+k_codo         <- which.max(-diff(caidas_rel_tmp)) + 1
+cat("k sugerido por el codo:", k_codo, "\n")
+```
+
+---
+
+# 3. Dendrograma — Clustering jerárquico
+
+El clustering jerárquico no requiere especificar k de antemano. Construye un árbol
+(dendrograma) mostrando cómo se van fusionando los lotes. El corte horizontal
+del árbol define los clusters.
+
+```{r dendrograma, fig.width=12, fig.height=7}
+# Muestra aleatoria de 80 lotes para que el dendrograma sea legible
+set.seed(42)
+idx_muestra <- sample(nrow(X_combinado), 80)
+X_muestra   <- X_combinado[idx_muestra, ]
+
+# Distancia euclídea + enlace de Ward (minimiza varianza intra-cluster)
+dist_m  <- dist(X_muestra, method = "euclidean")
+hc      <- hclust(dist_m, method = "ward.D2")
+
+# Cortar en k_codo clusters
+grupos_hc <- cutree(hc, k = k_codo)
+
+# Dendrograma con clusters coloreados
+library(dendextend)
+dend <- as.dendrogram(hc)
+dend <- color_branches(dend, k = k_codo)
+
+par(mar = c(4, 2, 3, 1))
+plot(dend,
+     main  = paste0("Dendrograma — Clustering jerárquico (Ward.D2)  ·  k = ", k_codo),
+     sub   = "Muestra de 80 lotes · variables numéricas + dummies",
+     xlab  = "",
+     ylab  = "Distancia euclídea",
+     leaflab = "none",
+     cex.main = 1)
+abline(h = rev(hc$height)[k_codo - 1] * 1.05,
+       col = "red", lty = 2, lwd = 1.5)
+legend("topright", legend = paste("Corte en k =", k_codo),
+       col = "red", lty = 2, bty = "n", cex = 0.9)
+```
+
+```{r dendrograma-fviz, fig.width=10, fig.height=6}
+# Versión más compacta con fviz_dend
+fviz_dend(hc, k = k_codo,
+          cex          = 0.4,
+          rect         = TRUE,
+          rect_fill    = TRUE,
+          rect_border  = "jco",
+          color_labels_by_k = TRUE,
+          show_labels  = FALSE,
+          main  = paste0("Dendrograma (fviz) — k = ", k_codo, " clusters"),
+          sub   = "Muestra de 80 lotes · Ward.D2",
+          ylab  = "Altura (distancia)") +
+  theme_minimal()
+```
+
+---
+
+# 4. K-means
+
+## 4.1. Estandarización
+
+K-means usa distancias euclidianas. La matriz `X_combinado` (CPs + dummies) ya está
+estandarizada en el paso anterior, así que se usa directamente.
+
+```{r estandarizar}
+X_stand <- X_combinado   # ya escalado: CPs + dummies (k_codo calculado en chunk combinar)
+```
+
+## 4.2. Elección de k — método WSS (codo)
 
 El método del codo calcula la **suma de cuadrados intra-cluster (WSS)** para cada k.
 A medida que k crece, WSS siempre baja; el punto óptimo es donde la curva
@@ -160,7 +290,7 @@ fviz_nbclust(X_stand, kmeans,
   theme_minimal()
 ```
 
-## 2.3. Ajuste del modelo final
+## 4.3. Ajuste del modelo final
 
 ```{r kmeans-modelo}
 # k_optimo se deriva directamente del análisis del codo
@@ -177,7 +307,7 @@ cat("\nRatio BSS/TSS (varianza explicada por clusters):",
     round(km$betweenss / km$totss * 100, 1), "%\n")
 ```
 
-## 2.4. Visualización en el plano CP1–CP2
+## 4.4. Visualización en el plano CP1–CP2
 
 ```{r kmeans-viz, fig.width=9, fig.height=7}
 fviz_cluster(km, data = X_stand,
@@ -191,7 +321,7 @@ fviz_cluster(km, data = X_stand,
        caption  = "1.070 lotes de café arábica · CQI")
 ```
 
-## 2.5. Perfil de cada cluster
+## 4.5. Perfil de cada cluster
 
 ```{r kmeans-perfil}
 datos_t$cluster_km <- factor(km$cluster)
@@ -205,7 +335,7 @@ perfil_km
 
 ---
 
-# 3. HDBSCAN
+# 5. HDBSCAN
 
 HDBSCAN (*Hierarchical Density-Based Spatial Clustering of Applications with Noise*)
 identifica clusters de densidad variable sin necesidad de especificar k.
@@ -247,7 +377,7 @@ ggplot(scores_plot, aes(x = CP1, y = CP2, color = cluster_hdb)) +
   theme(panel.grid.minor = element_blank())
 ```
 
-## 3.1. Perfil de cada cluster HDBSCAN
+## 5.1. Perfil de cada cluster HDBSCAN
 
 ```{r hdbscan-perfil}
 datos_t$cluster_hdb <- factor(hdb$cluster)
@@ -262,7 +392,7 @@ perfil_hdb
 
 ---
 
-# 4. Comparación K-means vs HDBSCAN
+# 6. Comparación K-means vs HDBSCAN
 
 ```{r comparacion, fig.width=12, fig.height=5}
 scores_comp <- as.data.frame(X_stand[, 1:2])
