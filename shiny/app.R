@@ -330,9 +330,10 @@ ui <- fluidPage(
             plotOutput("biplot", height = "400px"),
             div(class = "radio-ejes", style = "margin-top:8px;",
               radioButtons("ejes", NULL,
-                choices = c(
-                  paste0("CP1 vs CP2 — Calidad sensorial  ↔  Consistencia (", var_exp[1], "% + ", var_exp[2], "%)") = "12",
-                  paste0("CP1 vs CP3 — Calidad sensorial  ↔  Altitud       (", var_exp[1], "% + ", var_exp[3], "%)") = "13"
+                choices = setNames(
+                  c("12", "13"),
+                  c(paste0("CP1 vs CP2 — Calidad sensorial  ↔  Consistencia (", var_exp[1], "% + ", var_exp[2], "%)"),
+                    paste0("CP1 vs CP3 — Calidad sensorial  ↔  Altitud       (", var_exp[1], "% + ", var_exp[3], "%)"))
                 ),
                 selected = "12", inline = FALSE)
             )
