@@ -104,30 +104,68 @@ X_stand <- scale(X)
 
 ## 2.2. Elección de k — método WSS (codo)
 
+El método del codo calcula la **suma de cuadrados intra-cluster (WSS)** para cada k.
+A medida que k crece, WSS siempre baja; el punto óptimo es donde la curva
+"dobla" — a partir de ahí añadir más clusters da poco beneficio.
+
 ```{r elegir-k, fig.width=8, fig.height=5}
-fviz_nbclust(X_stand, kmeans,
-             method  = "wss",
-             k.max   = 8,
-             nstart  = 25) +
-  labs(title    = "Método del codo — suma de cuadrados intra-cluster",
-       subtitle = "Buscar el punto donde la curva pierde pendiente") +
-  theme_minimal()
+set.seed(42)
+k_max <- 10
+
+# Calcular WSS para cada k
+wss_vals <- sapply(1:k_max, function(k) {
+  kmeans(X_stand, centers = k, nstart = 25)$tot.withinss
+})
+
+# Detectar el codo: mayor caída relativa de WSS
+caidas      <- -diff(wss_vals)                 # cuánto baja WSS al pasar de k a k+1
+caidas_rel  <- caidas / wss_vals[-length(wss_vals)]  # caída relativa
+aceleracion <- diff(caidas_rel)                # segunda diferencia
+k_codo      <- which.max(-aceleracion) + 1    # k donde la caída se frena más
+
+cat("k sugerido por el método del codo:", k_codo, "\n")
+
+# Gráfico con línea marcando el k elegido
+wss_df <- data.frame(k = 1:k_max, wss = wss_vals)
+ggplot(wss_df, aes(x = k, y = wss)) +
+  geom_line(color = "#2563a8", linewidth = 1) +
+  geom_point(color = "#2563a8", size = 3) +
+  geom_point(data = wss_df[k_codo, ], aes(x = k, y = wss),
+             color = "#e74c3c", size = 5) +
+  geom_vline(xintercept = k_codo, linetype = "dashed",
+             color = "#e74c3c", linewidth = 0.8) +
+  annotate("label", x = k_codo + 0.3, y = max(wss_vals) * 0.9,
+           label = paste0("k = ", k_codo, "\n(codo)"),
+           color = "#e74c3c", size = 3.5, hjust = 0) +
+  scale_x_continuous(breaks = 1:k_max) +
+  labs(title    = "Método del codo — suma de cuadrados intra-cluster (WSS)",
+       subtitle = paste0("El punto rojo indica k = ", k_codo, " (mayor frenada en la caída de WSS)"),
+       x = "Número de clusters (k)",
+       y = "WSS total") +
+  theme_minimal(base_size = 13) +
+  theme(panel.grid.minor = element_blank())
 ```
 
 ```{r elegir-k-silhouette, fig.width=8, fig.height=5}
+# Silhouette como validación: mayor valor = mejor separación entre clusters
 fviz_nbclust(X_stand, kmeans,
              method  = "silhouette",
-             k.max   = 8,
+             k.max   = k_max,
              nstart  = 25) +
-  labs(title    = "Método Silhouette — cohesión vs separación",
-       subtitle = "Mayor silueta promedio = mejor k") +
+  labs(title    = "Validación — Silhouette promedio",
+       subtitle = "Mayor silhouette = clusters más cohesivos y separados",
+       x = "Número de clusters (k)") +
+  geom_vline(xintercept = k_codo, linetype = "dashed",
+             color = "#e74c3c", linewidth = 0.8) +
   theme_minimal()
 ```
 
 ## 2.3. Ajuste del modelo final
 
 ```{r kmeans-modelo}
-k_optimo <- 6   # igual que el ejemplo del profe
+# k_optimo se deriva directamente del análisis del codo
+k_optimo <- k_codo
+cat("k seleccionado:", k_optimo, "\n")
 
 set.seed(42)
 km <- kmeans(X_stand, centers = k_optimo, nstart = 25)
