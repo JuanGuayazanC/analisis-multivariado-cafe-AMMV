@@ -180,6 +180,16 @@ cat("  -> razón para estandarizar antes de PCA.\n")
 - $\operatorname{Var}(\texttt{altitude}) \approx 174\,656$ vs. $0.13$–$0.63$ en puntajes: 8 órdenes de magnitud.
 - Sin estandarizar, PC1 = altitud, por artefacto de unidades, no por relevancia.
 
+**Decisión: excluir `Category.One.Defects`, `Category.Two.Defects` y `Moisture` del análisis principal.** Las tres razones son complementarias y se verifican con los datos:
+
+1. **Inflación de ceros — Yeo-Johnson no converge.** En la sección 3.2 se intentó estimar el lambda óptimo de YJ para estas tres variables: `Moisture` y `Category.One.Defects` empujan $\lambda$ hasta el borde del intervalo de búsqueda ($\pm 5$), señal de que la optimización no encontró ningún $\lambda$ interior que simetrice la distribución. La razón es estructural: ambas variables tienen una **mezcla de pico en cero más cola continua** — 174 lotes con `Moisture = 0` (ver punto 3) y más del 80 % de lotes con `Category.One.Defects = 0` — y esa forma bimodal no es corregible con una transformación monótona de potencia. `Category.Two.Defects` sí converge (λ ≈ −0.22) y se tranformó en la sección 3.2, pero se excluye igualmente del análisis principal por coherencia con las otras dos variables de defectos.
+
+2. **Outliers extremos que dominan ejes enteros.** El análisis ANTES (sección 7) muestra que con 14 variables, **PC3 queda definido casi en su totalidad** por los lotes con 23–47 defectos (Cat1/Cat2 con cargas ≈ 0.54 y 0.65 en ese eje). Esos dos o tres lotes extremos "secuestran" una componente completa que de otro modo reflejaría variación real entre lotes normales. La distancia de Mahalanobis ANTES alcanzaba valores de ≈ 654, 410 y 300 — solo posibles cuando la covarianza en Cat1/Cat2 domina la métrica — y marcaba más de 60 lotes como atípicos. Excluir estas variables reduce ese número y concentra las componentes en la variación sensorial y de altitud.
+
+3. **`Moisture = 0` son faltantes codificados, no café genuinamente seco.** UMAP (sección 14) aisló los 174 lotes con `Moisture = 0` en un grupo completamente separado del resto. La sección 14 también muestra que estos lotes tienen `Moisture` media = 0.004 frente a 11.3 % en el resto — un valor físicamente imposible para granos de café, que normalmente retienen 9–13 % de humedad. Incluir `Moisture` en el PCA con esos 174 ceros introduce un artefacto de calidad de datos, no una dimensión real de variación.
+
+**Consecuencia de la exclusión:** al retirar estas tres variables, PC1 aumenta su proporción de varianza explicada (de 47.6 % a `r round(pca$sdev[1]^2/sum(pca$sdev^2)*100,1)` % tras aplicar también YJ a las 11) porque ya no comparte espacio de varianza con el eje de defectos, y los ejes secundarios reflejan exclusivamente contrastes entre atributos sensoriales y altitud — exactamente la estructura que el análisis busca.
+
 ```{r datos-oficiales}
 vars_11 <- setdiff(names(datos_transformados),
                    c("Category.One.Defects", "Category.Two.Defects", "Moisture"))
