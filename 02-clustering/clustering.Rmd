@@ -127,7 +127,7 @@ fviz_nbclust(X_stand, kmeans,
 ## 2.3. Ajuste del modelo final
 
 ```{r kmeans-modelo}
-k_optimo <- 3   # <-- ajustar según los gráficos anteriores
+k_optimo <- 6   # igual que el ejemplo del profe
 
 set.seed(42)
 km <- kmeans(X_stand, centers = k_optimo, nstart = 25)
