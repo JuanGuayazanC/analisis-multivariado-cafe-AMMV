@@ -44,7 +44,8 @@ vars_11 <- setdiff(names(datos_full),
 datos_t <- datos_full[, vars_11]
 
 pt_11      <- powerTransform(datos_t, family = "yjPower")
-lambdas_11 <- pmax(pmin(coef(pt_11, round = FALSE), 3), -3)
+# lambdas_11 <- pmax(pmin(coef(pt_11, round = FALSE), 3), -3)
+lambdas_11 <- coef(pt_11, round = FALSE)
 datos_t_yj <- datos_t
 for (v in names(datos_t)) datos_t_yj[[v]] <- yjPower(datos_t[[v]], lambdas_11[v])
 datos_t <- datos_t_yj
