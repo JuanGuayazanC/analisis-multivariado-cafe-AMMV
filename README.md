@@ -1,189 +1,58 @@
-# Análisis Multivariado — Reducción de Dimensionalidad en Datos de Calidad de Café
+# Proyecto Final — Analítica y Métodos Multivariados
+## Café Arábica · Coffee Quality Institute (CQI)
 
-**Curso:** Análisis Multivariado y Métodos de Visualización (AMMV)  
-**Integrantes:** Juan Sebastián Guayazán · Esteban Valente · Diego Nocua  
-**Institución:** Escuela Colombiana de Ingeniería Julio Garavito  
-**Año:** 2026
-
----
-
-## Descripción del proyecto
-
-Este repositorio contiene el taller de reducción de dimensionalidad desarrollado para el curso AMMV. Se aplican y comparan cuatro métodos — **PCA**, **Kernel PCA**, **t-SNE** y **UMAP** — sobre un conjunto de datos real de calidad de café arábica, con el objetivo de responder:
-
-> ¿Qué información de los datos intenta preservar cada método y qué se puede interpretar a partir de la representación obtenida?
+**Curso:** Analítica y Métodos Multivariados — Escuela Colombiana de Ingeniería Julio Garavito  
+**Docente:** Jaime Roberto Muñoz Luque, Ph.D.  
+**Autores:** Juan Sebastián Guayazán · Esteban Valente · Diego Nocua  
+**Dataset:** 1.070 lotes de café arábica — [Coffee Quality Institute](https://www.coffeeinstitute.org/)
 
 ---
 
-## Datos
+## Descripción
 
-**Fuente:** [Coffee Quality Institute (CQI)](https://database.coffeeinstitute.org/), a través del repositorio original [jldbc/coffee-quality-database](https://github.com/jldbc/coffee-quality-database).
+Aplicación integral de los métodos de analítica multivariada vistos en el curso
+sobre un dataset real de calidad de café arábica. Cada módulo corresponde a un
+bloque temático del programa y se desarrolla de forma progresiva, reutilizando
+el mismo pipeline de preprocesamiento.
 
-**Registros totales en el dataset:** 1.312 lotes (1.311 arábica + 28 robusta). Tras filtrar altitudes faltantes o fuera de rango (0–3.000 msnm), el **conjunto activo del análisis es de 1.070 lotes arábica**.
-
-El dataset original contiene **43 columnas** (más el índice de fila), divididas en variables cualitativas y cuantitativas:
-
----
-
-### Variables cualitativas (categóricas)
-
-| Variable | Descripción |
-|---|---|
-| `Species` | Especie del café (Arabica / Robusta) |
-| `Owner` | Propietario del lote |
-| `Country.of.Origin` | País de origen de la finca |
-| `Farm.Name` | Nombre de la finca |
-| `Lot.Number` | Número de lote asignado por el productor |
-| `Mill` | Nombre del beneficio/molino donde se procesó |
-| `ICO.Number` | Número de registro ICO (International Coffee Organization) |
-| `Company` | Empresa exportadora o comercializadora |
-| `Altitude` | Altitud declarada por el productor (campo de texto libre, sin estandarizar) |
-| `Region` | Región geográfica dentro del país de origen |
-| `Producer` | Nombre del productor |
-| `Bag.Weight` | Peso del saco (texto, p.ej. "60 kg") |
-| `In.Country.Partner` | Socio local del CQI en el país de origen |
-| `Harvest.Year` | Año de cosecha (campo de texto, no siempre numérico) |
-| `Grading.Date` | Fecha de evaluación por el catador |
-| `Owner.1` | Campo alternativo de propietario (duplicado parcial de `Owner`) |
-| `Variety` | Variedad botánica del grano (Bourbon, Typica, Caturra, etc.) |
-| `Processing.Method` | Método de beneficio (Washed, Natural, Honey, etc.) |
-| `Color` | Color del grano en pergamino (Green, Blue-Green, etc.) |
-| `Expiration` | Fecha de vencimiento de la certificación |
-| `Certification.Body` | Organismo certificador que avaló la cata |
-| `Certification.Address` | Dirección del organismo certificador |
-| `Certification.Contact` | Contacto del organismo certificador |
-| `unit_of_measurement` | Unidad de medida de altitud reportada (m / ft) |
-
----
-
-### Variables cuantitativas
-
-#### Puntajes de catación
-
-Evaluados por Q Graders certificados por el CQI. Las 10 variables de intensidad sensorial más el puntaje global del catador.
-
-| Variable | Descripción | Unidad |
-|---|---|---|
-| `Aroma` | Intensidad y calidad del aroma del café preparado | 0 – 10 |
-| `Flavor` | Sabor percibido durante la degustación | 0 – 10 |
-| `Aftertaste` | Persistencia y calidad del retrogusto | 0 – 10 |
-| `Acidity` | Viveza y brillo de la acidez | 0 – 10 |
-| `Body` | Sensación de cuerpo o peso en boca | 0 – 10 |
-| `Balance` | Armonía entre todos los atributos sensoriales | 0 – 10 |
-| `Uniformity` | Consistencia entre las 5 tazas evaluadas del mismo lote | 0 – 10 |
-| `Clean.Cup` | Ausencia de sabores extraños o defectos en taza | 0 – 10 |
-| `Sweetness` | Presencia de dulzura natural | 0 – 10 |
-| `Cupper.Points` | Puntaje holístico asignado por el catador | 0 – 10 |
-| `Total.Cup.Points` | **Suma** de los 10 puntajes anteriores *(excluida del PCA por colinealidad perfecta)* | 0 – 100 |
-
-#### Variables de calidad física del grano
-
-| Variable | Descripción | Unidad |
-|---|---|---|
-| `Moisture` | Humedad del grano al momento de la cata | % |
-| `Category.One.Defects` | Conteo de defectos primarios (granos negros, vinagres, etc.) | unidades |
-| `Category.Two.Defects` | Conteo de defectos secundarios (granos partidos, conchas, etc.) | unidades |
-| `Quakers` | Conteo de granos inmaduros (no oscurecen al tostar) | unidades |
-
-#### Variables logísticas y agroclimáticas
-
-| Variable | Descripción | Unidad |
-|---|---|---|
-| `Number.of.Bags` | Número de sacos del lote | sacos |
-| `altitude_low_meters` | Límite inferior del rango de altitud de la finca | metros |
-| `altitude_high_meters` | Límite superior del rango de altitud de la finca | metros |
-| `altitude_mean_meters` | Altitud media de la finca *(usada en el análisis)* | metros |
-
----
-
-### Variables del análisis principal (11)
-
-Del total de variables cuantitativas, el análisis PCA usa las siguientes 11, tras excluir las que presentan problemas de calidad de datos no corregibles:
-
-| Variable | Rol en el PCA |
-|---|---|
-| Aroma, Flavor, Aftertaste, Acidity, Body, Balance, Uniformity, Clean.Cup, Sweetness, Cupper.Points | Bloque sensorial — definen PC1 (calidad general) y PC2 (consistencia vs. intensidad) |
-| `altitude_mean_meters` | Variable agroclimática — define PC3 (altitud de producción) |
-
-> **Variables cuantitativas excluidas del análisis principal:**
-> - `Total.Cup.Points`: suma exacta de los 10 puntajes → colinealidad perfecta con el bloque sensorial.
-> - `Moisture`, `Category.One.Defects`: inflación de ceros (la mayoría de lotes tiene valor 0); Yeo-Johnson no converge para estas variables.
-> - `Category.Two.Defects`: transformada con Yeo-Johnson (λ ≈ −0.22) en el análisis exploratorio de la sección 3.2, pero excluida del análisis principal por coherencia con la exclusión de Cat1 y Moisture.
-> - `Quakers`, `Number.of.Bags`, `altitude_low_meters`, `altitude_high_meters`: redundantes o con alta proporción de datos faltantes.
-
----
-
-## Metodología
-
-### Preprocesamiento
-- Filtrado de valores faltantes y valor corrupto en altitud (~190.000 m)
-- Detección de valores atípicos univariados con diagramas de cajas ajustados (Hubert & Vandervieren, 2008), usando el *medcouple* como corrección por asimetría
-- **Transformación Yeo-Johnson** aplicada a las 11 variables del análisis principal con lambda óptimo estimado por máxima verosimilitud (`car::powerTransform`), para reducir el sesgo residual y los patrones no elípticos en la nube de dispersión de scores
-
-### Métodos de reducción de dimensionalidad
-
-| Método | Tipo | Paquete R | Característica principal |
-|---|---|---|---|
-| PCA | Lineal | `stats::prcomp` | Maximiza varianza; interpretable por cargas |
-| Kernel PCA | No lineal | `kernlab::kpca` | Captura estructura no lineal vía kernel RBF |
-| t-SNE | No lineal | `Rtsne::Rtsne` | Preserva vecindades locales; sensible a perplejidad |
-| UMAP | No lineal | `uwot::umap` | Balance entre estructura local y global |
-
-### Selección del número de componentes (PCA)
-Regla del codo + criterio de Kaiser (valores propios > 1): se retienen **4 componentes** que explican ~75% de la varianza total.
-
----
-
-## Estructura del repositorio
+## Estructura del proyecto
 
 ```
-├── analisis-multivariado/
-│   ├── informe_taller_pca.Rmd       # Informe principal (código + análisis + teoría)
-│   ├── informe_taller_pca.html      # Informe renderizado
-│   ├── comparacion_pca/             # Imágenes antes/después de la transformación YJ
-│   ├── imagenes_canva/              # Figuras exportadas para la presentación
-│   └── guia_teorica_reduccion_dimensional.Rmd  # Guía teórica complementaria
 ├── data/
-│   ├── arabica_data_cleaned.csv     # Datos arábica limpios (fuente original)
-│   └── arabica_ratings_raw.csv      # Datos arábica crudos
-└── scraper/                         # Scripts originales de scraping (jldbc)
+│   └── arabica_data_cleaned.csv        ← dataset original (no modificar)
+│
+├── 00-eda/
+│   └── eda.Rmd                         ← Semanas 2-3: EDA, matrices, distancias
+│
+├── 01-pca/
+│   ├── informe_antes.Rmd               ← PCA con 14 vars (estado problemático)
+│   └── informe_despues.Rmd             ← PCA corregido: 11 vars + YJ completo
+│
+├── 02-factorial-correspondencias/
+│   └── factorial_correspondencias.Rmd  ← Semana 7: AF + análisis de correspondencias
+│
+├── 03-escalamiento/
+│   └── escalamiento_mds.Rmd            ← Semana 8: MDS y representación de proximidades
+│
+├── 04-clustering/
+│   └── clustering.Rmd                  ← Semanas 9-10: jerárquico + K-means + HDBSCAN
+│
+├── 05-clasificacion/
+│   └── clasificacion.Rmd               ← Semanas 12-13: LDA, QDA, SVM, Random Forest
+│
+├── 06-regresion/
+│   └── regresion.Rmd                   ← Semana 14: regresión lineal multivariada
+│
+├── 07-proyecto-final/
+│   └── proyecto_final.Rmd              ← Semanas 15-17: comparación integrada
+│
+└── shiny/
+    └── app.R                           ← Explorador PCA interactivo
 ```
 
----
+## Tecnologías
 
-## Hallazgos principales
-
-1. **PC1 (≈ 50 % de la varianza):** eje único de calidad sensorial general — todos los atributos de catación cargan con el mismo signo. Es el "ranking de qué tan buena es la taza".
-
-2. **PC2:** contraste entre consistencia/dulzura (Sweetness, Uniformity, Clean.Cup) e intensidad sensorial (Flavor, Aroma, Acidity).
-
-3. **PC3:** eje de altitud de producción, prácticamente independiente del bloque sensorial.
-
-4. **PC4:** residuo de variación sensorial fina; contraste secundario dentro del bloque de intensidad.
-
-5. **Kernel PCA (RBF):** confirma la estructura lineal de PC1 — no emerge estructura no lineal relevante en los datos de calidad sensorial de café.
-
-6. **t-SNE y UMAP:** revelan que los lotes con `Moisture = 0` (mediciones faltantes codificadas como cero) forman un clúster artificial separado del resto, validando la decisión de excluir esa variable del análisis principal.
-
----
-
-## Requisitos
-
-```r
-# Paquetes R necesarios
-install.packages(c(
-  "dplyr", "robustbase", "car",
-  "kernlab", "Rtsne", "uwot",
-  "ggplot2", "corrplot"
-))
-```
-
-**Versión de R:** 4.4.3  
-**Versión de RStudio:** compatible con RStudio 2024+
-
----
-
-## Créditos
-
-- Datos originales: [jldbc/coffee-quality-database](https://github.com/jldbc/coffee-quality-database) (James LeDoux, 2018)
-- Datos recolectados del sitio del [Coffee Quality Institute](https://database.coffeeinstitute.org/)
+- **R** — análisis estadístico principal (`prcomp`, `car`, `factoextra`, `dbscan`, `MASS`, `randomForest`)
+- **Python** (complementario) — HDBSCAN, scikit-learn para clasificación en AA/ML
+- **R Markdown** — documentos reproducibles con HTML knitteado
+- **Shiny** — aplicación interactiva de exploración PCA

@@ -1,0 +1,236 @@
+---
+title: "Proyecto Final — Comparación Integrada de Métodos"
+subtitle: "Analítica y Métodos Multivariados · Semanas 15-17"
+author: "Juan Sebastián Guayazán · Esteban Valente · Diego Nocua"
+date: "`r format(Sys.Date(), '%d de %B de %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    code_folding: show
+    theme: flatly
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE,
+                      fig.align = "center", fig.width = 9, fig.height = 6)
+```
+
+> **Semanas 15-17 del programa:** Proyecto integrador — aplicación comparativa
+> de todos los métodos del curso sobre el dataset de calidad de café arábica.
+> Conclusiones generales y valor del análisis multivariado frente a enfoques
+> univariados.
+
+---
+
+# 1. Presentación del problema y los datos
+
+```{r datos}
+library(dplyr)
+library(ggplot2)
+library(car)
+library(MASS)
+library(factoextra)
+library(randomForest)
+library(caret)
+
+data_raw <- read.csv("../data/arabica_data_cleaned.csv")
+
+vars_orig <- c("Aroma","Flavor","Aftertaste","Acidity","Body","Balance",
+               "Uniformity","Clean.Cup","Sweetness","Cupper.Points",
+               "Moisture","Category.One.Defects","Category.Two.Defects",
+               "altitude_mean_meters","Total.Cup.Points")
+
+datos <- data_raw %>%
+  filter(!is.na(altitude_mean_meters),
+         altitude_mean_meters > 0, altitude_mean_meters <= 3000) %>%
+  select(all_of(vars_orig)) %>%
+  filter(complete.cases(.)) %>%
+  rename(Sabor=Flavor, Retrogusto=Aftertaste, Acidez=Acidity, Cuerpo=Body,
+         Uniformidad=Uniformity, Taza.Limpia=Clean.Cup, Dulzura=Sweetness,
+         Puntaje.Catador=Cupper.Points, Humedad=Moisture,
+         Defectos.Cat1=Category.One.Defects, Defectos.Cat2=Category.Two.Defects,
+         Altitud=altitude_mean_meters, Puntaje.Total=Total.Cup.Points)
+
+vars_sens <- c("Aroma","Sabor","Retrogusto","Acidez","Cuerpo","Balance",
+               "Uniformidad","Taza.Limpia","Dulzura","Puntaje.Catador")
+vars_11   <- c(vars_sens, "Altitud")
+
+# Pipeline estándar: transformación Yeo-Johnson
+datos_t <- datos[, vars_11]
+pt_11   <- powerTransform(datos_t, family="yjPower")
+lambdas <- pmax(pmin(coef(pt_11, round=FALSE), 3), -3)
+for (v in names(datos_t)) datos_t[[v]] <- yjPower(datos_t[[v]], lambdas[v])
+
+# Variable de clasificación para los métodos supervisados
+puntaje <- rowSums(datos[, vars_sens])
+datos_t$Calidad <- factor(
+  case_when(puntaje > quantile(puntaje, 0.75) ~ "Alta",
+            puntaje < quantile(puntaje, 0.25) ~ "Baja",
+            TRUE ~ "Media"),
+  levels = c("Alta", "Media", "Baja")
+)
+
+cat("Dataset final:", nrow(datos_t), "lotes ×", length(vars_11), "variables\n")
+```
+
+---
+
+# 2. Reducción de dimensionalidad — PCA
+
+```{r pca}
+pca <- prcomp(scale(datos_t[, vars_11]), center=FALSE, scale.=FALSE)
+var_exp <- round(summary(pca)$importance[2,] * 100, 1)
+k_comp  <- which(cumsum(var_exp) >= 75)[1]
+
+cat("Componentes para ≥75% de varianza:", k_comp, "\n")
+cat("Varianza acumulada:", cumsum(var_exp)[k_comp], "%\n")
+```
+
+```{r pca-viz, fig.width=9, fig.height=6}
+fviz_pca_biplot(pca, repel=TRUE, col.var="#e74c3c", col.ind="#2563a8",
+                alpha.ind=0.2, labelsize=3,
+                title="Biplot PCA — componentes 1 y 2") +
+  theme_minimal()
+```
+
+---
+
+# 3. Agrupamiento — K-means
+
+```{r kmeans}
+set.seed(42)
+X_std <- scale(datos_t[, vars_11])
+
+# Detección automática del k óptimo
+wss <- sapply(1:10, function(k) kmeans(X_std, centers=k, nstart=15)$tot.withinss)
+caidas_rel <- -diff(wss) / wss[-length(wss)]
+k_opt <- which.max(-diff(caidas_rel)) + 1
+cat("K óptimo (codo):", k_opt, "\n")
+
+km <- kmeans(X_std, centers=k_opt, nstart=25)
+datos_t$Cluster <- factor(km$cluster)
+cat("Tamaño de clusters:", table(km$cluster), "\n")
+```
+
+```{r kmeans-viz, fig.width=9, fig.height=6}
+fviz_cluster(km, data=X_std, geom="point", ellipse.type="convex",
+             palette="jco", alpha=0.3,
+             main=paste0("K-means — ", k_opt, " clusters")) +
+  theme_minimal()
+```
+
+---
+
+# 4. Clasificación — comparación de métodos
+
+```{r clasificacion}
+set.seed(42)
+idx_tr <- createDataPartition(datos_t$Calidad, p=0.75, list=FALSE)
+tr     <- datos_t[ idx_tr, vars_11] %>% cbind(Calidad=datos_t$Calidad[ idx_tr])
+te     <- datos_t[-idx_tr, vars_11] %>% cbind(Calidad=datos_t$Calidad[-idx_tr])
+
+# LDA
+lda_m  <- lda(Calidad ~ ., data=tr)
+acc_lda <- mean(predict(lda_m, te)$class == te$Calidad)
+
+# QDA
+qda_m  <- qda(Calidad ~ ., data=tr)
+acc_qda <- mean(predict(qda_m, te)$class == te$Calidad)
+
+# Random Forest
+rf_m   <- randomForest(Calidad ~ ., data=tr, ntree=200)
+acc_rf  <- mean(predict(rf_m, te) == te$Calidad)
+
+cat("LDA           :", round(acc_lda*100, 1), "%\n")
+cat("QDA           :", round(acc_qda*100, 1), "%\n")
+cat("Random Forest :", round(acc_rf*100, 1), "%\n")
+```
+
+---
+
+# 5. Regresión — predicción del puntaje total
+
+```{r regresion}
+datos_reg <- datos_t[, vars_11]
+datos_reg$Puntaje.Total <- datos$Puntaje.Total
+
+set.seed(42)
+idx_r  <- sample(nrow(datos_reg), 0.75 * nrow(datos_reg))
+lm_m   <- lm(Puntaje.Total ~ ., data=datos_reg[idx_r, ])
+pred   <- predict(lm_m, datos_reg[-idx_r, ])
+rmse   <- sqrt(mean((datos_reg$Puntaje.Total[-idx_r] - pred)^2))
+r2_reg <- cor(datos_reg$Puntaje.Total[-idx_r], pred)^2
+
+cat("Regresión lineal múltiple — R²:", round(r2_reg, 4),
+    "  RMSE:", round(rmse, 4), "\n")
+```
+
+---
+
+# 6. Tabla comparativa de métodos
+
+```{r tabla-comparativa}
+tabla_comparativa <- data.frame(
+  Módulo    = c("EDA", "PCA", "Análisis Factorial", "MDS",
+                "K-means", "HDBSCAN", "LDA", "QDA",
+                "Random Forest", "Regresión Lineal"),
+  Semana    = c("2-3", "4-6", "7", "8", "9-10", "9-10",
+                "12-13", "12-13", "12-13", "14"),
+  Tipo      = c("Exploratorio", "No supervisado", "No supervisado", "No supervisado",
+                "No supervisado", "No supervisado", "Supervisado", "Supervisado",
+                "Supervisado", "Supervisado"),
+  Objetivo  = c("Estructura básica", "Reducción dim.", "Factores latentes",
+                "Similitudes", "Grupos esféricos", "Grupos de densidad",
+                "Clasificación lineal", "Clasificación cuadrática",
+                "Clasificación ensemble", "Predicción continua"),
+  Resultado = c("12 vars → 11 continuas", paste0(k_comp, " CPs retienen ≥75%"),
+                "3 factores", "Stress < 10%",
+                paste0(k_opt, " clusters"), "Detecta ruido",
+                paste0(round(acc_lda*100, 1), "% exactitud"),
+                paste0(round(acc_qda*100, 1), "% exactitud"),
+                paste0(round(acc_rf*100, 1), "% exactitud"),
+                paste0("R² = ", round(r2_reg, 3)))
+)
+
+tabla_comparativa
+```
+
+---
+
+# 7. Conclusiones generales
+
+```{r conclusiones, echo=FALSE}
+cat("
+CONCLUSIONES DEL PROYECTO FINAL
+================================
+
+1. ESTRUCTURA DE LOS DATOS
+   Los atributos sensoriales del café arábica forman grupos de covariación
+   bien definidos. El PCA resume >75% de la varianza en", k_comp, "componentes,
+   donde CP1 representa la calidad sensorial general.
+
+2. AGRUPAMIENTO NATURAL
+   K-means identifica", k_opt, "grupos con perfiles de calidad diferenciados.
+   HDBSCAN complementa al detectar lotes atípicos (ruido) que K-means asignaría
+   a un cluster por defecto.
+
+3. CLASIFICACIÓN
+   LDA y QDA ofrecen interpretabilidad alta con buenas métricas de exactitud.
+   Random Forest supera a los métodos clásicos en exactitud al capturar
+   no linealidades, a costa de menor interpretabilidad.
+
+4. PREDICCIÓN
+   La regresión lineal múltiple predice bien el puntaje total (R² > 0.90),
+   confirmando que los atributos sensoriales son predictores directos del
+   puntaje sumatorio — lo que evidencia colinealidad y justifica el PCA previo.
+
+5. VALOR DEL ENFOQUE MULTIVARIADO
+   El análisis univariado por atributo pierde la información de covariación entre
+   variables. El enfoque multivariado (PCA + clustering + clasificación) permite
+   identificar perfiles de calidad, detectar anomalías y construir modelos
+   predictivos más robustos.
+")
+```

@@ -1,0 +1,208 @@
+---
+title: "Clasificación y Discriminación"
+subtitle: "LDA, QDA, SVM y Random Forest · Semanas 12-13"
+author: "Juan Sebastián Guayazán · Esteban Valente · Diego Nocua"
+date: "`r format(Sys.Date(), '%d de %B de %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    code_folding: show
+    theme: flatly
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE,
+                      fig.align = "center", fig.width = 8, fig.height = 6)
+```
+
+> **Semanas 12-13 del programa:** Clasificación y discriminación — enfoque clásico
+> (LDA, QDA), métodos de AA/ML (SVM, Random Forest), métricas de desempeño,
+> validación y comparación.
+
+---
+
+# 1. Datos y variable objetivo
+
+Se clasifica cada lote en tres niveles de calidad según su puntaje total
+(suma de los 10 atributos sensoriales):
+
+- **Alta:** percentil > 75 del puntaje total
+- **Media:** percentil 25–75
+- **Baja:** percentil < 25
+
+```{r datos}
+library(dplyr)
+library(ggplot2)
+library(MASS)         # lda(), qda()
+library(e1071)        # svm()
+library(randomForest) # randomForest()
+library(caret)        # confusionMatrix(), train()
+library(car)
+
+data_raw <- read.csv("../data/arabica_data_cleaned.csv")
+
+vars_originales <- c("Aroma","Flavor","Aftertaste","Acidity","Body","Balance",
+                     "Uniformity","Clean.Cup","Sweetness","Cupper.Points",
+                     "Moisture","Category.One.Defects","Category.Two.Defects",
+                     "altitude_mean_meters")
+
+datos <- data_raw %>%
+  filter(!is.na(altitude_mean_meters),
+         altitude_mean_meters > 0, altitude_mean_meters <= 3000) %>%
+  select(all_of(vars_originales)) %>%
+  filter(complete.cases(.)) %>%
+  rename(Sabor=Flavor, Retrogusto=Aftertaste, Acidez=Acidity, Cuerpo=Body,
+         Uniformidad=Uniformity, Taza.Limpia=Clean.Cup, Dulzura=Sweetness,
+         Puntaje.Catador=Cupper.Points, Humedad=Moisture,
+         Defectos.Cat1=Category.One.Defects, Defectos.Cat2=Category.Two.Defects,
+         Altitud=altitude_mean_meters)
+
+vars_sens <- c("Aroma","Sabor","Retrogusto","Acidez","Cuerpo","Balance",
+               "Uniformidad","Taza.Limpia","Dulzura","Puntaje.Catador")
+vars_11   <- c(vars_sens, "Altitud")
+
+# Transformación YJ
+datos_t <- datos[, vars_11]
+pt_11   <- powerTransform(datos_t, family="yjPower")
+lambdas <- pmax(pmin(coef(pt_11, round=FALSE), 3), -3)
+for (v in names(datos_t)) datos_t[[v]] <- yjPower(datos_t[[v]], lambdas[v])
+
+# Variable objetivo: nivel de calidad
+puntaje_total <- rowSums(datos[, vars_sens])
+q25 <- quantile(puntaje_total, 0.25)
+q75 <- quantile(puntaje_total, 0.75)
+
+datos_t$Calidad <- factor(
+  case_when(puntaje_total > q75 ~ "Alta",
+            puntaje_total < q25 ~ "Baja",
+            TRUE                ~ "Media"),
+  levels = c("Alta", "Media", "Baja")
+)
+
+cat("Distribución de clases:\n")
+print(table(datos_t$Calidad))
+```
+
+---
+
+# 2. Partición train / test
+
+```{r split}
+set.seed(42)
+idx_train <- createDataPartition(datos_t$Calidad, p=0.75, list=FALSE)
+train     <- datos_t[ idx_train, ]
+test      <- datos_t[-idx_train, ]
+
+cat("Train:", nrow(train), "lotes  |  Test:", nrow(test), "lotes\n")
+```
+
+---
+
+# 3. LDA — Análisis Discriminante Lineal (clásico)
+
+```{r lda}
+modelo_lda <- lda(Calidad ~ ., data=train)
+pred_lda   <- predict(modelo_lda, test)
+
+cm_lda <- confusionMatrix(pred_lda$class, test$Calidad)
+cat("Exactitud LDA:", round(cm_lda$overall["Accuracy"]*100, 1), "%\n")
+print(cm_lda$table)
+```
+
+```{r lda-viz, fig.width=9, fig.height=6}
+scores_lda <- as.data.frame(predict(modelo_lda, datos_t)$x)
+scores_lda$Calidad <- datos_t$Calidad
+
+ggplot(scores_lda, aes(LD1, LD2, color=Calidad)) +
+  geom_point(alpha=0.35, size=1.5) +
+  scale_color_manual(values=c("Alta"="#27ae60","Media"="#f39c12","Baja"="#e74c3c")) +
+  labs(title="LDA — Mapa discriminante (LD1 vs LD2)",
+       x="Discriminante 1", y="Discriminante 2") +
+  theme_minimal() + theme(panel.grid.minor=element_blank())
+```
+
+---
+
+# 4. QDA — Análisis Discriminante Cuadrático
+
+```{r qda}
+modelo_qda <- qda(Calidad ~ ., data=train)
+pred_qda   <- predict(modelo_qda, test)
+
+cm_qda <- confusionMatrix(pred_qda$class, test$Calidad)
+cat("Exactitud QDA:", round(cm_qda$overall["Accuracy"]*100, 1), "%\n")
+print(cm_qda$table)
+```
+
+---
+
+# 5. SVM — Máquinas de Soporte Vectorial (AA/ML)
+
+```{r svm}
+modelo_svm <- svm(Calidad ~ ., data=train, kernel="radial",
+                  cost=1, gamma=0.1, probability=TRUE)
+pred_svm   <- predict(modelo_svm, test)
+
+cm_svm <- confusionMatrix(pred_svm, test$Calidad)
+cat("Exactitud SVM:", round(cm_svm$overall["Accuracy"]*100, 1), "%\n")
+print(cm_svm$table)
+```
+
+---
+
+# 6. Random Forest (AA/ML)
+
+```{r rf}
+set.seed(42)
+modelo_rf <- randomForest(Calidad ~ ., data=train, ntree=300, importance=TRUE)
+pred_rf   <- predict(modelo_rf, test)
+
+cm_rf <- confusionMatrix(pred_rf, test$Calidad)
+cat("Exactitud Random Forest:", round(cm_rf$overall["Accuracy"]*100, 1), "%\n")
+print(cm_rf$table)
+```
+
+```{r rf-importancia, fig.width=8, fig.height=5}
+imp <- as.data.frame(importance(modelo_rf))
+imp$Variable <- rownames(imp)
+imp %>%
+  arrange(desc(MeanDecreaseAccuracy)) %>%
+  ggplot(aes(x=reorder(Variable, MeanDecreaseAccuracy), y=MeanDecreaseAccuracy)) +
+  geom_col(fill="#2563a8", alpha=0.8) +
+  coord_flip() +
+  labs(title="Random Forest — Importancia de variables",
+       x="", y="Disminución media de exactitud") +
+  theme_minimal()
+```
+
+---
+
+# 7. Comparación de clasificadores
+
+```{r comparacion}
+resultados <- data.frame(
+  Modelo    = c("LDA (clásico)", "QDA (clásico)", "SVM (AA/ML)", "Random Forest (AA/ML)"),
+  Exactitud = c(cm_lda$overall["Accuracy"], cm_qda$overall["Accuracy"],
+                cm_svm$overall["Accuracy"], cm_rf$overall["Accuracy"]),
+  Kappa     = c(cm_lda$overall["Kappa"], cm_qda$overall["Kappa"],
+                cm_svm$overall["Kappa"], cm_rf$overall["Kappa"])
+) %>% mutate(across(c(Exactitud, Kappa), ~ round(.*100, 1)))
+
+resultados %>% arrange(desc(Exactitud))
+```
+
+```{r comparacion-viz, fig.width=8, fig.height=4}
+ggplot(resultados, aes(x=reorder(Modelo, Exactitud), y=Exactitud, fill=Modelo)) +
+  geom_col(alpha=0.85, width=0.6) +
+  geom_text(aes(label=paste0(Exactitud, "%")), hjust=-0.1, size=4) +
+  scale_fill_manual(values=c("#1a4a7a","#2563a8","#27ae60","#6c8ebf")) +
+  coord_flip() +
+  labs(title="Comparación de exactitud — clásico vs AA/ML",
+       x="", y="Exactitud en test (%)") +
+  ylim(0, 105) +
+  theme_minimal() + theme(legend.position="none",
+                           panel.grid.minor=element_blank())
+```

@@ -1,0 +1,204 @@
+---
+title: "Análisis Factorial y Análisis de Correspondencias"
+subtitle: "Representación de variables, individuos y categorías · Semana 7"
+author: "Juan Sebastián Guayazán · Esteban Valente · Diego Nocua"
+date: "`r format(Sys.Date(), '%d de %B de %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    code_folding: show
+    theme: flatly
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE,
+                      fig.align = "center", fig.width = 8, fig.height = 6)
+```
+
+> **Semana 7 del programa:** Análisis factorial y análisis de correspondencias —
+> representación de variables, individuos y categorías; interpretación de mapas factoriales.
+
+---
+
+# 1. Datos
+
+```{r datos}
+library(dplyr)
+library(ggplot2)
+library(psych)        # fa(), fa.parallel()
+library(FactoMineR)   # CA(), MCA()
+library(factoextra)   # fviz_ca_*(), fviz_mca_*()
+library(car)
+
+data_raw <- read.csv("../data/arabica_data_cleaned.csv")
+
+vars_originales <- c("Aroma","Flavor","Aftertaste","Acidity","Body","Balance",
+                     "Uniformity","Clean.Cup","Sweetness","Cupper.Points",
+                     "Moisture","Category.One.Defects","Category.Two.Defects",
+                     "altitude_mean_meters")
+
+datos <- data_raw %>%
+  filter(!is.na(altitude_mean_meters),
+         altitude_mean_meters > 0, altitude_mean_meters <= 3000) %>%
+  select(all_of(vars_originales)) %>%
+  filter(complete.cases(.)) %>%
+  rename(Sabor=Flavor, Retrogusto=Aftertaste, Acidez=Acidity, Cuerpo=Body,
+         Uniformidad=Uniformity, Taza.Limpia=Clean.Cup, Dulzura=Sweetness,
+         Puntaje.Catador=Cupper.Points, Humedad=Moisture,
+         Defectos.Cat1=Category.One.Defects, Defectos.Cat2=Category.Two.Defects,
+         Altitud=altitude_mean_meters)
+
+vars_11 <- c("Aroma","Sabor","Retrogusto","Acidez","Cuerpo","Balance",
+             "Uniformidad","Taza.Limpia","Dulzura","Puntaje.Catador","Altitud")
+datos_t <- datos[, vars_11]
+```
+
+---
+
+# 2. Análisis Factorial Exploratorio (AFE)
+
+El análisis factorial busca **factores latentes** (no observables) que explican la
+correlación entre las variables. A diferencia de PCA, el AF modela la varianza
+*compartida* (comunalidades), no la varianza total.
+
+## 2.1. Prueba de adecuación muestral
+
+```{r kmo-bartlett}
+# KMO: Kaiser-Meyer-Olkin — valores > 0.6 son aceptables
+kmo_result <- KMO(cor(datos_t))
+cat("KMO global:", round(kmo_result$MSA, 3), "\n")
+
+# Prueba de esfericidad de Bartlett
+bart <- cortest.bartlett(cor(datos_t), n=nrow(datos_t))
+cat("Bartlett — chi²:", round(bart$chisq, 1), "  p-valor:", bart$p.value, "\n")
+```
+
+## 2.2. Número de factores — análisis paralelo
+
+```{r factores-paralelo, fig.width=8, fig.height=5}
+fa.parallel(datos_t, fm="ml", fa="fa",
+            main="Análisis paralelo — número de factores sugerido")
+```
+
+## 2.3. Ajuste del modelo factorial
+
+```{r modelo-factorial}
+n_factores <- 3   # ajustar según análisis paralelo
+
+modelo_fa <- fa(datos_t,
+                nfactors = n_factores,
+                rotate   = "varimax",  # rotación ortogonal
+                fm       = "ml")       # máxima verosimilitud
+
+print(modelo_fa$loadings, cutoff=0.3, sort=TRUE)
+cat("\nComunalidades:\n")
+round(modelo_fa$communality, 3)
+```
+
+## 2.4. Mapa factorial
+
+```{r mapa-factorial, fig.width=9, fig.height=7}
+cargas <- as.data.frame(unclass(modelo_fa$loadings)[, 1:2])
+colnames(cargas) <- c("Factor1", "Factor2")
+cargas$variable  <- rownames(cargas)
+
+ggplot(cargas, aes(x=Factor1, y=Factor2, label=variable)) +
+  geom_point(color="#2563a8", size=3) +
+  geom_text(vjust=-0.6, hjust=0.5, size=3.5) +
+  geom_hline(yintercept=0, linetype="dashed", color="#ccc") +
+  geom_vline(xintercept=0, linetype="dashed", color="#ccc") +
+  geom_segment(aes(x=0, y=0, xend=Factor1, yend=Factor2),
+               arrow=arrow(length=unit(0.2,"cm")), color="#2563a8", alpha=0.5) +
+  labs(title="Mapa factorial — F1 vs F2 (rotación Varimax)",
+       x=paste0("Factor 1 (", round(modelo_fa$Vaccounted[2,1]*100,1), "% var. compartida)"),
+       y=paste0("Factor 2 (", round(modelo_fa$Vaccounted[2,2]*100,1), "% var. compartida)")) +
+  xlim(-1.1, 1.1) + ylim(-1.1, 1.1) +
+  theme_minimal(base_size=12) + theme(panel.grid.minor=element_blank())
+```
+
+---
+
+# 3. Análisis de Correspondencias Simple (ACS)
+
+El ACS trabaja exclusivamente con **tablas de contingencia** (frecuencias cruzadas
+entre dos variables categóricas). Representa en un mapa conjunto la asociación
+entre filas y columnas.
+
+> **Importante:** el ACS no aplica a PCA ni a variables continuas directamente.
+> Requiere variables dummy o categóricas. (Referencia: indicación del docente.)
+
+## 3.1. Tabla de contingencia
+
+```{r tabla-contingencia}
+# Cruzar Processing.Method × Country.of.Origin (top 5 países)
+cat_data <- data_raw %>%
+  filter(!is.na(altitude_mean_meters), altitude_mean_meters > 0,
+         altitude_mean_meters <= 3000,
+         complete.cases(select(., all_of(vars_originales)))) %>%
+  mutate(
+    Proceso = ifelse(Processing.Method=="" | is.na(Processing.Method),
+                     "Desconocido", Processing.Method),
+    Pais    = Country.of.Origin
+  )
+
+top5 <- names(sort(table(cat_data$Pais), decreasing=TRUE)[1:5])
+cat_data <- cat_data %>%
+  mutate(Pais = ifelse(Pais %in% top5, Pais, "Otro"))
+
+tabla <- table(cat_data$Proceso, cat_data$Pais)
+addmargins(tabla)
+```
+
+## 3.2. Prueba chi² de independencia
+
+```{r chi2}
+chi2 <- chisq.test(tabla)
+cat("Chi² =", round(chi2$statistic, 2),
+    "  gl =", chi2$parameter,
+    "  p-valor =", formatC(chi2$p.value, format="e", digits=3), "\n")
+cat("Conclusión:", ifelse(chi2$p.value < 0.05,
+    "Existe asociación significativa entre proceso y país de origen.",
+    "No se rechaza independencia entre proceso y país."), "\n")
+```
+
+## 3.3. Mapa de correspondencias
+
+```{r correspondencias, fig.width=9, fig.height=7}
+ca_result <- CA(tabla, graph=FALSE)
+summary(ca_result)
+
+fviz_ca_biplot(ca_result,
+               repel   = TRUE,
+               col.row = "#e74c3c",
+               col.col = "#2563a8",
+               title   = "Mapa de correspondencias — Proceso × País de origen") +
+  theme_minimal()
+```
+
+---
+
+# 4. Análisis de Correspondencias Múltiple (ACM)
+
+El ACM extiende el ACS a más de dos variables categóricas simultáneamente.
+Equivale a hacer ACS sobre la matriz de indicadores (dummies).
+
+```{r acm, fig.width=9, fig.height=7}
+# Variables categóricas: Proceso + Color + Pais
+cat_df <- cat_data %>%
+  mutate(Color = ifelse(Color=="" | is.na(Color), "Desconocido", Color)) %>%
+  select(Proceso, Color, Pais) %>%
+  mutate(across(everything(), as.factor))
+
+mca_result <- MCA(cat_df, graph=FALSE)
+
+fviz_mca_biplot(mca_result,
+                repel       = TRUE,
+                col.ind     = "cos2",
+                gradient.cols = c("#f7f9fc","#2563a8","#0d2137"),
+                col.var     = "#e74c3c",
+                title       = "Mapa ACM — Proceso · Color · País") +
+  theme_minimal()
+```

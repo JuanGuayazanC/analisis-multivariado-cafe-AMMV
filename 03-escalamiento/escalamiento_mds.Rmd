@@ -1,0 +1,164 @@
+---
+title: "Escalamiento Multidimensional (MDS)"
+subtitle: "Mapas de similitudes y representación de proximidades · Semana 8"
+author: "Juan Sebastián Guayazán · Esteban Valente · Diego Nocua"
+date: "`r format(Sys.Date(), '%d de %B de %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    code_folding: show
+    theme: flatly
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE,
+                      fig.align = "center", fig.width = 8, fig.height = 6)
+```
+
+> **Semana 8 del programa:** Escalamiento y representación de proximidades —
+> mapas, similitudes, distancias e interpretación aplicada.
+
+---
+
+# 1. Datos
+
+```{r datos}
+library(dplyr)
+library(ggplot2)
+library(car)
+library(smacof)    # MDS métrico y no métrico
+
+data_raw <- read.csv("../data/arabica_data_cleaned.csv")
+
+vars_originales <- c("Aroma","Flavor","Aftertaste","Acidity","Body","Balance",
+                     "Uniformity","Clean.Cup","Sweetness","Cupper.Points",
+                     "Moisture","Category.One.Defects","Category.Two.Defects",
+                     "altitude_mean_meters")
+
+datos <- data_raw %>%
+  filter(!is.na(altitude_mean_meters),
+         altitude_mean_meters > 0, altitude_mean_meters <= 3000) %>%
+  select(all_of(vars_originales)) %>%
+  filter(complete.cases(.)) %>%
+  rename(Sabor=Flavor, Retrogusto=Aftertaste, Acidez=Acidity, Cuerpo=Body,
+         Uniformidad=Uniformity, Taza.Limpia=Clean.Cup, Dulzura=Sweetness,
+         Puntaje.Catador=Cupper.Points, Humedad=Moisture,
+         Defectos.Cat1=Category.One.Defects, Defectos.Cat2=Category.Two.Defects,
+         Altitud=altitude_mean_meters)
+
+vars_11 <- c("Aroma","Sabor","Retrogusto","Acidez","Cuerpo","Balance",
+             "Uniformidad","Taza.Limpia","Dulzura","Puntaje.Catador","Altitud")
+
+# Transformación YJ (pipeline estándar del proyecto)
+datos_t <- datos[, vars_11]
+pt_11   <- powerTransform(datos_t, family="yjPower")
+lambdas <- pmax(pmin(coef(pt_11, round=FALSE), 3), -3)
+for (v in names(datos_t)) datos_t[[v]] <- yjPower(datos_t[[v]], lambdas[v])
+
+# Muestra para MDS (el algoritmo es O(n²))
+set.seed(42)
+idx_muestra <- sample(nrow(datos_t), 150)
+datos_mds   <- scale(datos_t[idx_muestra, ])
+```
+
+---
+
+# 2. Escalamiento Métrico (MDS clásico / Torgerson)
+
+El MDS clásico reconstruye coordenadas en un espacio de baja dimensión a partir
+de una **matriz de distancias**, preservando las distancias originales lo mejor posible.
+Es matemáticamente equivalente a PCA sobre la matriz de doble centrado.
+
+```{r mds-clasico}
+D <- dist(datos_mds, method="euclidean")
+mds_clasico <- cmdscale(D, k=2, eig=TRUE)
+
+cat("Proporción de varianza explicada por las 2 dimensiones:\n")
+var_exp <- mds_clasico$eig / sum(abs(mds_clasico$eig))
+cat("Dim1:", round(var_exp[1]*100, 1), "%  Dim2:", round(var_exp[2]*100, 1),
+    "%  Total:", round(sum(var_exp[1:2])*100, 1), "%\n")
+```
+
+```{r mds-clasico-viz, fig.width=9, fig.height=7}
+mds_df <- as.data.frame(mds_clasico$points)
+colnames(mds_df) <- c("Dim1", "Dim2")
+
+ggplot(mds_df, aes(Dim1, Dim2)) +
+  geom_point(alpha=0.4, color="#2563a8", size=1.8) +
+  geom_hline(yintercept=0, linetype="dashed", color="#ccc") +
+  geom_vline(xintercept=0, linetype="dashed", color="#ccc") +
+  labs(title="MDS Clásico (Torgerson) — 150 lotes",
+       subtitle=paste0("Dim1 ", round(var_exp[1]*100,1),
+                       "% + Dim2 ", round(var_exp[2]*100,1), "%"),
+       caption="Distancia euclídea en espacio YJ-estandarizado",
+       x=paste0("Dimensión 1 (", round(var_exp[1]*100,1), "%)"),
+       y=paste0("Dimensión 2 (", round(var_exp[2]*100,1), "%)")) +
+  theme_minimal(base_size=12) + theme(panel.grid.minor=element_blank())
+```
+
+---
+
+# 3. MDS No Métrico (Kruskal)
+
+El MDS no métrico solo preserva el **orden** de las distancias (no sus magnitudes).
+Se evalúa con el estadístico **Stress** — valores < 0.1 son aceptables.
+
+```{r mds-nometrico}
+mds_nm <- isoMDS(D, k=2)
+cat("Stress (MDS no métrico):", round(mds_nm$stress, 3),
+    ifelse(mds_nm$stress < 10, "— Bueno (< 10%)", "— Revisar"), "\n")
+```
+
+```{r mds-nometrico-viz, fig.width=9, fig.height=7}
+nm_df <- as.data.frame(mds_nm$points)
+colnames(nm_df) <- c("Dim1","Dim2")
+
+ggplot(nm_df, aes(Dim1, Dim2)) +
+  geom_point(alpha=0.4, color="#27ae60", size=1.8) +
+  geom_hline(yintercept=0, linetype="dashed", color="#ccc") +
+  geom_vline(xintercept=0, linetype="dashed", color="#ccc") +
+  labs(title=paste0("MDS No Métrico (Kruskal) — Stress = ",
+                    round(mds_nm$stress, 2), "%"),
+       caption="Preserva orden de distancias, no magnitudes",
+       x="Dimensión 1", y="Dimensión 2") +
+  theme_minimal(base_size=12) + theme(panel.grid.minor=element_blank())
+```
+
+---
+
+# 4. Diagrama de Shepard
+
+El diagrama de Shepard compara las distancias originales con las distancias
+representadas en el mapa MDS. Puntos cercanos a la diagonal = buena representación.
+
+```{r shepard, fig.width=8, fig.height=6}
+d_orig <- as.vector(D)
+d_mds  <- as.vector(dist(mds_clasico$points))
+
+data.frame(original=d_orig, mds=d_mds) %>%
+  sample_n(2000) %>%
+  ggplot(aes(original, mds)) +
+  geom_point(alpha=0.1, size=0.8, color="#2563a8") +
+  geom_abline(slope=1, intercept=0, color="red", linetype="dashed") +
+  labs(title="Diagrama de Shepard — MDS clásico",
+       x="Distancia original", y="Distancia en el mapa MDS") +
+  theme_minimal()
+```
+
+---
+
+# 5. Comparación MDS vs PCA
+
+```{r comparacion}
+pca_ref <- prcomp(datos_mds, center=FALSE, scale.=FALSE)
+pca_df  <- as.data.frame(pca_ref$x[, 1:2])
+colnames(pca_df) <- c("PC1","PC2")
+
+cat("Correlación entre coordenadas MDS y PCA:\n")
+cat("Dim1-PC1:", round(abs(cor(mds_df$Dim1, pca_df$PC1)), 4), "\n")
+cat("Dim2-PC2:", round(abs(cor(mds_df$Dim2, pca_df$PC2)), 4), "\n")
+cat("\n(Correlación ≈ 1 confirma equivalencia entre MDS clásico y PCA)\n")
+```

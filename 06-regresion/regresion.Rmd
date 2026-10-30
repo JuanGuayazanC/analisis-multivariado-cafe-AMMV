@@ -1,0 +1,203 @@
+---
+title: "Regresión Lineal Multivariada"
+subtitle: "Predicción de calidad del café · Semana 14"
+author: "Juan Sebastián Guayazán · Esteban Valente · Diego Nocua"
+date: "`r format(Sys.Date(), '%d de %B de %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    code_folding: show
+    theme: flatly
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE,
+                      fig.align = "center", fig.width = 8, fig.height = 6)
+```
+
+> **Semana 14 del programa:** Regresión lineal simple y múltiple, selección de
+> variables, diagnósticos de regresión, predicción y comparación con modelos AA/ML.
+
+---
+
+# 1. Datos y variable respuesta
+
+Se predice el **puntaje total del catador** (`Total.Cup.Points`) a partir de los
+10 atributos sensoriales y la altitud.
+
+```{r datos}
+library(dplyr)
+library(ggplot2)
+library(car)
+library(broom)     # tidy(), glance(), augment()
+library(MASS)      # stepAIC()
+library(leaps)     # regsubsets()
+
+data_raw <- read.csv("../data/arabica_data_cleaned.csv")
+
+vars_originales <- c("Aroma","Flavor","Aftertaste","Acidity","Body","Balance",
+                     "Uniformity","Clean.Cup","Sweetness","Cupper.Points",
+                     "Moisture","Category.One.Defects","Category.Two.Defects",
+                     "altitude_mean_meters","Total.Cup.Points")
+
+datos <- data_raw %>%
+  filter(!is.na(altitude_mean_meters),
+         altitude_mean_meters > 0, altitude_mean_meters <= 3000) %>%
+  select(all_of(vars_originales)) %>%
+  filter(complete.cases(.)) %>%
+  rename(Sabor=Flavor, Retrogusto=Aftertaste, Acidez=Acidity, Cuerpo=Body,
+         Uniformidad=Uniformity, Taza.Limpia=Clean.Cup, Dulzura=Sweetness,
+         Puntaje.Catador=Cupper.Points, Humedad=Moisture,
+         Defectos.Cat1=Category.One.Defects, Defectos.Cat2=Category.Two.Defects,
+         Altitud=altitude_mean_meters, Puntaje.Total=Total.Cup.Points)
+
+vars_pred <- c("Aroma","Sabor","Retrogusto","Acidez","Cuerpo","Balance",
+               "Uniformidad","Taza.Limpia","Dulzura","Puntaje.Catador","Altitud")
+
+cat("Dimensiones:", nrow(datos), "×", ncol(datos), "\n")
+cat("Variable respuesta: Puntaje.Total\n")
+summary(datos$Puntaje.Total)
+```
+
+---
+
+# 2. Regresión lineal simple
+
+Exploración del predictor más correlacionado con el puntaje total.
+
+```{r regresion-simple}
+cors <- cor(datos[, vars_pred], datos$Puntaje.Total)
+mejor_var <- names(which.max(abs(cors)))
+cat("Variable más correlacionada:", mejor_var,
+    "  r =", round(cors[mejor_var,], 4), "\n")
+
+modelo_simple <- lm(Puntaje.Total ~ get(mejor_var), data=datos)
+summary(modelo_simple)
+```
+
+```{r regresion-simple-viz, fig.width=8, fig.height=5}
+ggplot(datos, aes_string(x=mejor_var, y="Puntaje.Total")) +
+  geom_point(alpha=0.2, color="#2563a8", size=1.2) +
+  geom_smooth(method="lm", color="#e74c3c", se=TRUE) +
+  labs(title=paste0("Regresión simple: Puntaje.Total ~ ", mejor_var),
+       subtitle=paste0("R² = ", round(summary(modelo_simple)$r.squared, 4))) +
+  theme_minimal()
+```
+
+---
+
+# 3. Regresión lineal múltiple (modelo completo)
+
+```{r regresion-multiple}
+formula_completa <- as.formula(paste("Puntaje.Total ~", paste(vars_pred, collapse=" + ")))
+modelo_completo  <- lm(formula_completa, data=datos)
+
+glance(modelo_completo)
+```
+
+```{r coeficientes}
+tidy(modelo_completo, conf.int=TRUE) %>%
+  filter(term != "(Intercept)") %>%
+  arrange(desc(abs(estimate))) %>%
+  mutate(across(where(is.numeric), ~ round(., 4)))
+```
+
+```{r coef-viz, fig.width=9, fig.height=6}
+tidy(modelo_completo, conf.int=TRUE) %>%
+  filter(term != "(Intercept)") %>%
+  ggplot(aes(x=reorder(term, estimate), y=estimate)) +
+  geom_col(aes(fill=estimate > 0), alpha=0.8, width=0.6) +
+  geom_errorbar(aes(ymin=conf.low, ymax=conf.high), width=0.2, color="#333") +
+  scale_fill_manual(values=c("TRUE"="#27ae60","FALSE"="#e74c3c"), guide="none") +
+  coord_flip() +
+  labs(title="Coeficientes estandarizados — modelo completo",
+       x="", y="Estimación (IC 95%)") +
+  theme_minimal()
+```
+
+---
+
+# 4. Diagnósticos del modelo
+
+```{r diagnosticos, fig.width=10, fig.height=8}
+par(mfrow=c(2,2))
+plot(modelo_completo)
+par(mfrow=c(1,1))
+```
+
+```{r vif}
+cat("Factor de inflación de varianza (VIF):\n")
+round(vif(modelo_completo), 2)
+```
+
+---
+
+# 5. Selección de variables
+
+## 5.1. Stepwise AIC
+
+```{r stepwise}
+modelo_step <- stepAIC(modelo_completo, direction="both", trace=FALSE)
+cat("Variables seleccionadas por AIC:\n")
+cat(names(coef(modelo_step))[-1], sep=", ")
+cat("\n\nComparación R² ajustado:\n")
+cat("Modelo completo: ", round(summary(modelo_completo)$adj.r.squared, 4), "\n")
+cat("Modelo stepwise:", round(summary(modelo_step)$adj.r.squared, 4), "\n")
+```
+
+## 5.2. Mejor subconjunto
+
+```{r mejor-subconjunto, fig.width=9, fig.height=6}
+reg_sub <- regsubsets(formula_completa, data=datos, nvmax=11)
+reg_sum <- summary(reg_sub)
+
+data.frame(
+  k = 1:11,
+  R2_adj = reg_sum$adjr2,
+  Cp     = reg_sum$cp,
+  BIC    = reg_sum$bic
+) %>%
+  tidyr::pivot_longer(-k, names_to="Métrica", values_to="Valor") %>%
+  ggplot(aes(k, Valor, color=Métrica)) +
+  geom_line(size=1) + geom_point(size=2) +
+  facet_wrap(~Métrica, scales="free_y") +
+  labs(title="Criterios de selección de subconjunto",
+       x="Número de variables", y="") +
+  theme_minimal() + theme(legend.position="none")
+```
+
+---
+
+# 6. Predicción y evaluación
+
+```{r prediccion}
+set.seed(42)
+idx_test   <- sample(nrow(datos), 0.25 * nrow(datos))
+datos_test <- datos[ idx_test, ]
+datos_tr   <- datos[-idx_test, ]
+
+modelo_final <- lm(formula_completa, data=datos_tr)
+pred_vals    <- predict(modelo_final, datos_test)
+
+rmse <- sqrt(mean((datos_test$Puntaje.Total - pred_vals)^2))
+mae  <- mean(abs(datos_test$Puntaje.Total - pred_vals))
+r2   <- cor(datos_test$Puntaje.Total, pred_vals)^2
+
+cat("RMSE:", round(rmse, 4), "\n")
+cat("MAE: ", round(mae, 4), "\n")
+cat("R²:  ", round(r2, 4), "\n")
+```
+
+```{r prediccion-viz, fig.width=7, fig.height=6}
+data.frame(real=datos_test$Puntaje.Total, pred=pred_vals) %>%
+  ggplot(aes(real, pred)) +
+  geom_point(alpha=0.3, color="#2563a8", size=1.5) +
+  geom_abline(slope=1, intercept=0, color="red", linetype="dashed") +
+  labs(title="Valores reales vs predichos — modelo lineal múltiple",
+       subtitle=paste0("R² = ", round(r2,4), "  |  RMSE = ", round(rmse,4)),
+       x="Puntaje real", y="Puntaje predicho") +
+  theme_minimal()
+```

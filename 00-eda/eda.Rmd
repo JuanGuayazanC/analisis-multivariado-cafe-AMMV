@@ -1,0 +1,209 @@
+---
+title: "Análisis Exploratorio Multivariado"
+subtitle: "Matrices de covarianza, correlación, distancias · Semanas 2-3"
+author: "Juan Sebastián Guayazán · Esteban Valente · Diego Nocua"
+date: "`r format(Sys.Date(), '%d de %B de %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    code_folding: show
+    theme: flatly
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE,
+                      fig.align = "center", fig.width = 8, fig.height = 6)
+```
+
+> **Semanas 2-3 del programa:** Matriz de datos, tipos de variables, preparación,
+> escalamiento, estandarización, visualización exploratoria. Medidas de localización
+> y dispersión multivariada: medias, matriz de varianzas y covarianzas, matriz de
+> correlaciones y varianza generalizada.
+
+---
+
+# 1. Carga y preparación de datos
+
+```{r datos}
+library(dplyr)
+library(ggplot2)
+library(GGally)      # ggpairs
+library(corrplot)    # corrplot
+library(robustbase)  # adjboxStats, mc
+
+data_raw <- read.csv("../data/arabica_data_cleaned.csv")
+
+vars_originales <- c("Aroma","Flavor","Aftertaste","Acidity","Body","Balance",
+                     "Uniformity","Clean.Cup","Sweetness","Cupper.Points",
+                     "Moisture","Category.One.Defects","Category.Two.Defects",
+                     "altitude_mean_meters")
+
+datos <- data_raw %>%
+  filter(!is.na(altitude_mean_meters),
+         altitude_mean_meters > 0,
+         altitude_mean_meters <= 3000) %>%
+  select(all_of(vars_originales)) %>%
+  filter(complete.cases(.)) %>%
+  rename(
+    Sabor=Flavor, Retrogusto=Aftertaste, Acidez=Acidity, Cuerpo=Body,
+    Uniformidad=Uniformity, Taza.Limpia=Clean.Cup, Dulzura=Sweetness,
+    Puntaje.Catador=Cupper.Points, Humedad=Moisture,
+    Defectos.Cat1=Category.One.Defects, Defectos.Cat2=Category.Two.Defects,
+    Altitud=altitude_mean_meters
+  )
+
+cat("Dimensiones:", nrow(datos), "lotes ×", ncol(datos), "variables\n")
+glimpse(datos)
+```
+
+## 1.1. Tipos de variables
+
+```{r tipos}
+# Variables numéricas continuas (cuantitativas)
+vars_continuas <- c("Aroma","Sabor","Retrogusto","Acidez","Cuerpo","Balance",
+                    "Uniformidad","Taza.Limpia","Dulzura","Puntaje.Catador","Altitud")
+
+# Variables con inflación de ceros (problemáticas)
+vars_infladas <- c("Humedad","Defectos.Cat1","Defectos.Cat2")
+
+cat("Variables continuas (11):\n"); cat(vars_continuas, sep=", "); cat("\n")
+cat("\nVariables con inflación de ceros (3):\n"); cat(vars_infladas, sep=", "); cat("\n")
+```
+
+---
+
+# 2. Estadísticos de localización y dispersión multivariada
+
+## 2.1. Vector de medias
+
+```{r medias}
+mu <- colMeans(datos[, vars_continuas])
+round(mu, 3)
+```
+
+## 2.2. Matriz de varianzas y covarianzas (S)
+
+```{r covarianza}
+S <- cov(datos[, vars_continuas])
+round(S, 3)
+cat("\nVarianza total (traza de S):", round(sum(diag(S)), 2), "\n")
+cat("Varianza generalizada (det S):", formatC(det(S), format="e", digits=3), "\n")
+```
+
+## 2.3. Matriz de correlaciones (R)
+
+```{r correlacion, fig.width=9, fig.height=8}
+R <- cor(datos[, vars_continuas])
+round(R, 3)
+
+corrplot(R, method="color", type="upper", order="hclust",
+         tl.cex=0.8, tl.col="black", addCoef.col="black",
+         number.cex=0.6, col=colorRampPalette(c("#2563a8","white","#e74c3c"))(200),
+         title="Matriz de correlaciones — 11 variables continuas",
+         mar=c(0,0,2,0))
+```
+
+## 2.4. Varianza generalizada y varianza total
+
+```{r varianza-generalizada}
+cat("Varianza total       (traza S):", round(sum(diag(S)), 2), "\n")
+cat("Varianza generalizada (det S): ", formatC(det(S), format="e", digits=3), "\n")
+cat("Varianza media                :", round(sum(diag(S))/ncol(S), 4), "\n")
+```
+
+---
+
+# 3. Visualización exploratoria
+
+## 3.1. Boxplots univariados
+
+```{r boxplots, fig.width=12, fig.height=8}
+library(tidyr)
+
+datos[, vars_continuas] %>%
+  pivot_longer(everything(), names_to="Variable", values_to="Valor") %>%
+  ggplot(aes(x=reorder(Variable, Valor, median), y=Valor)) +
+  geom_boxplot(fill="#2563a8", alpha=0.4, outlier.alpha=0.3,
+               outlier.size=1, color="#1a4a7a") +
+  coord_flip() +
+  labs(title="Distribución univariada — 11 variables continuas",
+       x="", y="Valor") +
+  theme_minimal(base_size=12) +
+  theme(panel.grid.minor=element_blank())
+```
+
+## 3.2. Matriz de dispersión (pares)
+
+```{r pairs, fig.width=11, fig.height=10}
+ggpairs(datos[, vars_continuas[1:6]],
+        lower=list(continuous=wrap("points", alpha=0.15, size=0.8, color="#2563a8")),
+        diag =list(continuous=wrap("densityDiag", fill="#2563a8", alpha=0.4)),
+        upper=list(continuous=wrap("cor", size=3.5)),
+        title="Matriz de dispersión — primeras 6 variables") +
+  theme_minimal(base_size=10)
+```
+
+---
+
+# 4. Distancias y similitudes
+
+## 4.1. Distancia euclídea
+
+```{r dist-euclidea}
+datos_std <- scale(datos[, vars_continuas])
+
+# Matriz de distancias euclídeas sobre muestra de 10 lotes
+set.seed(42)
+idx <- sample(nrow(datos_std), 10)
+D_euc <- dist(datos_std[idx, ], method="euclidean")
+round(as.matrix(D_euc), 2)
+```
+
+## 4.2. Distancia de Mahalanobis
+
+La distancia de Mahalanobis tiene en cuenta la covarianza entre variables.
+Un lote con $d^2_M > \chi^2_{p,0.975}$ se considera multivariadamente atípico.
+
+```{r mahalanobis}
+dm2 <- mahalanobis(datos[, vars_continuas],
+                   colMeans(datos[, vars_continuas]),
+                   cov(datos[, vars_continuas]))
+
+umbral <- qchisq(0.975, df=length(vars_continuas))
+n_atipicos <- sum(dm2 > umbral)
+
+cat("Umbral chi² al 97.5% (p=11):", round(umbral, 2), "\n")
+cat("Lotes atípicos multivariados:", n_atipicos,
+    sprintf("(%.1f%%)\n", n_atipicos/nrow(datos)*100))
+cat("\nTop 5 distancias de Mahalanobis:\n")
+print(sort(dm2, decreasing=TRUE)[1:5])
+```
+
+```{r mahalanobis-viz, fig.width=9, fig.height=5}
+data.frame(id=seq_along(dm2), dm2=dm2) %>%
+  ggplot(aes(x=id, y=dm2)) +
+  geom_point(aes(color=dm2>umbral), alpha=0.5, size=1.2) +
+  geom_hline(yintercept=umbral, linetype="dashed", color="red", linewidth=0.8) +
+  scale_color_manual(values=c("TRUE"="#e74c3c","FALSE"="#2563a8"),
+                     labels=c("TRUE"="Atípico","FALSE"="Normal"),
+                     name="") +
+  annotate("label", x=1050, y=umbral*1.1, label=paste0("χ²₀.₉₇₅ = ",round(umbral,1)),
+           color="red", size=3.5, hjust=1) +
+  labs(title="Distancias de Mahalanobis — 11 variables continuas",
+       x="Lote", y="d²_M") +
+  theme_minimal() + theme(panel.grid.minor=element_blank())
+```
+
+## 4.3. Comparación de distancias
+
+```{r comparacion-distancias}
+# Distancia estandarizada (euclídea sobre datos escalados) vs Mahalanobis
+d_std <- sqrt(rowSums(datos_std^2))   # euclídea en espacio estandarizado
+
+cat("Correlación euclídea-estandarizada vs Mahalanobis:",
+    round(cor(d_std, sqrt(dm2)), 4), "\n")
+cat("(Si correlación < 1: Mahalanobis detecta estructura de covarianza adicional)\n")
+```
