@@ -1,6 +1,6 @@
 ---
 title: "Taller PCA — DESPUÉS de las correcciones"
-subtitle: "11 variables + Yeo-Johnson en todas — Coffee Quality Institute"
+subtitle: "11 variables · YJ selectivo · depuración de atípicos multivariados — Coffee Quality Institute"
 author: "Juan Sebastián Guayazán · Esteban Valente · Diego Nocua"
 date: "`r format(Sys.Date(), '%d de %B de %Y')`"
 output:
@@ -18,7 +18,7 @@ knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE,
                        fig.align = "center", fig.width = 8, fig.height = 7)
 ```
 
-> **Propósito de este documento:** análisis corregido. Se excluyen `Category.One.Defects`, `Category.Two.Defects` y `Moisture` (inflación de ceros, no normalizables), y se aplica Yeo-Johnson a **todas** las 11 variables restantes con lambda óptimo individual, atendiendo la retroalimentación del profesor sobre patrones en la matriz de dispersión y outliers.
+> **Propósito de este documento:** análisis corregido con tres ajustes metodológicos. (1) Se excluyen `Category.One.Defects`, `Category.Two.Defects` y `Moisture` (inflación de ceros, no normalizables). (2) Yeo-Johnson se aplica **solo** a variables con sesgo fuerte (|skewness| > 1) — las que ya son aproximadamente simétricas se dejan sin transformar para no introducir distorsiones innecesarias. (3) Se detectan atípicos multivariados por distancia de Mahalanobis vía scores del PCA exploratorio, se caracteriza qué tienen en común, se reporta su retiro y el PCA final corre sobre los datos depurados.
 
 > **Notación del curso.** $X$: matriz $n \times p$; $\bar{x}$: media por columna; $P = I_n - \frac{1}{n}\mathbf{1}\mathbf{1}^\top$: centrado; $S = \frac{1}{n}\tilde{X}^\top\tilde{X}$: covarianza; $R = D^{-1/2}SD^{-1/2}$: correlación. `pca$rotation` = $A$ (vectores propios); `pca$x` = $Z = X^*A$ (scores).
 
@@ -193,29 +193,44 @@ cat("  -> razón para estandarizar antes de PCA.\n")
 ```{r datos-oficiales}
 vars_11 <- setdiff(names(datos_transformados),
                    c("Category.One.Defects", "Category.Two.Defects", "Moisture"))
+# datos_t se construye aquí; la transformación YJ selectiva y la depuración de atípicos
+# se aplican en la sección 5b antes del PCA final
 datos_t <- datos_transformados[, vars_11]
 ```
 
-```{r yj-todas-variables}
+```{r yj-selectivo}
 library(car)
+skew <- function(x) mean((x - mean(x))^3) / sd(x)^3
+
+skew_pre <- sapply(datos_t, skew)
+cat("Skewness por variable (antes de cualquier transformación):\n")
+print(round(skew_pre, 3))
+
+# Solo transformar variables con sesgo fuerte (|skewness| > 1)
+vars_transformar <- names(skew_pre[abs(skew_pre) > 1])
+vars_sin_transformar <- setdiff(names(skew_pre), vars_transformar)
+
+cat("\nVariables con |sesgo| > 1 → se aplica Yeo-Johnson:\n", vars_transformar, "\n")
+cat("Variables con sesgo suave → se dejan sin transformar:\n", vars_sin_transformar, "\n")
+
 datos_t_sin_yj <- datos_t
 
-pt_11 <- powerTransform(datos_t, family = "yjPower")
-lambdas_11 <- coef(pt_11, round = FALSE)
-cat("Lambdas Yeo-Johnson por variable:\n")
-print(round(lambdas_11, 3))
-
-datos_t_yj <- datos_t
-for (v in names(datos_t)) {
-  datos_t_yj[[v]] <- yjPower(datos_t[[v]], lambdas_11[v])
+if (length(vars_transformar) > 0) {
+  pt_sel <- powerTransform(datos_t[, vars_transformar, drop = FALSE], family = "yjPower")
+  lambdas_sel <- coef(pt_sel, round = FALSE)
+  cat("\nLambdas Yeo-Johnson (solo variables transformadas):\n")
+  print(round(lambdas_sel, 3))
+  for (v in vars_transformar) {
+    datos_t[[v]] <- yjPower(datos_t[[v]], lambdas_sel[v])
+  }
 }
-datos_t <- datos_t_yj
 
-skew <- function(x) mean((x - mean(x))^3) / sd(x)^3
-cat("\nSkewness ANTES de YJ:\n")
-print(round(sapply(datos_t_sin_yj, skew), 3))
-cat("\nSkewness DESPUES de YJ:\n")
-print(round(sapply(datos_t, skew), 3))
+cat("\nSkewness ANTES (solo vars. transformadas):\n")
+print(round(sapply(datos_t_sin_yj[, vars_transformar, drop=FALSE], skew), 3))
+cat("\nSkewness DESPUES:\n")
+print(round(sapply(datos_t[, vars_transformar, drop=FALSE], skew), 3))
+cat("\nSkewness variables NO transformadas (referencia):\n")
+print(round(sapply(datos_t[, vars_sin_transformar, drop=FALSE], skew), 3))
 ```
 
 ```{r antes-despues-comparacion, fig.width=12, fig.height=5}
@@ -235,14 +250,100 @@ biplot(prcomp(datos_t, center=TRUE, scale.=TRUE), scale = 0, cex = 0.45, col = c
        main = "DESPUES: 11 variables + YJ en todas")
 ```
 
+---
+
+# 5b. Atípicos multivariados — detección, caracterización y depuración
+
+> **Flujo:** (1) PCA exploratorio con todos los lotes → (2) identificar atípicos por distancia de Mahalanobis vía scores → (3) caracterizar qué tienen en común → (4) retirarlos y reportarlos → (5) PCA final sobre datos limpios.
+
+```{r pca-preliminar}
+pca_prelim <- prcomp(datos_t, center = TRUE, scale. = TRUE)
+
+# Mahalanobis via scores PCA: numéricamente estable (evita cov singular post-YJ)
+dm2_prelim <- rowSums((pca_prelim$x / pca_prelim$sdev)^2)
+umbral_chi2 <- qchisq(0.975, df = ncol(datos_t))
+
+idx_atipicos <- which(dm2_prelim > umbral_chi2)
+cat("Umbral chi² al 97.5% (p =", ncol(datos_t), "):", round(umbral_chi2, 1), "\n")
+cat("Lotes atípicos multivariados:", length(idx_atipicos),
+    sprintf("(%.1f%% del total)\n", length(idx_atipicos) / nrow(datos_t) * 100))
+```
+
+```{r atipicos-en-pca, fig.width=10, fig.height=5}
+par(mfrow = c(1, 2))
+# PC1 vs PC2
+plot(pca_prelim$x[, 1], pca_prelim$x[, 2],
+     col = ifelse(dm2_prelim > umbral_chi2, "firebrick", adjustcolor("steelblue", 0.4)),
+     pch = 19, cex = ifelse(dm2_prelim > umbral_chi2, 0.9, 0.5),
+     xlab = paste0("PC1 (", round(pca_prelim$sdev[1]^2/sum(pca_prelim$sdev^2)*100,1), "%)"),
+     ylab = paste0("PC2 (", round(pca_prelim$sdev[2]^2/sum(pca_prelim$sdev^2)*100,1), "%)"),
+     main = "Atípicos multivariados — PC1 vs PC2")
+legend("topright", legend = c("Normal", "Atípico"), pch = 19,
+       col = c("steelblue", "firebrick"), cex = 0.8)
+
+# PC1 vs PC3
+plot(pca_prelim$x[, 1], pca_prelim$x[, 3],
+     col = ifelse(dm2_prelim > umbral_chi2, "firebrick", adjustcolor("steelblue", 0.4)),
+     pch = 19, cex = ifelse(dm2_prelim > umbral_chi2, 0.9, 0.5),
+     xlab = paste0("PC1 (", round(pca_prelim$sdev[1]^2/sum(pca_prelim$sdev^2)*100,1), "%)"),
+     ylab = paste0("PC3 (", round(pca_prelim$sdev[3]^2/sum(pca_prelim$sdev^2)*100,1), "%)"),
+     main = "Atípicos multivariados — PC1 vs PC3")
+```
+
+```{r atipicos-caracterizacion}
+# Qué tienen en común los atípicos: comparar sus medias con el resto
+vars_orig_11 <- c("Aroma","Sabor","Retrogusto","Acidez","Cuerpo","Balance",
+                  "Uniformidad","Taza.Limpia","Dulzura","Puntaje.Catador","Altitud")
+
+# Reconstruir datos originales en la escala pre-transformación para inspección
+datos_orig_11 <- datos_t_sin_yj   # antes de YJ selectivo
+
+cat("=== Medias de los atípicos vs. el resto ===\n")
+comp <- rbind(
+  Atipicos = round(colMeans(datos_orig_11[idx_atipicos, , drop=FALSE]), 3),
+  Resto    = round(colMeans(datos_orig_11[-idx_atipicos, , drop=FALSE]), 3)
+)
+print(comp)
+
+# Revisar el dataset original para detectar patrón
+datos_atipicos_raw <- data_f[idx_atipicos, c("Moisture","Category.One.Defects",
+                                               "Category.Two.Defects","altitude_mean_meters",
+                                               "Country.of.Origin")]
+cat("\n--- Distribución de Moisture en atípicos ---\n")
+print(table(round(datos_atipicos_raw$Moisture, 1)))
+cat("\nPaíses de origen de los atípicos:\n")
+print(sort(table(datos_atipicos_raw$Country.of.Origin), decreasing=TRUE)[1:10])
+```
+
+**Hallazgo:** describir aquí qué estructura comparten los atípicos (e.g., concentración de Moisture = 0, altitudes extremas, puntajes sensoriales inconsistentes).
+
+```{r atipicos-reporte}
+cat("=== REPORTE DE DEPURACIÓN ===\n")
+cat("Lotes totales antes de depuración:", nrow(datos_t), "\n")
+cat("Lotes atípicos identificados (d²_M > chi²_0.975):", length(idx_atipicos), "\n")
+cat("Fracción con Moisture = 0 entre atípicos:",
+    round(mean(datos_atipicos_raw$Moisture == 0) * 100, 1), "%\n")
+cat("Lotes retenidos para análisis final:", nrow(datos_t) - length(idx_atipicos), "\n")
+```
+
+```{r datos-limpios}
+# Retirar atípicos para el PCA final
+datos_limpio <- datos_t[-idx_atipicos, ]
+cat("Dimensiones de la matriz limpia:", nrow(datos_limpio), "×", ncol(datos_limpio), "\n")
+```
+
+---
+
 ```{r estandarizacion-explicita}
-Z <- scale(datos_t)
+Z <- scale(datos_limpio)
 round(colMeans(Z), 12)
 round(apply(Z, 2, var), 3)
 ```
 
 ```{r pca}
-pca <- prcomp(datos_t, center = TRUE, scale. = TRUE)
+# PCA final sobre datos sin atípicos
+pca <- prcomp(datos_limpio, center = TRUE, scale. = TRUE)
+cat("PCA final: datos limpios (", nrow(datos_limpio), "lotes ×", ncol(datos_limpio), "variables)\n")
 ```
 
 ---
@@ -438,7 +539,8 @@ biplot(pca, choices = c(1,3), cex = 0.6,
 ```{r kpca}
 library(kernlab)
 
-datos_esc <- as.data.frame(scale(datos_t))
+# Kernel PCA sobre los datos limpios (sin atípicos, con YJ selectivo)
+datos_esc <- as.data.frame(scale(datos_limpio))
 
 kp <- kpca(~.,
            data    = datos_esc,
@@ -520,7 +622,7 @@ pairs(rotated(kp_sigma_alto)[, 1:5],
 ```{r tsne}
 library(Rtsne)
 
-X <- scale(datos_t)
+X <- scale(datos_limpio)  # datos limpios (sin atípicos)
 
 set.seed(123)
 tsne <- Rtsne(X,
@@ -552,7 +654,7 @@ plot(tsne_perp5$Y,
 ```{r umap}
 library(uwot)
 
-X <- scale(datos_t)
+X <- scale(datos_limpio)  # datos limpios (sin atípicos)
 
 set.seed(123)
 um <- umap(X)
@@ -568,7 +670,9 @@ plot(um[, 1], um[, 2],
 cluster_bajo <- um[, 2] < -5
 sum(cluster_bajo)
 
-comp <- sapply(datos, function(v) c(cluster = mean(v[cluster_bajo]), resto = mean(v[!cluster_bajo])))
+# Comparar contra el subconjunto limpio (sin los atípicos ya retirados)
+datos_limpio_orig <- datos[-idx_atipicos, ]  # datos originales sin transformar, sin atípicos
+comp <- sapply(datos_limpio_orig, function(v) c(cluster = mean(v[cluster_bajo]), resto = mean(v[!cluster_bajo])))
 round(t(comp), 3)
 ```
 
@@ -576,7 +680,7 @@ round(t(comp), 3)
 
 ```{r moisture-cero-vecindad}
 library(FNN)
-es_cero <- datos$Moisture == 0
+es_cero <- datos_limpio_orig$Moisture == 0
 fraccion_vecinos <- function(coords, grupo) {
   vecinos <- knnx.index(coords, coords, k = 11)[, -1]
   mean(sapply(which(grupo), function(i) mean(grupo[vecinos[i, ]])))
