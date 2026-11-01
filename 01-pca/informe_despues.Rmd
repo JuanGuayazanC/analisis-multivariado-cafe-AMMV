@@ -1,6 +1,6 @@
 ---
 title: "Taller PCA — DESPUÉS de las correcciones"
-subtitle: "11 variables · YJ selectivo · depuración de atípicos multivariados — Coffee Quality Institute"
+subtitle: "8 variables · YJ selectivo · depuración de atípicos multivariados — Coffee Quality Institute"
 author: "Juan Sebastián Guayazán · Esteban Valente · Diego Nocua"
 date: "`r format(Sys.Date(), '%d de %B de %Y')`"
 output:
@@ -152,7 +152,7 @@ datos_transformados$Category.Two.Defects <-
   yeojohnson_transform(datos$Category.Two.Defects, lambdas["Category.Two.Defects"])
 ```
 
-Las variables sensoriales obtienen lambdas cercanos a 1, pero **lambda ≈ 1 no significa lambda = 1 exactamente**: incluso una ligera asimetría residual puede generar patrones no elípticos en la matriz de dispersión que el profesor identificó. Por eso el análisis principal aplica YJ **a todas las 11 variables** con lambda óptimo individual.
+Las variables sensoriales obtienen lambdas cercanos a 1. Sin embargo, este análisis previo revela que `Moisture` y `Category.One.Defects` no convergen, por lo que se excluyen del análisis principal (sección 5).
 
 ---
 
@@ -172,7 +172,7 @@ cat("  -> razón para estandarizar antes de PCA.\n")
 
 ---
 
-# 5. PCA — 11 variables + YJ en todas
+# 5. PCA — 8 variables + YJ selectivo
 
 **Decisión: ESTANDARIZAR** (`prcomp(datos_t, center=TRUE, scale.=TRUE)`). Justificación:
 
@@ -180,22 +180,36 @@ cat("  -> razón para estandarizar antes de PCA.\n")
 - $\operatorname{Var}(\texttt{altitude}) \approx 174\,656$ vs. $0.13$–$0.63$ en puntajes: 8 órdenes de magnitud.
 - Sin estandarizar, PC1 = altitud, por artefacto de unidades, no por relevancia.
 
-**Decisión: excluir `Category.One.Defects`, `Category.Two.Defects` y `Moisture` del análisis principal.** Las tres razones son complementarias y se verifican con los datos:
+**Decisión: excluir 6 variables del análisis principal** — 3 por inflación de ceros y 3 por inflación de máximos. Ambos patrones impiden que YJ corrija la distribución.
 
-1. **Inflación de ceros — Yeo-Johnson no converge.** En la sección 3.2 se intentó estimar el lambda óptimo de YJ para estas tres variables: `Moisture` y `Category.One.Defects` empujan $\lambda$ hasta el borde del intervalo de búsqueda ($\pm 5$), señal de que la optimización no encontró ningún $\lambda$ interior que simetrice la distribución. La razón es estructural: ambas variables tienen una **mezcla de pico en cero más cola continua** — 174 lotes con `Moisture = 0` (ver punto 3) y más del 80 % de lotes con `Category.One.Defects = 0` — y esa forma bimodal no es corregible con una transformación monótona de potencia. `Category.Two.Defects` sí converge (λ ≈ −0.22) y se tranformó en la sección 3.2, pero se excluye igualmente del análisis principal por coherencia con las otras dos variables de defectos.
+**Variables con inflación de ceros (se excluyen):**
 
-2. **Outliers extremos que dominan ejes enteros.** El análisis ANTES (sección 7) muestra que con 14 variables, **PC3 queda definido casi en su totalidad** por los lotes con 23–47 defectos (Cat1/Cat2 con cargas ≈ 0.54 y 0.65 en ese eje). Esos dos o tres lotes extremos "secuestran" una componente completa que de otro modo reflejaría variación real entre lotes normales. La distancia de Mahalanobis ANTES alcanzaba valores de ≈ 654, 410 y 300 — solo posibles cuando la covarianza en Cat1/Cat2 domina la métrica — y marcaba más de 60 lotes como atípicos. Excluir estas variables reduce ese número y concentra las componentes en la variación sensorial y de altitud.
+1. **`Moisture` y `Category.One.Defects` — YJ no converge.** Ambas tienen una mezcla de pico en cero más cola continua (174 lotes con `Moisture = 0`; > 80 % con `Cat1 = 0`). La distribución bimodal no es corregible con una transformación monótona de potencia.
 
-3. **`Moisture = 0` son faltantes codificados, no café genuinamente seco.** UMAP (sección 14) aisló los 174 lotes con `Moisture = 0` en un grupo completamente separado del resto. La sección 14 también muestra que estos lotes tienen `Moisture` media = 0.004 frente a 11.3 % en el resto — un valor físicamente imposible para granos de café, que normalmente retienen 9–13 % de humedad. Incluir `Moisture` en el PCA con esos 174 ceros introduce un artefacto de calidad de datos, no una dimensión real de variación.
+2. **`Category.Two.Defects`** — aunque converge (λ ≈ −0.22), se excluye por coherencia con las otras dos variables de defectos y porque los outliers extremos en Cat1/Cat2 dominaban PC3 completo (cargas ≈ 0.54 y 0.65, valores de Mahalanobis > 300).
 
-**Consecuencia de la exclusión:** al retirar estas tres variables, PC1 aumenta su proporción de varianza explicada respecto al análisis con 14 variables, porque ya no comparte espacio de varianza con el eje de defectos, y los ejes secundarios reflejan exclusivamente contrastes entre atributos sensoriales y altitud — exactamente la estructura que el análisis busca.
+3. **`Moisture = 0` son faltantes codificados.** UMAP aisló esos 174 lotes en un grupo separado — un valor físicamente imposible (el café retiene 9–13 % de humedad). Incluirlos es un artefacto de calidad de datos.
+
+**Variables con inflación de máximos — "pegged at 10" (se excluyen):**
+
+4. **`Sweetness`, `Uniformity`, `Clean.Cup`** — el 94.7 %, 88.8 % y 92.9 % de los lotes tienen exactamente el valor 10 (perfecto). En café de especialidad, estas tres métricas de control de consistencia se saturan: casi todos los lotes aprobados pasan con la puntuación máxima. El resultado es idéntico al problema de Moisture: una distribución con un pico masivo en un valor (10 en lugar de 0) que YJ no puede normalizar. En el espacio PCA, los ~57 lotes con Sweetness < 10 formaban un "riel" lineal separado de los 1.013 lotes con Sweetness = 10 — causando los patrones lineales observados.
+
+**Consecuencia:** se retienen **8 variables** — los 6 atributos sensoriales que realmente discriminan entre lotes (Aroma, Flavor, Aftertaste, Acidity, Body, Balance), más Cupper.Points (juicio holístico del catador) y altitude_mean_meters (variable geográfica). YJ se aplica selectivamente solo donde |sesgo| > 1.
 
 ```{r datos-oficiales}
-vars_11 <- setdiff(names(datos_transformados),
-                   c("Category.One.Defects", "Category.Two.Defects", "Moisture"))
-# datos_t se construye aquí; la transformación YJ selectiva y la depuración de atípicos
-# se aplican en la sección 5b antes del PCA final
-datos_t <- datos_transformados[, vars_11]
+# Se excluyen 6 variables: 3 con inflación de ceros + 3 con inflación de máximos (>88% en valor 10)
+vars_8 <- setdiff(names(datos),
+                  c("Category.One.Defects", "Category.Two.Defects", "Moisture",
+                    "Sweetness", "Uniformity", "Clean.Cup"))
+datos_t <- datos[, vars_8]
+
+cat("Variables en el análisis principal (8):\n")
+print(names(datos_t))
+
+# Verificar fracción con valor == 10 (debe ser 0 para las 8 variables restantes)
+frac10 <- sapply(datos_t, function(x) mean(x == 10))
+cat("\nFracción con valor == 10 (debe ser ~0 para todas):\n")
+print(round(frac10, 3))
 ```
 
 ```{r yj-selectivo}
@@ -237,17 +251,19 @@ print(round(sapply(datos_t[, vars_sin_transformar, drop=FALSE], skew), 3))
 pca_14 <- prcomp(datos_transformados, center = TRUE, scale. = TRUE)
 
 var14 <- round(summary(pca_14)$importance[2, 1:2] * 100, 1)
-var11 <- round(summary(prcomp(datos_t, center=TRUE, scale.=TRUE))$importance[2, 1:2] * 100, 1)
+# DESPUÉS: 8 variables + YJ selectivo (atípicos se eliminan en sección 5b)
+pca_despues_comp <- prcomp(datos_t, center = TRUE, scale. = TRUE)
+var8  <- round(summary(pca_despues_comp)$importance[2, 1:2] * 100, 1)
 
 par(mfrow = c(1, 2), mar = c(4, 4, 3, 1))
 biplot(pca_14, scale = 0, cex = 0.45, col = c("gray70", "firebrick"),
        xlab = paste0("PC1 (", var14[1], " %)"),
        ylab = paste0("PC2 (", var14[2], " %)"),
-       main = "ANTES: 14 variables (con Cat1/Cat2/Moisture)")
-biplot(prcomp(datos_t, center=TRUE, scale.=TRUE), scale = 0, cex = 0.45, col = c("gray70", "steelblue"),
-       xlab = paste0("PC1 (", var11[1], " %)"),
-       ylab = paste0("PC2 (", var11[2], " %)"),
-       main = "DESPUES: 11 variables + YJ en todas")
+       main = "ANTES: 14 variables (con Cat1/Cat2/Moisture/Sweetness/Unif/CleanCup)")
+biplot(pca_despues_comp, scale = 0, cex = 0.45, col = c("gray70", "steelblue"),
+       xlab = paste0("PC1 (", var8[1], " %)"),
+       ylab = paste0("PC2 (", var8[2], " %)"),
+       main = "DESPUES: 8 variables + YJ selectivo (sin atipicos)")
 ```
 
 ---
@@ -376,7 +392,7 @@ screeplot(pca_14, type = "lines",
 abline(h = 1, lty = 2, col = "red")
 
 screeplot(pca, type = "lines",
-          main = paste0("DESPUES: 11 variables\n(PC1 = ",
+          main = paste0("DESPUES: 8 variables\n(PC1 = ",
                         round(pca$sdev[1]^2 / sum(pca$sdev^2) * 100, 1), " %)"))
 abline(h = 1, lty = 2, col = "red")
 ```
@@ -411,7 +427,7 @@ pairs(pca_14$x[, 1:k],
 ```{r pairs-pca, fig.height=8}
 k <- 4
 pairs(pca$x[, 1:k],
-      main = "DESPUES: 11 variables + YJ en todas",
+      main = "DESPUES: 8 variables + YJ selectivo (sin atipicos)",
       pch = 19,
       col = adjustcolor("steelblue", alpha.f = 0.4),
       labels = paste0("PC", 1:k, "\n",
@@ -431,7 +447,7 @@ datos[-idx_atipicos, ][unique(c(idx_pc1, idx_pc3, idx_pc4)), ]
 library(GGally)
 
 pca_scores <- as.data.frame(pca$x[, 1:k])
-pca_scores$Processing.Method <- data_f$Processing.Method[-idx_atipicos]
+pca_scores$Processing.Method <- data_f[as.integer(rownames(datos_limpio)), "Processing.Method"]
 
 ggpairs(pca_scores,
         columns = 1:k,
@@ -454,7 +470,7 @@ dm2_14 <- mahalanobis(datos_transformados,
                       cov(datos_transformados))
 umbral_14 <- qchisq(0.975, df = ncol(datos_transformados))
 
-# DESPUES: 11 variables con YJ
+# DESPUES: 8 variables con YJ selectivo
 # YJ genera alta colinealidad post-transformación; cov(datos_t) es singular (rcond ≈ 8e-210).
 # Se usa la equivalencia: d²_M(xᵢ) = Σₖ (zᵢₖ / sdevₖ)² — numéricamente estable via scores PCA.
 dm2 <- rowSums((pca$x / pca$sdev)^2)
@@ -462,14 +478,14 @@ umbral <- qchisq(0.975, df = ncol(datos_t))
 
 cat("ANTES (14 vars) — umbral chi2_14 =", round(umbral_14, 1),
     "| atípicos:", sum(dm2_14 > umbral_14), "\n")
-cat("DESPUES (11 vars) — umbral chi2_11 =", round(umbral, 1),
+cat("DESPUES (8 vars) — umbral chi2_8 =", round(umbral, 1),
     "| atípicos:", sum(dm2 > umbral), "\n")
 
 cat("\nTop 6 distancias ANTES:\n"); print(sort(dm2_14, decreasing=TRUE)[1:6])
 cat("\nTop 6 distancias DESPUES:\n"); print(sort(dm2, decreasing=TRUE)[1:6])
 ```
 
-Con 11 variables se marcan **`r sum(dm2 > umbral)`** lotes como atípicos (vs. `r sum(dm2_14 > umbral_14)` con 14). La reducción confirma que los casos más problemáticos eran impulsados por Cat1/Cat2/Moisture.
+Con 8 variables se marcan **`r sum(dm2 > umbral)`** lotes como atípicos (vs. `r sum(dm2_14 > umbral_14)` con 14). La reducción confirma que los casos más problemáticos eran impulsados por Cat1/Cat2/Moisture/Sweetness/Uniformity/Clean.Cup.
 
 ---
 
@@ -483,19 +499,19 @@ round(pca_14$rotation[, 1:4], 3)
 ```
 
 ```{r cargas-despues}
-cat("=== DESPUES: Cargas con 11 variables + YJ en todas ===\n")
+cat("=== DESPUES: Cargas con 8 variables + YJ selectivo ===\n")
 round(pca$rotation[, 1:4], 3)
 ```
 
-**Diferencia clave:** con 14 variables, PC3 era el "eje de defectos" (Cat1 ≈ 0.54, Cat2 ≈ 0.65). Con 11 variables esas dimensiones desaparecen y los ejes secundarios reflejan exclusivamente contrastes dentro de los atributos sensoriales y la altitud.
+**Diferencia clave:** con 14 variables, PC3 era el "eje de defectos" (Cat1 ≈ 0.54, Cat2 ≈ 0.65). Con 8 variables esas dimensiones desaparecen y los ejes secundarios reflejan exclusivamente contrastes dentro de los atributos sensoriales y la altitud.
 
 ### PC1 (`r round(pca$sdev[1]^2/sum(pca$sdev^2)*100,1)` %) — "calidad sensorial general"
 
 Flavor, Aftertaste, Balance, Acidity, Cupper.Points, Body, Aroma — todos con cargas de magnitud similar (~0.33–0.36), mismo signo. PC1 es un **ranking de calidad sensorial general**: los 1.070 lotes ordenados de peor a mejor café en una sola cifra.
 
-### PC2 (`r round(pca$sdev[2]^2/sum(pca$sdev^2)*100,1)` %) — "consistencia y dulzura vs. intensidad sensorial"
+### PC2 (`r round(pca$sdev[2]^2/sum(pca$sdev^2)*100,1)` %) — "altitud vs. atributos sensoriales de taza"
 
-Sweetness, Clean.Cup y Uniformity (cargas positivas altas) vs. Flavor, Aroma, Acidity (cargas negativas moderadas). Distingue lotes que destacan en consistencia/dulzura de los que destacan en intensidad.
+altitude_mean_meters (carga positiva alta) vs. Acidity, Body, Aroma (cargas negativas moderadas). Distingue lotes de gran altura (altitud predominante) de los que destacan en intensidad sensorial en taza.
 
 ### PC3 (`r round(pca$sdev[3]^2/sum(pca$sdev^2)*100,1)` %) — "altitud de producción"
 
@@ -522,12 +538,12 @@ biplot(pca, choices = c(1,2), scale = 0, cex = 0.45,
        col = c("gray70", "steelblue"),
        xlab = paste0("PC1 (", round(pca$sdev[1]^2/sum(pca$sdev^2)*100,1), " %)"),
        ylab = paste0("PC2 (", round(pca$sdev[2]^2/sum(pca$sdev^2)*100,1), " %)"),
-       main = "DESPUES: 11 variables + YJ en todas")
+       main = "DESPUES: 8 variables + YJ selectivo (sin atipicos)")
 ```
 
 ```{r biplot, fig.height=8}
 biplot(pca, choices = c(1,2), cex = 0.6,
-       main = "Biplot PCA — Componentes 1 y 2 (11 variables)")
+       main = "Biplot PCA — Componentes 1 y 2 (8 variables)")
 ```
 
 ```{r biplot-pc3, fig.height=8}
@@ -761,13 +777,13 @@ Tres hallazgos:
 
 ---
 
-# 18.1. Evidencia: comparación 14 vs. 11 variables
+# 18.1. Evidencia: comparación 14 vs. 8 variables
 
 ```{r sensibilidad-14vars-setup}
 pca_14_ref  <- prcomp(datos_transformados, center = TRUE, scale. = TRUE)
 var_prop_14 <- pca_14_ref$sdev^2 / sum(pca_14_ref$sdev^2)
 var_acum_14 <- cumsum(var_prop_14)
-var_prop_11 <- pca$sdev^2 / sum(pca$sdev^2)
+var_prop_8 <- pca$sdev^2 / sum(pca$sdev^2)
 
 data.frame(
   PC       = paste0("PC", seq_along(var_prop_14)),
@@ -783,10 +799,10 @@ barplot(var_prop_14 * 100, names.arg = paste0("PC", seq_along(var_prop_14)),
         main = "ANTES — 14 variables", las = 2, cex.names = 0.8)
 abline(h = 100/14, lty = 2, col = "red")
 
-barplot(var_prop_11 * 100, names.arg = paste0("PC", seq_along(var_prop_11)),
+barplot(var_prop_8 * 100, names.arg = paste0("PC", seq_along(var_prop_8)),
         col = "steelblue", ylab = "Varianza explicada (%)",
-        main = "DESPUES — 11 variables + YJ en todas", las = 2, cex.names = 0.8)
-abline(h = 100/11, lty = 2, col = "red")
+        main = "DESPUES — 8 variables + YJ selectivo", las = 2, cex.names = 0.8)
+abline(h = 100/8, lty = 2, col = "red")
 ```
 
 ---
