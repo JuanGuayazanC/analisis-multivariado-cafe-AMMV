@@ -188,7 +188,7 @@ cat("  -> razón para estandarizar antes de PCA.\n")
 
 3. **`Moisture = 0` son faltantes codificados, no café genuinamente seco.** UMAP (sección 14) aisló los 174 lotes con `Moisture = 0` en un grupo completamente separado del resto. La sección 14 también muestra que estos lotes tienen `Moisture` media = 0.004 frente a 11.3 % en el resto — un valor físicamente imposible para granos de café, que normalmente retienen 9–13 % de humedad. Incluir `Moisture` en el PCA con esos 174 ceros introduce un artefacto de calidad de datos, no una dimensión real de variación.
 
-**Consecuencia de la exclusión:** al retirar estas tres variables, PC1 aumenta su proporción de varianza explicada (de 47.6 % a `r round(pca$sdev[1]^2/sum(pca$sdev^2)*100,1)` % tras aplicar también YJ a las 11) porque ya no comparte espacio de varianza con el eje de defectos, y los ejes secundarios reflejan exclusivamente contrastes entre atributos sensoriales y altitud — exactamente la estructura que el análisis busca.
+**Consecuencia de la exclusión:** al retirar estas tres variables, PC1 aumenta su proporción de varianza explicada respecto al análisis con 14 variables, porque ya no comparte espacio de varianza con el eje de defectos, y los ejes secundarios reflejan exclusivamente contrastes entre atributos sensoriales y altitud — exactamente la estructura que el análisis busca.
 
 ```{r datos-oficiales}
 vars_11 <- setdiff(names(datos_transformados),
@@ -329,6 +329,13 @@ cat("Lotes retenidos para análisis final:", nrow(datos_t) - length(idx_atipicos
 ```{r datos-limpios}
 # Retirar atípicos para el PCA final
 datos_limpio <- datos_t[-idx_atipicos, ]
+
+# Eliminar columnas con varianza cero (constantes tras la depuración)
+vars_var_cero <- names(which(apply(datos_limpio, 2, var) == 0))
+if (length(vars_var_cero) > 0) {
+  cat("Variables con varianza cero retiradas:", vars_var_cero, "\n")
+  datos_limpio <- datos_limpio[, apply(datos_limpio, 2, var) > 0]
+}
 cat("Dimensiones de la matriz limpia:", nrow(datos_limpio), "×", ncol(datos_limpio), "\n")
 ```
 
@@ -417,14 +424,14 @@ pairs(pca$x[, 1:k],
 idx_pc1 <- order(pca$x[, 1], decreasing = TRUE)[1:2]
 idx_pc3 <- order(pca$x[, 3], decreasing = TRUE)[1:2]
 idx_pc4 <- order(pca$x[, 4])[1:2]
-datos[unique(c(idx_pc1, idx_pc3, idx_pc4)), ]
+datos[-idx_atipicos, ][unique(c(idx_pc1, idx_pc3, idx_pc4)), ]
 ```
 
 ```{r pairs-pca-color, fig.height=8, message=FALSE}
 library(GGally)
 
 pca_scores <- as.data.frame(pca$x[, 1:k])
-pca_scores$Processing.Method <- data_f$Processing.Method
+pca_scores$Processing.Method <- data_f$Processing.Method[-idx_atipicos]
 
 ggpairs(pca_scores,
         columns = 1:k,
