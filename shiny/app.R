@@ -34,50 +34,49 @@ datos_full <- data_raw %>%
     Altitud         = altitude_mean_meters
   )
 
-yj_transform <- function(x, lambda) {
-  if (lambda != 0) ((x + 1)^lambda - 1) / lambda else log(x + 1)
+# ── Pipeline oficial: 8 variables (excluye 3 infladas-cero + 3 infladas-máximo) ──
+# Excluidas: Moisture, Cat1, Cat2 (inflación ceros) + Sweetness, Uniformity, Clean.Cup (>88% en 10)
+vars_8 <- c("Aroma", "Sabor", "Retrogusto", "Acidez",
+            "Cuerpo", "Balance", "Puntaje.Catador", "Altitud")
+datos_t <- datos_full[, vars_8]
+
+# YJ selectivo: solo donde |sesgo| > 1
+skew_fn <- function(x) mean((x - mean(x))^3) / sd(x)^3
+skew_pre <- sapply(datos_t, skew_fn)
+vars_yj  <- names(skew_pre[abs(skew_pre) > 1])
+
+lambdas_8 <- setNames(rep(1, length(vars_8)), vars_8)  # lambda=1 = sin transformar
+if (length(vars_yj) > 0) {
+  pt_sel       <- powerTransform(datos_t[, vars_yj, drop = FALSE], family = "yjPower")
+  lambdas_yj   <- coef(pt_sel, round = FALSE)
+  lambdas_8[vars_yj] <- lambdas_yj
+  for (v in vars_yj) datos_t[[v]] <- yjPower(datos_t[[v]], lambdas_yj[v])
 }
-datos_full$Defectos.Cat2 <- yj_transform(datos_full$Defectos.Cat2, -0.217)
-
-vars_11 <- setdiff(names(datos_full),
-                   c("Defectos.Cat1", "Defectos.Cat2", "Humedad"))
-datos_t <- datos_full[, vars_11]
-
-pt_11      <- powerTransform(datos_t, family = "yjPower")
-# lambdas_11 <- pmax(pmin(coef(pt_11, round = FALSE), 3), -3)
-lambdas_11 <- coef(pt_11, round = FALSE)
-datos_t_yj <- datos_t
-for (v in names(datos_t)) datos_t_yj[[v]] <- yjPower(datos_t[[v]], lambdas_11[v])
-datos_t <- datos_t_yj
 
 pca       <- prcomp(datos_t, center = TRUE, scale. = TRUE)
 scores_df <- as.data.frame(pca$x)
 var_exp   <- round(pca$sdev^2 / sum(pca$sdev^2) * 100, 1)
 
-rangos <- lapply(vars_11, function(v) {
+rangos <- lapply(vars_8, function(v) {
   x <- datos_full[[v]]
   list(min = floor(min(x) * 10) / 10,
        max = ceiling(max(x) * 10) / 10,
        val = round(median(x), 1))
 })
-names(rangos) <- vars_11
+names(rangos) <- vars_8
 
-grupo_intensidad   <- c("Aroma", "Sabor", "Retrogusto", "Acidez",
-                        "Cuerpo", "Balance", "Puntaje.Catador")
-grupo_consistencia <- c("Uniformidad", "Taza.Limpia", "Dulzura")
-grupo_altitud      <- c("Altitud")
+grupo_sensorial <- c("Aroma", "Sabor", "Retrogusto", "Acidez",
+                     "Cuerpo", "Balance", "Puntaje.Catador")
+grupo_altitud   <- c("Altitud")
 
 descripciones <- c(
-  Aroma           = "Intensidad y calidad del aroma",
+  Aroma           = "Intensidad y calidad del aroma percibido",
   Sabor           = "Sabor percibido durante la degustación",
-  Retrogusto      = "Persistencia del retrogusto",
+  Retrogusto      = "Persistencia y calidad del retrogusto",
   Acidez          = "Viveza y brillo de la acidez",
-  Cuerpo          = "Sensación de peso en boca",
-  Balance         = "Armonía entre todos los atributos",
-  Puntaje.Catador = "Puntaje holístico del catador",
-  Uniformidad     = "Consistencia entre las 5 tazas evaluadas",
-  Taza.Limpia     = "Ausencia de sabores extraños",
-  Dulzura         = "Presencia de dulzura natural",
+  Cuerpo          = "Sensación de peso y textura en boca",
+  Balance         = "Armonía entre todos los atributos sensoriales",
+  Puntaje.Catador = "Puntaje holístico del catador profesional",
   Altitud         = "Altura de la finca sobre el nivel del mar (metros)"
 )
 
@@ -89,9 +88,6 @@ nombres_ui <- c(
   Cuerpo          = "Cuerpo",
   Balance         = "Balance",
   Puntaje.Catador = "Puntaje Catador",
-  Uniformidad     = "Uniformidad",
-  Taza.Limpia     = "Taza Limpia",
-  Dulzura         = "Dulzura",
   Altitud         = "Altitud (metros)"
 )
 
@@ -260,14 +256,14 @@ ui <- fluidPage(
   ),
 
   div(class = "app-header",
-    h2("Explorador PCA — Calidad de Café Arábica"),
+    h2("Explorador PCA — Calidad de Café Arábica · CQI"),
     p(class = "subtitle",
-      "Ingresa los atributos de un lote nuevo y observa dónde se ubica en el espacio de componentes principales"),
+      "Ajusta los atributos sensoriales y agroclimáticos de un lote nuevo para ubicarlo en el espacio de componentes principales respecto a los 1,070 lotes de referencia"),
     div(class = "stat-chips",
-      span(class = "chip", "1.070 lotes de referencia"),
-      span(class = "chip", "11 variables"),
-      span(class = "chip", paste0("CP1 explica ", var_exp[1], " % de la varianza")),
-      span(class = "chip", "Café Arábica · CQI")
+      span(class = "chip", "1,070 lotes · Coffee Quality Institute"),
+      span(class = "chip", "8 variables (7 sensoriales + altitud)"),
+      span(class = "chip", paste0("CP1 explica ", var_exp[1], "% de la varianza")),
+      span(class = "chip", paste0("CP1+CP2 = ", var_exp[1] + var_exp[2], "%"))
     )
   ),
 
@@ -281,12 +277,12 @@ ui <- fluidPage(
       div(class = "pc-badge",
         div(class = "pc-name", "CP2"),
         div(class = "pc-var",  paste0(var_exp[2], "%")),
-        div(class = "pc-desc", "Consistencia vs. intensidad")
+        div(class = "pc-desc", "Contraste entre atributos")
       ),
       div(class = "pc-badge",
         div(class = "pc-name", "CP3"),
         div(class = "pc-var",  paste0(var_exp[3], "%")),
-        div(class = "pc-desc", "Altitud de producción")
+        div(class = "pc-desc", "Componente de altitud")
       ),
       div(class = "pc-badge",
         div(class = "pc-name", "CP4"),
@@ -306,11 +302,8 @@ ui <- fluidPage(
           del modelo (Yeo-Johnson) y se ubica en el espacio PCA de los 1.070 lotes de referencia."
         ),
 
-        div(class = "group-label", "Puntajes de intensidad  ·  escala 0 – 10"),
-        slider_group(grupo_intensidad),
-
-        div(class = "group-label", "Consistencia y pureza  ·  escala 0 – 10"),
-        slider_group(grupo_consistencia),
+        div(class = "group-label", "Puntajes sensoriales  ·  escala 0 – 10"),
+        slider_group(grupo_sensorial),
 
         div(class = "group-label", "Agroclimático"),
         slider_group(grupo_altitud),
@@ -333,8 +326,8 @@ ui <- fluidPage(
               radioButtons("ejes", NULL,
                 choices = setNames(
                   c("12", "13"),
-                  c(paste0("CP1 vs CP2 — Calidad sensorial  ↔  Consistencia (", var_exp[1], "% + ", var_exp[2], "%)"),
-                    paste0("CP1 vs CP3 — Calidad sensorial  ↔  Altitud       (", var_exp[1], "% + ", var_exp[3], "%)"))
+                  c(paste0("CP1 vs CP2 — Calidad sensorial  ↔  Contraste atributos (", var_exp[1], "% + ", var_exp[2], "%)"),
+                    paste0("CP1 vs CP3 — Calidad sensorial  ↔  Altitud              (", var_exp[1], "% + ", var_exp[3], "%)"))
                 ),
                 selected = "12", inline = FALSE)
             )
@@ -360,12 +353,12 @@ ui <- fluidPage(
 server <- function(input, output, session) {
 
   observeEvent(input$reset, {
-    for (v in vars_11) updateSliderInput(session, v, value = rangos[[v]]$val)
+    for (v in vars_8) updateSliderInput(session, v, value = rangos[[v]]$val)
   })
 
   nuevo_score <- eventReactive(input$proyectar, {
-    nuevo_df <- as.data.frame(setNames(lapply(vars_11, function(v) input[[v]]), vars_11))
-    for (v in names(nuevo_df)) nuevo_df[[v]] <- yjPower(nuevo_df[[v]], lambdas_11[v])
+    nuevo_df <- as.data.frame(setNames(lapply(vars_8, function(v) input[[v]]), vars_8))
+    for (v in vars_yj) nuevo_df[[v]] <- yjPower(nuevo_df[[v]], lambdas_8[v])
     nuevo_scaled <- scale(nuevo_df, center = pca$center, scale = pca$scale)
     scores <- as.numeric(nuevo_scaled %*% pca$rotation)
     names(scores) <- paste0("PC", seq_along(scores))
@@ -406,8 +399,9 @@ server <- function(input, output, session) {
     ns <- nuevo_score()
     if (!is.null(ns)) {
       nd <- setNames(data.frame(ns[e[1]], ns[e[2]]), c(cx, cy))
-      pct_pc1 <- mean(scores_df$PC1 <= ns[1]) * 100
-      calidad <- if (pct_pc1 < 25) "Alta calidad" else if (pct_pc1 < 60) "Calidad media" else "Baja calidad"
+      pct_pc1    <- mean(scores_df$PC1 <= ns[1]) * 100
+      pct_calidad <- 100 - pct_pc1   # PC1 negativo = mayor calidad sensorial
+      calidad <- if (pct_calidad >= 75) "Alta calidad" else if (pct_calidad >= 25) "Calidad media" else "Baja calidad"
       p <- p +
         geom_point(data = nd, aes_string(x = cx, y = cy),
                    color = "#e74c3c", size = 12, shape = 21,
@@ -462,13 +456,14 @@ server <- function(input, output, session) {
     ns <- nuevo_score()
     if (is.null(ns)) return(NULL)
 
-    pct_pc1 <- mean(scores_df$PC1 <= ns[1]) * 100
-    pct_pc3 <- mean(scores_df$PC3 <= ns[3]) * 100
+    pct_pc1     <- mean(scores_df$PC1 <= ns[1]) * 100
+    pct_pc3     <- mean(scores_df$PC3 <= ns[3]) * 100
+    pct_calidad <- 100 - pct_pc1   # PC1 negativo = mayor calidad sensorial
 
-    if (pct_pc1 < 25) {
+    if (pct_calidad >= 75) {
       badge_class <- "quality-badge q-alta"
       badge_text  <- "Alta calidad sensorial"
-    } else if (pct_pc1 < 60) {
+    } else if (pct_calidad >= 25) {
       badge_class <- "quality-badge q-media"
       badge_text  <- "Calidad sensorial media"
     } else {
@@ -477,37 +472,38 @@ server <- function(input, output, session) {
     }
 
     pc2_txt <- if (ns[2] > 0.8) {
-      "Destaca en consistencia y dulzura (Uniformidad, Dulzura, Taza Limpia elevados)"
+      "Perfil con mayor peso en atributos secundarios (Retrogusto, Balance, Cuerpo)"
     } else if (ns[2] < -0.8) {
-      "Destaca en intensidad sensorial (Sabor, Aroma, Acidez elevados)"
+      "Perfil con mayor peso en atributos primarios (Aroma, Sabor, Acidez, Puntaje Catador)"
     } else {
-      "Balance entre consistencia y dulzura"
+      "Perfil equilibrado entre atributos primarios y secundarios"
     }
 
     pc3_txt <- if (ns[3] > 0.8) {
-      paste0("Altitud relativamente alta (percentil ", round(pct_pc3), " entre los lotes de referencia)")
+      paste0("Altitud de cultivo alta — percentil ", round(pct_pc3), " en el dataset")
     } else if (ns[3] < -0.8) {
-      paste0("Altitud relativamente baja (percentil ", round(pct_pc3), " entre los lotes de referencia)")
+      paste0("Altitud de cultivo baja — percentil ", round(pct_pc3), " en el dataset")
     } else {
-      paste0("Altitud típica del dataset (percentil ", round(pct_pc3), ")")
+      paste0("Altitud de cultivo típica — percentil ", round(pct_pc3), " en el dataset")
     }
 
     tagList(
       div(class = badge_class, badge_text),
       div(style = "font-size:12px; color:#666; margin-bottom:10px;",
-          sprintf("Percentil %d en CP1 — el %.0f%% de los lotes tiene menor calidad sensorial.",
-                  round(pct_pc1), pct_pc1)),
+          sprintf("Superior al %.0f%% de los lotes en calidad sensorial (CP1, percentil %d).",
+                  pct_calidad, round(pct_calidad))),
       div(class = "interp-item con",
-        div(class = "interp-pc", "CP2 · Consistencia vs. Intensidad"),
+        div(class = "interp-pc", "CP2 · Contraste entre atributos sensoriales"),
         div(class = "interp-val", pc2_txt)
       ),
       div(class = "interp-item alt",
-        div(class = "interp-pc", "CP3 · Altitud"),
+        div(class = "interp-pc", "CP3 · Altitud de cultivo"),
         div(class = "interp-val", pc3_txt)
       ),
       div(style = "font-size:11px; color:#aaa; margin-top:10px; line-height:1.5;",
-        "Los scores negativos en CP1 indican mayor calidad sensorial
-        (las cargas sensoriales apuntan en dirección negativa)."
+        paste0("CP1 captura el ", var_exp[1], "% de la varianza total. ",
+               "Score negativo en CP1 indica mayor calidad sensorial ",
+               "(los 7 atributos sensoriales cargan negativamente en CP1).")
       )
     )
   })
