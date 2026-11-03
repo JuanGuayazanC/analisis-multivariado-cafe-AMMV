@@ -275,7 +275,7 @@ fviz_nbclust(
 ```
 
 ```{r fviz-cluster, fig.width=9, fig.height=7}
-fviz_cluster(
+grafico_kmeans <- fviz_cluster(
   km,
   data = X_stand,
   geom = "point",
@@ -285,10 +285,28 @@ fviz_cluster(
   ggtheme = theme_minimal()
 ) +
   labs(
-    title = paste("K-means — k =", k_optimo),
-    subtitle = "Proyección bidimensional; asignaciones ajustadas con toda X",
-    caption = "Café arábica · 1.070 lotes"
+    title = paste("K-means (k =", k_optimo, ")"),
+    subtitle = "Proyección en dos dimensiones; los grupos se ajustaron con toda la matriz X",
+    caption = "1.070 lotes de café arábica · las áreas se superponen y no representan categorías comerciales"
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(
+    plot.background = element_rect(fill = "transparent", colour = NA),
+    panel.background = element_rect(fill = "transparent", colour = NA),
+    legend.background = element_rect(fill = "transparent", colour = NA),
+    legend.key = element_rect(fill = "transparent", colour = NA)
   )
+
+ggsave(
+  "../imagenes_presentacion/kmeans_01_clusters.png",
+  plot = grafico_kmeans,
+  width = 12,
+  height = 5.3,
+  dpi = 180,
+  bg = "transparent"
+)
+
+grafico_kmeans
 ```
 
 ## 5.2 Sensibilidad a la inicialización
