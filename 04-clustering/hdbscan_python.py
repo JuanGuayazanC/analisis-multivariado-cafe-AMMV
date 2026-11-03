@@ -36,7 +36,14 @@ CATEGORICAL_FEATURES = ["Processing.Method", "Color", "Country.of.Origin"]
 
 def build_feature_matrix(data_path: Path) -> tuple[pd.DataFrame, np.ndarray, np.ndarray, list[str], list[str]]:
     """Filter lots, transform numeric features, and balance numeric/dummy blocks."""
-    data = pd.read_csv(data_path, low_memory=False)
+    # Preserve the literal category "None" in Color. pandas otherwise treats
+    # it as a missing-value marker and merges it into "Desconocido", unlike R.
+    data = pd.read_csv(
+        data_path,
+        low_memory=False,
+        keep_default_na=False,
+        na_values=["", "NA", "N/A"],
+    )
     data["row_id"] = np.arange(1, len(data) + 1)
     data["altitude_mean_meters"] = pd.to_numeric(
         data["altitude_mean_meters"], errors="coerce"
@@ -139,19 +146,23 @@ def main() -> None:
         plot_path = args.output_dir / "hdbscan_clusters.png"
         unique = sorted(np.unique(labels))
         palette = plt.get_cmap("tab10")
-        fig, ax = plt.subplots(figsize=(10, 7))
+        fig, ax = plt.subplots(figsize=(12, 5.6))
         for i, label in enumerate(unique):
             mask = labels == label
             color = "#9ca3af" if label == -1 else palette(i % 10)
             name = "Ruido (-1)" if label == -1 else f"Cluster {label}"
             ax.scatter(scores[mask, 0], scores[mask, 1], s=25, alpha=0.72,
                        color=color, label=name, edgecolors="none")
-        ax.set(title="HDBSCAN sobre la proyección PCA",
+        ax.set(title="Etiquetas HDBSCAN en la vista PC1-PC2",
                xlabel="Componente principal 1", ylabel="Componente principal 2")
+        fig.suptitle(
+            "Asignaciones calculadas con PC1-PC4 + indicadores categóricos",
+            fontsize=12,
+        )
         ax.legend(title="Asignación", frameon=True)
         ax.grid(alpha=0.2)
-        fig.tight_layout()
-        fig.savefig(plot_path, dpi=180)
+        fig.tight_layout(rect=(0, 0, 1, 0.95))
+        fig.savefig(plot_path, dpi=180, transparent=True)
         plt.close(fig)
         print(f"Gráfico: {plot_path}")
 
