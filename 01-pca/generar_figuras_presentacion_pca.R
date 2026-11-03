@@ -75,6 +75,10 @@ tema <- theme_minimal(base_size = 15) +
   theme(plot.title = element_text(face = "bold", color = azul),
         plot.subtitle = element_text(color = "#555555"),
         axis.title = element_text(color = azul),
+        plot.background = element_rect(fill = "transparent", color = NA),
+        panel.background = element_rect(fill = "transparent", color = NA),
+        legend.background = element_rect(fill = "transparent", color = NA),
+        legend.key = element_rect(fill = "transparent", color = NA),
         panel.grid.minor = element_blank())
 
 # Scree plot — the cumulative label is computed from this exact PCA fit.
@@ -145,11 +149,11 @@ p_biplot <- ggplot(scores, aes(CP1, CP2)) +
   tema
 
 ggsave(file.path(output_dir, "pca_final_scree.png"), p_scree,
-       width = 6, height = 6.45, dpi = 200, bg = "white")
+       width = 6, height = 6.45, dpi = 200, bg = "transparent")
 ggsave(file.path(output_dir, "pca_final_cargas.png"), p_loadings,
-       width = 6, height = 6.45, dpi = 200, bg = "white")
+       width = 6, height = 6.45, dpi = 200, bg = "transparent")
 ggsave(file.path(output_dir, "pca_final_biplot.png"), p_biplot,
-       width = 6, height = 6.45, dpi = 200, bg = "white")
+       width = 6, height = 6.45, dpi = 200, bg = "transparent")
 
 cat(sprintf("PCA reproducido: %d lotes x %d variables; atípicos retirados: %d\n",
             nrow(datos_limpio), ncol(datos_limpio), length(idx_atipicos)))
