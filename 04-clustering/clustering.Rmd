@@ -1,6 +1,6 @@
 ---
 title: "Clustering — Café Arábica"
-subtitle: "K-means, Ward.D2 y HDBSCAN · Flujo de trabajo visto en clase"
+subtitle: "K-means y Ward.D2 · Análisis en R"
 author: "Juan Sebastián Guayazán · Esteban Valente · Diego Nocua"
 date: "`r format(Sys.Date(), '%d de %B de %Y')`"
 output:
@@ -20,7 +20,7 @@ knitr::opts_chunk$set(echo = TRUE, warning = TRUE, message = FALSE,
 
 # Propósito y alcance
 
-Se aplican K-means, clustering jerárquico Ward.D2 y HDBSCAN a los 1.070 lotes que
+Se aplican K-means y clustering jerárquico Ward.D2 en R a los 1.070 lotes que
 pasan el filtro de altitud. Se conserva el flujo de clase para K-means:
 estandarizar la matriz X, examinar WSS con factoextra, fijar k a partir del gráfico,
 ajustar con 25 inicializaciones y visualizar con fviz_cluster.
@@ -28,8 +28,7 @@ ajustar con 25 inicializaciones y visualizar con fviz_cluster.
 El espacio de clustering combina cuatro scores PCA con tres variables categóricas
 codificadas como indicadores. La matriz se pondera por bloques para que las 14
 columnas dummy no dominen solo por ser más numerosas. No se quitan las filas que
-el informe PCA posterior marca como atípicas: aquí HDBSCAN debe tener la
-oportunidad de reconocerlas como ruido. Por eso este análisis usa el PCA
+el informe PCA posterior marca como atípicas. Por eso este análisis usa el PCA
 exploratorio sobre los 1.070 lotes; sus componentes no son los del PCA final
 ajustado después de retirar atípicos.
 
@@ -391,158 +390,42 @@ cat("Tamaño de los grupos Ward en la muestra:\n")
 print(table(grupos_ward))
 ```
 
-Ward se ajustó sobre 80 lotes, mientras K-means y HDBSCAN usan los 1.070.
+Ward se ajustó sobre 80 lotes, mientras K-means usa los 1.070.
 Por tanto, el dendrograma ilustra el método y sus grupos no se comparan como si
 fueran etiquetas de toda la base.
 
-# 7. HDBSCAN
+# 7. Comparación K-means y Ward.D2
 
-HDBSCAN no requiere fijar k y puede asignar observaciones a ruido (etiqueta -1).
-Como en el ejemplo de clase, HDBSCAN se ejecuta en Python con el paquete
-oficial hdbscan y min_cluster_size = 20. Las etiquetas de ruido de Python son -1.
-El Rmd exporta X a un archivo temporal, ejecuta hdbscan_python.py y vuelve a
-leer las asignaciones verificando que conserven el identificador de cada lote.
-Instala la dependencia con:
-
-    py -3.14 -m pip install -r 04-clustering/requirements-hdbscan.txt
-
-El núcleo del código Python es el de clase:
-
-    import hdbscan
-    clusterer = hdbscan.HDBSCAN(min_cluster_size=20)
-    labels = clusterer.fit_predict(X)
-
-```{r hdbscan-modelo}
-python_exe <- Sys.getenv("AMMV_PYTHON", unset = Sys.which("python"))
-if (!nzchar(python_exe)) {
-  stop("No se encontró Python en PATH. Instala Python 3.14 y el requirements-hdbscan.txt.")
-}
-
-archivo_x <- tempfile(fileext = ".csv")
-archivo_resultados <- tempfile(fileext = ".csv")
-write.csv(
-  data.frame(row_id = datos_originales$.id_fila, X_stand, check.names = FALSE),
-  archivo_x,
-  row.names = FALSE
-)
-
-script_hdbscan <- normalizePath("hdbscan_python.py", mustWork = TRUE)
-salida_python <- system2(
-  command = python_exe,
-  args = c(
-    shQuote(script_hdbscan),
-    shQuote(archivo_x),
-    shQuote(archivo_resultados),
-    "--min-cluster-size", "20"
-  ),
-  stdout = TRUE,
-  stderr = TRUE
-)
-estado_python <- attr(salida_python, "status")
-if (!is.null(estado_python) && estado_python != 0) {
-  stop(paste(salida_python, collapse = "\n"))
-}
-
-hdb_resultados <- read.csv(archivo_resultados)
-stopifnot(identical(as.integer(hdb_resultados$row_id),
-                    as.integer(datos_originales$.id_fila)))
-hdb_labels <- hdb_resultados$cluster
-n_clusters_hdb <- length(unique(hdb_labels[hdb_labels >= 0]))
-n_ruido <- sum(hdb_labels == -1)
-unlink(c(archivo_x, archivo_resultados))
-
-cat("Clusters HDBSCAN, sin contar ruido:", n_clusters_hdb, "\n")
-cat("Puntos clasificados como ruido:", n_ruido,
-    sprintf("(%.1f%%)\n", 100 * n_ruido / length(hdb_labels)))
-print(table(hdb_labels))
-```
-
-```{r hdbscan-visual, fig.width=9, fig.height=7}
-mapa_hdb <- data.frame(
-  PC1 = pca_exploratorio$x[, 1],
-  PC2 = pca_exploratorio$x[, 2],
-  cluster = factor(hdb_labels),
-  ruido = hdb_labels == -1
-)
-
-ggplot(mapa_hdb, aes(PC1, PC2, color = cluster, shape = ruido)) +
-  geom_point(alpha = 0.65, size = 1.8) +
-  scale_shape_manual(values = c("FALSE" = 16, "TRUE" = 4), name = "Ruido") +
-  scale_color_brewer(palette = "Set1", name = "Grupo HDBSCAN") +
-  labs(
-    title = "HDBSCAN proyectado sobre las dos primeras CP",
-    subtitle = paste(n_ruido, "lotes etiquetados como ruido"),
-    x = "PC1",
-    y = "PC2"
-  ) +
-  theme_minimal(base_size = 13)
-```
-
-```{r hdbscan-perfil}
-datos_perfil_hdb <- datos_perfil_km %>%
-  mutate(cluster_hdb = factor(hdb_labels)) %>%
-  filter(cluster_hdb != "-1")
-
-perfil_hdb <- datos_perfil_hdb %>%
-  group_by(cluster_hdb) %>%
-  summarise(
-    lotes = n(),
-    Aroma = mean(Aroma),
-    Flavor = mean(Flavor),
-    Aftertaste = mean(Aftertaste),
-    Total.Cup.Points = mean(Total.Cup.Points),
-    .groups = "drop"
-  )
-
-perfil_hdb
-```
-
-# 8. Comparación de métodos
-
-Adjusted Rand Index compara dos particiones en las mismas observaciones; no es
-una medida absoluta de calidad. Para Ward, el cálculo se restringe a los mismos
-80 lotes de la muestra. Para HDBSCAN, la etiqueta -1 se conserva como grupo de
-ruido, así que el ARI se interpreta solo como acuerdo descriptivo.
+Adjusted Rand Index compara las particiones de los mismos 80 lotes; no es una
+medida absoluta de calidad. Ward se muestra como método jerárquico ilustrativo
+en esa muestra, mientras K-means se ajusta a la base completa.
 
 ```{r comparacion}
-ari_km_hdb <- ari(km$cluster, hdb_labels)
 ari_km_ward <- ari(km$cluster[idx_ward], grupos_ward)
-ari_hdb_ward <- ari(hdb_labels[idx_ward], grupos_ward)
-
-idx_hdb_asignados <- which(hdb_labels >= 0)
-grupos_hdb_sil <- as.integer(factor(hdb_labels[idx_hdb_asignados]))
-sil_hdb <- silhouette(
-  grupos_hdb_sil,
-  dist(X_stand[idx_hdb_asignados, , drop = FALSE])
-)
 sil_ward <- silhouette(grupos_ward, dist(X_ward))
 
 resumen_metodos <- data.frame(
-  Metodo = c("K-means", "Ward.D2", "HDBSCAN"),
-  Lotes_ajustados = c(nrow(X_stand), length(idx_ward), nrow(X_stand)),
-  Clusters_sin_ruido = c(k_optimo, length(unique(grupos_ward)), n_clusters_hdb),
+  Metodo = c("K-means", "Ward.D2"),
+  Lotes_ajustados = c(nrow(X_stand), length(idx_ward)),
+  Clusters = c(k_optimo, length(unique(grupos_ward))),
   Silhouette_promedio = c(
     mean(sil_km[, 3]),
-    mean(sil_ward[, 3]),
-    mean(sil_hdb[, 3])
+    mean(sil_ward[, 3])
   ),
   Nota = c(
     "Todos los lotes; silhouette en X",
-    "Muestra de 80; silhouette en la muestra",
-    "Silhouette solo en puntos asignados; excluye ruido"
+    "Muestra de 80; silhouette en la muestra"
   )
 )
 
 resumen_metodos
-cat("ARI K-means / HDBSCAN, 1.070 lotes:", round(ari_km_hdb, 3), "\n")
 cat("ARI K-means / Ward.D2, muestra:", round(ari_km_ward, 3), "\n")
-cat("ARI HDBSCAN / Ward.D2, muestra:", round(ari_hdb_ward, 3), "\n")
 ```
 
-Las Silhouette de HDBSCAN y Ward no son directamente comparables con la de
-K-means: HDBSCAN excluye el ruido y Ward usa una muestra de 80. Las diferencias
-entre métodos reflejan también sus supuestos: centroides y distancia euclídea
-para K-means, varianza intra-grupo para Ward, y densidad con ruido para HDBSCAN.
+Las métricas de Ward se restringen a una muestra de 80 y no son directamente
+comparables con las de K-means sobre los 1.070 lotes. Ambos métodos usan distancia
+euclídea y buscan grupos compactos; sus resultados dependen de la representación
+y ponderación de las variables.
 
 # 9. Conclusión
 

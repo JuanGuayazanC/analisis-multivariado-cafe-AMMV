@@ -35,7 +35,7 @@ el mismo pipeline de preprocesamiento.
 │   └── escalamiento_mds.Rmd            ← Semana 8: MDS y representación de proximidades
 │
 ├── 04-clustering/
-│   ├── clustering.Rmd                  ← K-means + Ward.D2 + HDBSCAN
+│   ├── clustering.Rmd                  ← K-means + Ward.D2 (R)
 │   ├── clustering.html                 ← informe reproducido
 │   ├── hdbscan_python.py               ← implementación Python vista en clase
 │   └── requirements-hdbscan.txt        ← dependencia Python del análisis
@@ -60,9 +60,11 @@ el mismo pipeline de preprocesamiento.
 - **R Markdown** — documentos reproducibles con HTML knitteado
 - **Shiny** — aplicación interactiva de exploración PCA
 
-Para ejecutar HDBSCAN desde el informe de clustering, instala su dependencia
-Python desde la raíz del proyecto:
+HDBSCAN se ejecuta por separado con Python. El script lee el CSV, prepara su
+propia matriz de análisis y guarda etiquetas, resumen de tamaños y gráfico en
+`04-clustering/`:
 
 ```powershell
 py -3.14 -m pip install -r 04-clustering/requirements-hdbscan.txt
+py 04-clustering/hdbscan_python.py
 ```

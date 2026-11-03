@@ -1,2 +1,5 @@
 hdbscan==0.8.44
+numpy>=1.26
 pandas>=2.0
+scikit-learn>=1.5
+matplotlib>=3.8
