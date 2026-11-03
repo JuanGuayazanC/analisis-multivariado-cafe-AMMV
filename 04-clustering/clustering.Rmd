@@ -236,6 +236,12 @@ tabla_tamanos$porcentaje <- 100 * tabla_tamanos$lotes / nrow(X_stand)
 tabla_tamanos
 ```
 
+Cada lote recibe una sola etiqueta de cluster en la matriz completa. El gráfico
+reduce esa matriz a dos dimensiones para poder verla; por eso, puntos de grupos
+distintos pueden quedar cerca o superpuestos en el plano. La proyección no cambia
+las asignaciones y las distancias entre puntos del dibujo no resumen todas las
+distancias que usó K-means.
+
 ```{r kmeans-validacion}
 cat("BSS/TSS:",
     round(100 * km$betweenss / km$totss, 1), "%\n")
@@ -279,15 +285,15 @@ grafico_kmeans <- fviz_cluster(
   km,
   data = X_stand,
   geom = "point",
-  ellipse.type = "convex",
+  ellipse.type = "none",
   palette = "jco",
   alpha = 0.45,
   ggtheme = theme_minimal()
 ) +
   labs(
     title = paste("K-means (k =", k_optimo, ")"),
-    subtitle = "Proyección en dos dimensiones; los grupos se ajustaron con toda la matriz X",
-    caption = "1.070 lotes de café arábica · las áreas se superponen y no representan categorías comerciales"
+    subtitle = "Cada punto tiene una sola etiqueta; la proyección a 2D puede hacer que los grupos se vean superpuestos",
+    caption = "Las asignaciones se ajustaron con toda X · 1.070 lotes · los colores no indican categorías comerciales"
   ) +
   theme_minimal(base_size = 13) +
   theme(
