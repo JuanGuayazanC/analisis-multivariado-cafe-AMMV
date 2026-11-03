@@ -45,7 +45,6 @@ library(car)
 library(factoextra)
 library(fastDummies)
 library(cluster)
-library(dbscan)
 library(ggplot2)
 
 data_raw <- read.csv("../data/arabica_data_cleaned.csv")
@@ -398,28 +397,72 @@ fueran etiquetas de toda la base.
 
 # 7. HDBSCAN
 
-HDBSCAN no requiere fijar k y puede asignar observaciones a ruido (etiqueta 0).
-En dbscan para R, minPts controla el tamaño mínimo detectable y también suaviza
-la estimación de densidad; no es solo un equivalente directo al parámetro
-min_cluster_size de la implementación de Python.
+HDBSCAN no requiere fijar k y puede asignar observaciones a ruido (etiqueta -1).
+Como en el ejemplo de clase, HDBSCAN se ejecuta en Python con el paquete
+oficial hdbscan y min_cluster_size = 20. Las etiquetas de ruido de Python son -1.
+El Rmd exporta X a un archivo temporal, ejecuta hdbscan_python.py y vuelve a
+leer las asignaciones verificando que conserven el identificador de cada lote.
+Instala la dependencia con:
+
+    py -3.14 -m pip install -r 04-clustering/requirements-hdbscan.txt
+
+El núcleo del código Python es el de clase:
+
+    import hdbscan
+    clusterer = hdbscan.HDBSCAN(min_cluster_size=20)
+    labels = clusterer.fit_predict(X)
 
 ```{r hdbscan-modelo}
-hdb <- dbscan::hdbscan(X_stand, minPts = 20)
-n_clusters_hdb <- length(unique(hdb$cluster[hdb$cluster > 0]))
-n_ruido <- sum(hdb$cluster == 0)
+python_exe <- Sys.getenv("AMMV_PYTHON", unset = Sys.which("python"))
+if (!nzchar(python_exe)) {
+  stop("No se encontró Python en PATH. Instala Python 3.14 y el requirements-hdbscan.txt.")
+}
+
+archivo_x <- tempfile(fileext = ".csv")
+archivo_resultados <- tempfile(fileext = ".csv")
+write.csv(
+  data.frame(row_id = datos_originales$.id_fila, X_stand, check.names = FALSE),
+  archivo_x,
+  row.names = FALSE
+)
+
+script_hdbscan <- normalizePath("hdbscan_python.py", mustWork = TRUE)
+salida_python <- system2(
+  command = python_exe,
+  args = c(
+    shQuote(script_hdbscan),
+    shQuote(archivo_x),
+    shQuote(archivo_resultados),
+    "--min-cluster-size", "20"
+  ),
+  stdout = TRUE,
+  stderr = TRUE
+)
+estado_python <- attr(salida_python, "status")
+if (!is.null(estado_python) && estado_python != 0) {
+  stop(paste(salida_python, collapse = "\n"))
+}
+
+hdb_resultados <- read.csv(archivo_resultados)
+stopifnot(identical(as.integer(hdb_resultados$row_id),
+                    as.integer(datos_originales$.id_fila)))
+hdb_labels <- hdb_resultados$cluster
+n_clusters_hdb <- length(unique(hdb_labels[hdb_labels >= 0]))
+n_ruido <- sum(hdb_labels == -1)
+unlink(c(archivo_x, archivo_resultados))
 
 cat("Clusters HDBSCAN, sin contar ruido:", n_clusters_hdb, "\n")
 cat("Puntos clasificados como ruido:", n_ruido,
-    sprintf("(%.1f%%)\n", 100 * n_ruido / length(hdb$cluster)))
-print(table(hdb$cluster))
+    sprintf("(%.1f%%)\n", 100 * n_ruido / length(hdb_labels)))
+print(table(hdb_labels))
 ```
 
 ```{r hdbscan-visual, fig.width=9, fig.height=7}
 mapa_hdb <- data.frame(
   PC1 = pca_exploratorio$x[, 1],
   PC2 = pca_exploratorio$x[, 2],
-  cluster = factor(hdb$cluster),
-  ruido = hdb$cluster == 0
+  cluster = factor(hdb_labels),
+  ruido = hdb_labels == -1
 )
 
 ggplot(mapa_hdb, aes(PC1, PC2, color = cluster, shape = ruido)) +
@@ -437,8 +480,8 @@ ggplot(mapa_hdb, aes(PC1, PC2, color = cluster, shape = ruido)) +
 
 ```{r hdbscan-perfil}
 datos_perfil_hdb <- datos_perfil_km %>%
-  mutate(cluster_hdb = factor(hdb$cluster)) %>%
-  filter(cluster_hdb != "0")
+  mutate(cluster_hdb = factor(hdb_labels)) %>%
+  filter(cluster_hdb != "-1")
 
 perfil_hdb <- datos_perfil_hdb %>%
   group_by(cluster_hdb) %>%
@@ -458,17 +501,19 @@ perfil_hdb
 
 Adjusted Rand Index compara dos particiones en las mismas observaciones; no es
 una medida absoluta de calidad. Para Ward, el cálculo se restringe a los mismos
-80 lotes de la muestra. Para HDBSCAN, la etiqueta 0 se conserva como grupo de
+80 lotes de la muestra. Para HDBSCAN, la etiqueta -1 se conserva como grupo de
 ruido, así que el ARI se interpreta solo como acuerdo descriptivo.
 
 ```{r comparacion}
-ari_km_hdb <- ari(km$cluster, hdb$cluster)
+ari_km_hdb <- ari(km$cluster, hdb_labels)
 ari_km_ward <- ari(km$cluster[idx_ward], grupos_ward)
-ari_hdb_ward <- ari(hdb$cluster[idx_ward], grupos_ward)
+ari_hdb_ward <- ari(hdb_labels[idx_ward], grupos_ward)
 
+idx_hdb_asignados <- which(hdb_labels >= 0)
+grupos_hdb_sil <- as.integer(factor(hdb_labels[idx_hdb_asignados]))
 sil_hdb <- silhouette(
-  hdb$cluster[hdb$cluster > 0],
-  dist(X_stand[hdb$cluster > 0, , drop = FALSE])
+  grupos_hdb_sil,
+  dist(X_stand[idx_hdb_asignados, , drop = FALSE])
 )
 sil_ward <- silhouette(grupos_ward, dist(X_ward))
 

@@ -35,7 +35,10 @@ el mismo pipeline de preprocesamiento.
 │   └── escalamiento_mds.Rmd            ← Semana 8: MDS y representación de proximidades
 │
 ├── 04-clustering/
-│   └── clustering.Rmd                  ← Semanas 9-10: jerárquico + K-means + HDBSCAN
+│   ├── clustering.Rmd                  ← K-means + Ward.D2 + HDBSCAN
+│   ├── clustering.html                 ← informe reproducido
+│   ├── hdbscan_python.py               ← implementación Python vista en clase
+│   └── requirements-hdbscan.txt        ← dependencia Python del análisis
 │
 ├── 05-clasificacion/
 │   └── clasificacion.Rmd               ← Semanas 12-13: LDA, QDA, SVM, Random Forest
@@ -56,3 +59,10 @@ el mismo pipeline de preprocesamiento.
 - **Python** (complementario) — HDBSCAN, scikit-learn para clasificación en AA/ML
 - **R Markdown** — documentos reproducibles con HTML knitteado
 - **Shiny** — aplicación interactiva de exploración PCA
+
+Para ejecutar HDBSCAN desde el informe de clustering, instala su dependencia
+Python desde la raíz del proyecto:
+
+```powershell
+py -3.14 -m pip install -r 04-clustering/requirements-hdbscan.txt
+```
