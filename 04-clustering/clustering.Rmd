@@ -285,7 +285,7 @@ grafico_kmeans <- fviz_cluster(
   km,
   data = X_stand,
   geom = "point",
-  ellipse.type = "none",
+  ellipse.type = "convex",
   palette = "jco",
   alpha = 0.45,
   ggtheme = theme_minimal()
