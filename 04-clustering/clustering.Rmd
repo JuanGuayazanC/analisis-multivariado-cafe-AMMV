@@ -1,6 +1,6 @@
 ---
 title: "Clustering — Café Arábica"
-subtitle: "Variables dummies, K-means, Dendrograma y HDBSCAN · Coffee Quality Institute"
+subtitle: "K-means, Ward.D2 y HDBSCAN · Flujo de trabajo visto en clase"
 author: "Juan Sebastián Guayazán · Esteban Valente · Diego Nocua"
 date: "`r format(Sys.Date(), '%d de %B de %Y')`"
 output:
@@ -14,418 +14,496 @@ output:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE,
+knitr::opts_chunk$set(echo = TRUE, warning = TRUE, message = FALSE,
                       fig.align = "center", fig.width = 8, fig.height = 6)
 ```
 
-> **Propósito:** aplicar métodos de clustering a los 1.070 lotes de café arábica.
-> Se incluyen variables numéricas (scores PCA) y variables categóricas convertidas a
-> **dummies**. Se comparan tres enfoques: **K-means**, **Clustering jerárquico** (dendrograma) y **HDBSCAN**.
+# Propósito y alcance
 
----
+Se aplican K-means, clustering jerárquico Ward.D2 y HDBSCAN a los 1.070 lotes que
+pasan el filtro de altitud. Se conserva el flujo de clase para K-means:
+estandarizar la matriz X, examinar WSS con factoextra, fijar k a partir del gráfico,
+ajustar con 25 inicializaciones y visualizar con fviz_cluster.
 
-> **Nota sobre análisis de correspondencia:** el análisis de correspondencia es una
-> técnica *diferente* — trabaja exclusivamente con tablas de frecuencias de variables
-> dummy y **no** es equivalente a PCA ni a K-means. Se desarrollará en un documento
-> aparte (`03-correspondencia/`).
+El espacio de clustering combina cuatro scores PCA con tres variables categóricas
+codificadas como indicadores. La matriz se pondera por bloques para que las 14
+columnas dummy no dominen solo por ser más numerosas. No se quitan las filas que
+el informe PCA posterior marca como atípicas: aquí HDBSCAN debe tener la
+oportunidad de reconocerlas como ruido. Por eso este análisis usa el PCA
+exploratorio sobre los 1.070 lotes; sus componentes no son los del PCA final
+ajustado después de retirar atípicos.
 
----
+La elección k = 3 se usa como solución exploratoria, elegida visualmente en la curva
+WSS. Silhouette se reporta como validación y muestra que la separación es débil.
+Los números 3 o 8 no se traducen automáticamente en Specialty, Premium o Commodity.
 
-# 1. Preparación de datos
-
-El clustering se aplica sobre los **scores de las primeras componentes principales**
-(no sobre las variables originales), porque:
-
-- Ya están estandarizados y transformados (Yeo-Johnson).
-- Reducen el ruido: los últimos PCs capturan principalmente varianza residual.
-- Facilitan la visualización: los clusters se pueden graficar directamente en el biplot.
+# 1. Preparar datos y PCA exploratorio
 
 ```{r datos}
 library(dplyr)
-library(factoextra)
-library(dbscan)      # incluye hdbscan()
-library(ggplot2)
 library(car)
+library(factoextra)
+library(fastDummies)
+library(cluster)
+library(dbscan)
+library(ggplot2)
 
-# ── Pipeline idéntico al informe_despues.Rmd ──────────────────────────────────
 data_raw <- read.csv("../data/arabica_data_cleaned.csv")
+data_raw$.id_fila <- seq_len(nrow(data_raw))
 
-vars_originales <- c("Aroma", "Flavor", "Aftertaste", "Acidity", "Body",
-                     "Balance", "Uniformity", "Clean.Cup", "Sweetness",
-                     "Cupper.Points", "Moisture", "Category.One.Defects",
-                     "Category.Two.Defects", "altitude_mean_meters")
+vars_numericas <- c(
+  "Aroma", "Flavor", "Aftertaste", "Acidity", "Body", "Balance",
+  "Uniformity", "Clean.Cup", "Sweetness", "Cupper.Points", "Moisture",
+  "Category.One.Defects", "Category.Two.Defects", "altitude_mean_meters"
+)
 
-datos_full <- data_raw %>%
+datos_filtrados <- data_raw %>%
   filter(!is.na(altitude_mean_meters),
          altitude_mean_meters > 0,
-         altitude_mean_meters <= 3000) %>%
-  select(all_of(vars_originales)) %>%
-  filter(complete.cases(.)) %>%
-  rename(
-    Sabor           = Flavor,
-    Retrogusto      = Aftertaste,
-    Acidez          = Acidity,
-    Cuerpo          = Body,
-    Uniformidad     = Uniformity,
-    Taza.Limpia     = Clean.Cup,
-    Dulzura         = Sweetness,
-    Puntaje.Catador = Cupper.Points,
-    Humedad         = Moisture,
-    Defectos.Cat1   = Category.One.Defects,
-    Defectos.Cat2   = Category.Two.Defects,
-    Altitud         = altitude_mean_meters
+         altitude_mean_meters <= 3000)
+
+# Se conserva la selección de 8 variables activas del PCA vigente.
+vars_activas <- setdiff(
+  vars_numericas,
+  c("Category.One.Defects", "Category.Two.Defects", "Moisture",
+    "Sweetness", "Uniformity", "Clean.Cup")
+)
+datos_originales <- datos_filtrados %>%
+  select(.id_fila, all_of(vars_activas))
+
+stopifnot(nrow(datos_originales) == 1070L)
+stopifnot(!anyNA(datos_originales[, vars_activas]))
+
+datos_modelo <- datos_originales[, vars_activas, drop = FALSE]
+
+sesgo <- function(x) mean((x - mean(x))^3) / sd(x)^3
+sesgo_inicial <- sapply(datos_modelo, sesgo)
+vars_transformar <- names(sesgo_inicial[abs(sesgo_inicial) > 1])
+
+cat("Lotes usados:", nrow(datos_modelo), "\n")
+cat("Variables PCA activas:", paste(vars_activas, collapse = ", "), "\n")
+cat("Variables con |sesgo| > 1:", paste(vars_transformar, collapse = ", "), "\n")
+```
+
+Yeo-Johnson se aplica selectivamente siguiendo el criterio del informe PCA actual
+(|sesgo| > 1). Se conserva la estimación de máxima verosimilitud de car; no se
+fuerzan lambdas a un rango arbitrario.
+
+```{r transformacion-yj}
+if (length(vars_transformar) > 0) {
+  ajuste_yj <- powerTransform(
+    datos_modelo[, vars_transformar, drop = FALSE],
+    family = "yjPower"
   )
+  lambdas_yj <- coef(ajuste_yj, round = FALSE)
+  print(round(lambdas_yj, 3))
 
-yj_transform <- function(x, lambda) {
-  if (lambda != 0) ((x + 1)^lambda - 1) / lambda else log(x + 1)
+  for (v in vars_transformar) {
+    datos_modelo[[v]] <- yjPower(datos_modelo[[v]], lambdas_yj[v])
+  }
 }
-datos_full$Defectos.Cat2 <- yj_transform(datos_full$Defectos.Cat2, -0.217)
 
-vars_11 <- setdiff(names(datos_full), c("Defectos.Cat1", "Defectos.Cat2", "Humedad"))
-datos_t <- datos_full[, vars_11]
+pca_exploratorio <- prcomp(datos_modelo, center = TRUE, scale. = TRUE)
+varianza_acumulada_4pc <-
+  sum(pca_exploratorio$sdev[1:4]^2) / sum(pca_exploratorio$sdev^2)
 
-pt_11      <- powerTransform(datos_t, family = "yjPower")
-lambdas_11 <- pmax(pmin(coef(pt_11, round = FALSE), 3), -3)
-for (v in names(datos_t)) datos_t[[v]] <- yjPower(datos_t[[v]], lambdas_11[v])
-
-pca <- prcomp(datos_t, center = TRUE, scale. = TRUE)
-
-# Matriz de scores — se usará como X para clustering
-X <- pca$x
-cat("Dimensiones de X (scores PCA):", nrow(X), "lotes ×", ncol(X), "componentes\n")
+cat("Varianza acumulada por las primeras 4 CP:",
+    round(varianza_acumulada_4pc * 100, 1), "%\n")
 ```
 
----
+# 2. Variables categóricas y alineación de filas
 
-# 2. Variables categóricas → Dummies
+Se usan método de procesamiento, color y país de origen. País se resume en los
+cinco orígenes con más lotes y una categoría Otro. Se conserva una columna de
+identificador para verificar que cada fila dummy corresponde al mismo lote que
+sus scores PCA.
 
-K-means trabaja con distancias euclidianas, por lo que **no puede aplicarse
-directamente a variables de texto o factores**. La solución es convertirlas a
-variables binarias (dummies): una columna por categoría, con 1 si el lote pertenece
-a esa categoría y 0 si no.
+```{r categoricas}
+categoricas <- datos_filtrados %>%
+  select(.id_fila, Processing.Method, Color, Country.of.Origin) %>%
+  mutate(across(
+    c(Processing.Method, Color, Country.of.Origin),
+    ~ ifelse(is.na(.) | trimws(as.character(.)) == "",
+             "Desconocido", as.character(.))
+  ))
 
-El dataset tiene tres variables categóricas útiles con pocas categorías:
-`Processing.Method`, `Color` y `Country.of.Origin` (simplificada a los 5 países
-con más lotes para no generar decenas de columnas).
+top5_paises <- names(
+  sort(table(categoricas$Country.of.Origin), decreasing = TRUE)[1:5]
+)
+categoricas$Country.of.Origin <- ifelse(
+  categoricas$Country.of.Origin %in% top5_paises,
+  categoricas$Country.of.Origin,
+  "Otro"
+)
 
-```{r dummies}
-library(fastDummies)   # dummy_cols()
-
-# Seleccionar variables categóricas del CSV original
-cat_vars <- data_raw %>%
-  filter(!is.na(altitude_mean_meters),
-         altitude_mean_meters > 0,
-         altitude_mean_meters <= 3000) %>%
-  filter(complete.cases(select(., all_of(vars_originales)))) %>%
-  select(Processing.Method, Color, Country.of.Origin) %>%
-  mutate(across(everything(), ~ ifelse(. == "" | is.na(.), "Desconocido", .)))
-
-# Simplificar Country.of.Origin: top 5 países, el resto = "Otro"
-top5_paises <- names(sort(table(cat_vars$Country.of.Origin), decreasing = TRUE)[1:5])
-cat_vars$Pais <- ifelse(cat_vars$Country.of.Origin %in% top5_paises,
-                        cat_vars$Country.of.Origin, "Otro")
-cat_vars$Country.of.Origin <- NULL
-
-cat("Categorías de Processing.Method:\n")
-print(table(cat_vars$Processing.Method))
-cat("\nCategorías de Color:\n")
-print(table(cat_vars$Color))
-cat("\nTop 5 países + Otro:\n")
-print(table(cat_vars$Pais))
+stopifnot(identical(datos_originales$.id_fila, categoricas$.id_fila))
 ```
 
-```{r dummies-crear}
-# Convertir a dummies (elimina primera columna de cada variable para evitar
-# multicolinealidad perfecta — convención estándar)
-dummies <- dummy_cols(cat_vars,
-                      remove_first_dummy    = TRUE,
-                      remove_selected_columns = TRUE)
+Se mantienen todos los indicadores de cada factor. Quitar una categoría de
+referencia evita colinealidad en ciertos modelos lineales, pero aquí cambiaría
+las distancias usadas por K-means y Ward.
 
-cat("Dimensiones de la matriz de dummies:", nrow(dummies), "×", ncol(dummies), "\n")
-cat("Columnas creadas:\n")
-print(names(dummies))
+```{r crear-dummies}
+datos_categoricos <- categoricas %>%
+  select(-.id_fila) %>%
+  mutate(across(everything(), factor))
+
+dummies <- model.matrix(
+  ~ Processing.Method + Color + Country.of.Origin - 1,
+  data = datos_categoricos
+)
+
+cat("Filas categóricas:", nrow(dummies), "\n")
+cat("Columnas dummy:", ncol(dummies), "\n")
+cat("Filas PCA:", nrow(pca_exploratorio$x), "\n")
+stopifnot(nrow(dummies) == nrow(pca_exploratorio$x))
 ```
 
-```{r combinar}
-# Combinar scores PCA (variables numéricas transformadas) con dummies
-X_num    <- scale(X[, 1:4])           # primeras 4 CPs
-X_dum    <- scale(as.matrix(dummies)) # dummies escaladas
-X_combinado <- cbind(X_num, X_dum)
-cat("Matriz final para clustering:", nrow(X_combinado), "×", ncol(X_combinado),
-    "(4 CPs + dummies)\n")
+# 3. Construir y escalar X
 
-# Calcular k_codo aquí (necesario para el dendrograma que viene a continuación)
+El código de clase estandariza X antes de ejecutar los algoritmos. Aquí se
+estandariza cada una de las cuatro CP y se divide el bloque numérico por la raíz
+de 4. El bloque dummy completo se divide por la raíz de 3 variables categóricas.
+Así, ambos bloques aportan aproximadamente la misma suma de cuadrados total;
+además, los indicadores no se estandarizan individualmente, lo que daría pesos
+muy grandes a categorías raras.
+
+Esta ponderación es una decisión de distancia que debe quedar documentada.
+Más adelante se puede presentar el análisis de sensibilidad con otros pesos.
+
+```{r construir-x}
+X_num <- scale(pca_exploratorio$x[, 1:4, drop = FALSE]) / sqrt(4)
+X_dum <- dummies / sqrt(3)
+X_stand <- cbind(X_num, X_dum)
+
+cat("Dimensiones de X:", nrow(X_stand), "×", ncol(X_stand), "\n")
+cat("Proporción de suma de cuadrados, bloque numérico:",
+    round(sum(X_num^2) / sum(X_stand^2) * 100, 1), "%\n")
+cat("Proporción de suma de cuadrados, bloque categórico:",
+    round(sum(X_dum^2) / sum(X_stand^2) * 100, 1), "%\n")
+```
+
+# 4. Elegir k con el método del codo
+
+Se limita el gráfico a k = 1,…,5 como en el ejemplo de clase. WSS disminuye
+siempre al aumentar k; se inspecciona la curva buscando dónde la reducción
+empieza a aplanarse. La selección visual no se automatiza mediante una segunda
+diferencia arbitraria.
+
+```{r metodo-codo, fig.width=8, fig.height=5}
 set.seed(42)
-k_max <- 10
-wss_tmp        <- sapply(1:k_max, function(k) kmeans(X_combinado, centers=k, nstart=15)$tot.withinss)
-caidas_tmp     <- -diff(wss_tmp)
-caidas_rel_tmp <- caidas_tmp / wss_tmp[-length(wss_tmp)]
-k_codo         <- which.max(-diff(caidas_rel_tmp)) + 1
-cat("k sugerido por el codo:", k_codo, "\n")
+grafico_wss <- fviz_nbclust(
+  X_stand,
+  kmeans,
+  method = "wss",
+  k.max = 5,
+  nstart = 25
+) +
+  labs(
+    title = "Método del codo para seleccionar k",
+    subtitle = "WSS calculado con 25 inicializaciones por cada valor de k",
+    x = "Número de clusters (k)",
+    y = "Suma de cuadrados intra-cluster (WSS)"
+  ) +
+  theme_minimal(base_size = 13)
+
+grafico_wss
 ```
 
----
+La curva reproducida para esta matriz se aplana gradualmente después de k = 3.
+Se fija k = 3 como candidato de trabajo para describir la solución y compararla
+con otros métodos; no se afirma que exista un óptimo estadístico único.
 
-# 3. Dendrograma — Clustering jerárquico
-
-El clustering jerárquico no requiere especificar k de antemano. Construye un árbol
-(dendrograma) mostrando cómo se van fusionando los lotes. El corte horizontal
-del árbol define los clusters.
-
-```{r dendrograma, fig.width=12, fig.height=7}
-# Muestra aleatoria de 80 lotes para que el dendrograma sea legible
-set.seed(42)
-idx_muestra <- sample(nrow(X_combinado), 80)
-X_muestra   <- X_combinado[idx_muestra, ]
-
-# Distancia euclídea + enlace de Ward (minimiza varianza intra-cluster)
-dist_m  <- dist(X_muestra, method = "euclidean")
-hc      <- hclust(dist_m, method = "ward.D2")
-
-# Cortar en k_codo clusters
-grupos_hc <- cutree(hc, k = k_codo)
-
-# Dendrograma con clusters coloreados
-library(dendextend)
-dend <- as.dendrogram(hc)
-dend <- color_branches(dend, k = k_codo)
-
-par(mar = c(4, 2, 3, 1))
-plot(dend,
-     main  = paste0("Dendrograma — Clustering jerárquico (Ward.D2)  ·  k = ", k_codo),
-     sub   = "Muestra de 80 lotes · variables numéricas + dummies",
-     xlab  = "",
-     ylab  = "Distancia euclídea",
-     leaflab = "none",
-     cex.main = 1)
-abline(h = rev(hc$height)[k_codo - 1] * 1.05,
-       col = "red", lty = 2, lwd = 1.5)
-legend("topright", legend = paste("Corte en k =", k_codo),
-       col = "red", lty = 2, bty = "n", cex = 0.9)
+```{r elegir-k}
+k_optimo <- 3L
+cat("k exploratorio seleccionado por inspección de WSS:", k_optimo, "\n")
 ```
 
-```{r dendrograma-fviz, fig.width=10, fig.height=6}
-# Versión más compacta con fviz_dend
-fviz_dend(hc, k = k_codo,
-          cex          = 0.4,
-          rect         = TRUE,
-          rect_fill    = TRUE,
-          rect_border  = "jco",
-          color_labels_by_k = TRUE,
-          show_labels  = FALSE,
-          main  = paste0("Dendrograma (fviz) — k = ", k_codo, " clusters"),
-          sub   = "Muestra de 80 lotes · Ward.D2",
-          ylab  = "Altura (distancia)") +
-  theme_minimal()
-```
+# 5. K-means
 
----
+## 5.1 Ajustar y visualizar
 
-# 4. K-means
-
-## 4.1. Estandarización
-
-K-means usa distancias euclidianas. La matriz `X_combinado` (CPs + dummies) ya está
-estandarizada en el paso anterior, así que se usa directamente.
-
-```{r estandarizar}
-X_stand <- X_combinado   # ya escalado: CPs + dummies (k_codo calculado en chunk combinar)
-```
-
-## 4.2. Elección de k — método WSS (codo)
-
-El método del codo calcula la **suma de cuadrados intra-cluster (WSS)** para cada k.
-A medida que k crece, WSS siempre baja; el punto óptimo es donde la curva
-"dobla" — a partir de ahí añadir más clusters da poco beneficio.
-
-```{r elegir-k, fig.width=8, fig.height=5}
-set.seed(42)
-k_max <- 10
-
-# Calcular WSS para cada k
-wss_vals <- sapply(1:k_max, function(k) {
-  kmeans(X_stand, centers = k, nstart = 25)$tot.withinss
-})
-
-# Detectar el codo: mayor caída relativa de WSS
-caidas      <- -diff(wss_vals)                 # cuánto baja WSS al pasar de k a k+1
-caidas_rel  <- caidas / wss_vals[-length(wss_vals)]  # caída relativa
-aceleracion <- diff(caidas_rel)                # segunda diferencia
-k_codo      <- which.max(-aceleracion) + 1    # k donde la caída se frena más
-
-cat("k sugerido por el método del codo:", k_codo, "\n")
-
-# Gráfico con línea marcando el k elegido
-wss_df <- data.frame(k = 1:k_max, wss = wss_vals)
-ggplot(wss_df, aes(x = k, y = wss)) +
-  geom_line(color = "#2563a8", linewidth = 1) +
-  geom_point(color = "#2563a8", size = 3) +
-  geom_point(data = wss_df[k_codo, ], aes(x = k, y = wss),
-             color = "#e74c3c", size = 5) +
-  geom_vline(xintercept = k_codo, linetype = "dashed",
-             color = "#e74c3c", linewidth = 0.8) +
-  annotate("label", x = k_codo + 0.3, y = max(wss_vals) * 0.9,
-           label = paste0("k = ", k_codo, "\n(codo)"),
-           color = "#e74c3c", size = 3.5, hjust = 0) +
-  scale_x_continuous(breaks = 1:k_max) +
-  labs(title    = "Método del codo — suma de cuadrados intra-cluster (WSS)",
-       subtitle = paste0("El punto rojo indica k = ", k_codo, " (mayor frenada en la caída de WSS)"),
-       x = "Número de clusters (k)",
-       y = "WSS total") +
-  theme_minimal(base_size = 13) +
-  theme(panel.grid.minor = element_blank())
-```
-
-```{r elegir-k-silhouette, fig.width=8, fig.height=5}
-# Silhouette como validación: mayor valor = mejor separación entre clusters
-fviz_nbclust(X_stand, kmeans,
-             method  = "silhouette",
-             k.max   = k_max,
-             nstart  = 25) +
-  labs(title    = "Validación — Silhouette promedio",
-       subtitle = "Mayor silhouette = clusters más cohesivos y separados",
-       x = "Número de clusters (k)") +
-  geom_vline(xintercept = k_codo, linetype = "dashed",
-             color = "#e74c3c", linewidth = 0.8) +
-  theme_minimal()
-```
-
-## 4.3. Ajuste del modelo final
+Se fija la semilla para que el informe sea reproducible y se usan 25 inicializaciones,
+como en el ejemplo de clase. La visualización reduce X a dos dimensiones para
+mostrar los grupos; las etiquetas se ajustaron en toda la matriz, no solo en ese
+plano.
 
 ```{r kmeans-modelo}
-# k_optimo se deriva directamente del análisis del codo
-k_optimo <- k_codo
-cat("k seleccionado:", k_optimo, "\n")
-
 set.seed(42)
 km <- kmeans(X_stand, centers = k_optimo, nstart = 25)
 
-cat("Tamaño de cada cluster:\n")
-print(km$size)
-
-cat("\nRatio BSS/TSS (varianza explicada por clusters):",
-    round(km$betweenss / km$totss * 100, 1), "%\n")
+tabla_tamanos <- as.data.frame(table(cluster = km$cluster))
+names(tabla_tamanos)[2] <- "lotes"
+tabla_tamanos$porcentaje <- 100 * tabla_tamanos$lotes / nrow(X_stand)
+tabla_tamanos
 ```
 
-## 4.4. Visualización en el plano CP1–CP2
+```{r kmeans-validacion}
+cat("BSS/TSS:",
+    round(100 * km$betweenss / km$totss, 1), "%\n")
 
-```{r kmeans-viz, fig.width=9, fig.height=7}
-fviz_cluster(km, data = X_stand,
-             geom        = "point",
-             ellipse.type = "convex",
-             palette     = "jco",
-             alpha       = 0.4,
-             ggtheme     = theme_minimal()) +
-  labs(title    = paste0("K-means — k = ", k_optimo, " clusters"),
-       subtitle = "Proyección sobre CP1 y CP2",
-       caption  = "1.070 lotes de café arábica · CQI")
+sil_km <- silhouette(km$cluster, dist(X_stand))
+cat("Silhouette promedio:",
+    round(mean(sil_km[, 3]), 3), "\n")
+cat("Observaciones con Silhouette negativa:",
+    sum(sil_km[, 3] < 0), "de", nrow(X_stand),
+    sprintf("(%.1f%%)\n", mean(sil_km[, 3] < 0) * 100))
+
+sil_por_cluster <- aggregate(
+  sil_km[, 3],
+  by = list(cluster = sil_km[, 1]),
+  FUN = mean
+)
+names(sil_por_cluster)[2] <- "silhouette_promedio"
+sil_por_cluster
 ```
 
-## 4.5. Perfil de cada cluster
+```{r silhouette-k, fig.width=8, fig.height=5}
+set.seed(42)
+fviz_nbclust(
+  X_stand,
+  kmeans,
+  method = "silhouette",
+  k.max = 5,
+  nstart = 25
+) +
+  labs(
+    title = "Silhouette promedio como validación",
+    subtitle = "Un valor bajo indica separación limitada entre grupos",
+    x = "Número de clusters (k)",
+    y = "Silhouette promedio"
+  ) +
+  theme_minimal(base_size = 13)
+```
 
-```{r kmeans-perfil}
-datos_t$cluster_km <- factor(km$cluster)
+```{r fviz-cluster, fig.width=9, fig.height=7}
+fviz_cluster(
+  km,
+  data = X_stand,
+  geom = "point",
+  ellipse.type = "convex",
+  palette = "jco",
+  alpha = 0.45,
+  ggtheme = theme_minimal()
+) +
+  labs(
+    title = paste("K-means — k =", k_optimo),
+    subtitle = "Proyección bidimensional; asignaciones ajustadas con toda X",
+    caption = "Café arábica · 1.070 lotes"
+  )
+```
 
-perfil_km <- datos_t %>%
-  group_by(cluster_km) %>%
-  summarise(across(where(is.numeric), mean), .groups = "drop")
+## 5.2 Sensibilidad a la inicialización
+
+K-means puede llegar a soluciones distintas con distintos centros iniciales.
+Se compara la solución de referencia con 20 ejecuciones adicionales de 25
+inicializaciones cada una, usando el índice Rand ajustado (ARI).
+
+```{r estabilidad}
+ari <- function(a, b) {
+  tab <- table(a, b)
+  choose2 <- function(x) x * (x - 1) / 2
+  n <- sum(tab)
+  suma_celdas <- sum(choose2(tab))
+  suma_filas <- sum(choose2(rowSums(tab)))
+  suma_columnas <- sum(choose2(colSums(tab)))
+  esperado <- suma_filas * suma_columnas / choose2(n)
+  (suma_celdas - esperado) /
+    (0.5 * (suma_filas + suma_columnas) - esperado)
+}
+
+ari_repeticiones <- numeric(20)
+wss_repeticiones <- numeric(20)
+
+for (i in seq_len(20)) {
+  set.seed(1000 + i)
+  km_i <- kmeans(X_stand, centers = k_optimo, nstart = 25)
+  ari_repeticiones[i] <- ari(km$cluster, km_i$cluster)
+  wss_repeticiones[i] <- km_i$tot.withinss
+}
+
+cat("ARI frente a la solución de referencia — rango:",
+    paste(round(range(ari_repeticiones), 3), collapse = " a "), "\n")
+cat("WSS entre las 20 repeticiones — rango:",
+    paste(round(wss_repeticiones, 1), collapse = " a "), "\n")
+cat("Repeticiones idénticas a la referencia:",
+    sum(ari_repeticiones == 1), "de 20\n")
+```
+
+## 5.3 Perfil en las variables originales
+
+Las etiquetas de K-means se unen a las variables originales usando el mismo orden
+de filas verificado antes. Los puntajes se reportan en su escala de origen para
+poder describir los grupos. Total.Cup.Points se usa solo para perfilar, no para
+ajustar el clustering.
+
+```{r perfil-kmeans}
+datos_perfil_km <- datos_filtrados %>%
+  select(.id_fila, all_of(vars_numericas), Total.Cup.Points) %>%
+  mutate(cluster = factor(km$cluster))
+
+perfil_km <- datos_perfil_km %>%
+  group_by(cluster) %>%
+  summarise(
+    lotes = n(),
+    porcentaje = 100 * n() / nrow(datos_perfil_km),
+    Aroma = mean(Aroma),
+    Flavor = mean(Flavor),
+    Aftertaste = mean(Aftertaste),
+    Acidity = mean(Acidity),
+    Body = mean(Body),
+    Balance = mean(Balance),
+    Cupper.Points = mean(Cupper.Points),
+    Total.Cup.Points = mean(Total.Cup.Points),
+    .groups = "drop"
+  )
 
 perfil_km
 ```
 
----
+No se asignan los nombres Specialty, Premium o Commodity desde el algoritmo.
+Para defender esas categorías se deben definir cortes externos de calidad y
+comprobar cómo se distribuyen los lotes de cada cluster respecto a ellos.
 
-# 5. HDBSCAN
+# 6. Clustering jerárquico Ward.D2
 
-HDBSCAN (*Hierarchical Density-Based Spatial Clustering of Applications with Noise*)
-identifica clusters de densidad variable sin necesidad de especificar k.
-Los puntos en zonas de baja densidad se clasifican como **ruido** (cluster 0).
+Se usa una muestra de 80 observaciones para que el dendrograma sea legible.
+El corte en k emplea el mismo candidato que K-means. La caja de rect.hclust marca
+el corte correcto; no se calcula una altura aproximada aparte.
+
+```{r ward, fig.width=12, fig.height=7}
+set.seed(42)
+idx_ward <- sample(seq_len(nrow(X_stand)), 80)
+X_ward <- X_stand[idx_ward, , drop = FALSE]
+
+hc_ward <- hclust(dist(X_ward), method = "ward.D2")
+grupos_ward <- cutree(hc_ward, k = k_optimo)
+
+plot(
+  hc_ward,
+  labels = FALSE,
+  main = paste("Ward.D2 — muestra de 80 lotes; corte k =", k_optimo),
+  xlab = "Lotes",
+  ylab = "Distancia"
+)
+rect.hclust(hc_ward, k = k_optimo, border = "steelblue")
+
+cat("Tamaño de los grupos Ward en la muestra:\n")
+print(table(grupos_ward))
+```
+
+Ward se ajustó sobre 80 lotes, mientras K-means y HDBSCAN usan los 1.070.
+Por tanto, el dendrograma ilustra el método y sus grupos no se comparan como si
+fueran etiquetas de toda la base.
+
+# 7. HDBSCAN
+
+HDBSCAN no requiere fijar k y puede asignar observaciones a ruido (etiqueta 0).
+En dbscan para R, minPts controla el tamaño mínimo detectable y también suaviza
+la estimación de densidad; no es solo un equivalente directo al parámetro
+min_cluster_size de la implementación de Python.
 
 ```{r hdbscan-modelo}
-# minPts equivale a min_cluster_size en Python's hdbscan
-hdb <- hdbscan(X_stand, minPts = 20)
+hdb <- dbscan::hdbscan(X_stand, minPts = 20)
+n_clusters_hdb <- length(unique(hdb$cluster[hdb$cluster > 0]))
+n_ruido <- sum(hdb$cluster == 0)
 
-cat("Clusters encontrados (sin contar ruido):",
-    length(unique(hdb$cluster[hdb$cluster > 0])), "\n")
-
-cat("\nDistribución de puntos por cluster (0 = ruido):\n")
+cat("Clusters HDBSCAN, sin contar ruido:", n_clusters_hdb, "\n")
+cat("Puntos clasificados como ruido:", n_ruido,
+    sprintf("(%.1f%%)\n", 100 * n_ruido / length(hdb$cluster)))
 print(table(hdb$cluster))
 ```
 
-```{r hdbscan-viz, fig.width=9, fig.height=7}
-scores_plot <- as.data.frame(X_stand[, 1:2])
-colnames(scores_plot) <- c("CP1", "CP2")
-scores_plot$cluster_hdb <- factor(hdb$cluster)
-scores_plot$ruido       <- hdb$cluster == 0
+```{r hdbscan-visual, fig.width=9, fig.height=7}
+mapa_hdb <- data.frame(
+  PC1 = pca_exploratorio$x[, 1],
+  PC2 = pca_exploratorio$x[, 2],
+  cluster = factor(hdb$cluster),
+  ruido = hdb$cluster == 0
+)
 
-ggplot(scores_plot, aes(x = CP1, y = CP2, color = cluster_hdb)) +
-  geom_point(aes(alpha = ifelse(ruido, 0.2, 0.5), shape = ruido), size = 1.5) +
-  scale_alpha_identity() +
-  scale_shape_manual(values = c(`FALSE` = 16, `TRUE` = 4),
-                     labels  = c("Cluster", "Ruido"),
-                     name    = "") +
-  scale_color_brewer(palette = "Set1", name = "Cluster") +
-  geom_hline(yintercept = 0, linetype = "dashed", color = "#ccc") +
-  geom_vline(xintercept = 0, linetype = "dashed", color = "#ccc") +
-  labs(title    = "HDBSCAN — clustering de densidad jerárquica",
-       subtitle = paste0("minPts = 20  ·  ",
-                         sum(hdb$cluster == 0), " puntos clasificados como ruido"),
-       caption  = "1.070 lotes de café arábica · CQI",
-       x = "CP1 (Calidad sensorial general)",
-       y = "CP2 (Consistencia vs. intensidad)") +
-  theme_minimal(base_size = 13) +
-  theme(panel.grid.minor = element_blank())
+ggplot(mapa_hdb, aes(PC1, PC2, color = cluster, shape = ruido)) +
+  geom_point(alpha = 0.65, size = 1.8) +
+  scale_shape_manual(values = c("FALSE" = 16, "TRUE" = 4), name = "Ruido") +
+  scale_color_brewer(palette = "Set1", name = "Grupo HDBSCAN") +
+  labs(
+    title = "HDBSCAN proyectado sobre las dos primeras CP",
+    subtitle = paste(n_ruido, "lotes etiquetados como ruido"),
+    x = "PC1",
+    y = "PC2"
+  ) +
+  theme_minimal(base_size = 13)
 ```
 
-## 5.1. Perfil de cada cluster HDBSCAN
-
 ```{r hdbscan-perfil}
-datos_t$cluster_hdb <- factor(hdb$cluster)
+datos_perfil_hdb <- datos_perfil_km %>%
+  mutate(cluster_hdb = factor(hdb$cluster)) %>%
+  filter(cluster_hdb != "0")
 
-perfil_hdb <- datos_t %>%
-  filter(cluster_hdb != 0) %>%   # excluir ruido
+perfil_hdb <- datos_perfil_hdb %>%
   group_by(cluster_hdb) %>%
-  summarise(across(where(is.numeric), mean), .groups = "drop")
+  summarise(
+    lotes = n(),
+    Aroma = mean(Aroma),
+    Flavor = mean(Flavor),
+    Aftertaste = mean(Aftertaste),
+    Total.Cup.Points = mean(Total.Cup.Points),
+    .groups = "drop"
+  )
 
 perfil_hdb
 ```
 
----
+# 8. Comparación de métodos
 
-# 6. Comparación K-means vs HDBSCAN
+Adjusted Rand Index compara dos particiones en las mismas observaciones; no es
+una medida absoluta de calidad. Para Ward, el cálculo se restringe a los mismos
+80 lotes de la muestra. Para HDBSCAN, la etiqueta 0 se conserva como grupo de
+ruido, así que el ARI se interpreta solo como acuerdo descriptivo.
 
-```{r comparacion, fig.width=12, fig.height=5}
-scores_comp <- as.data.frame(X_stand[, 1:2])
-colnames(scores_comp) <- c("CP1", "CP2")
-scores_comp$kmeans  <- factor(km$cluster)
-scores_comp$hdbscan <- factor(hdb$cluster)
+```{r comparacion}
+ari_km_hdb <- ari(km$cluster, hdb$cluster)
+ari_km_ward <- ari(km$cluster[idx_ward], grupos_ward)
+ari_hdb_ward <- ari(hdb$cluster[idx_ward], grupos_ward)
 
-p1 <- ggplot(scores_comp, aes(CP1, CP2, color = kmeans)) +
-  geom_point(alpha = 0.35, size = 1.2) +
-  scale_color_brewer(palette = "Set1") +
-  labs(title = paste0("K-means (k=", k_optimo, ")"), color = "Cluster") +
-  theme_minimal() + theme(panel.grid.minor = element_blank())
+sil_hdb <- silhouette(
+  hdb$cluster[hdb$cluster > 0],
+  dist(X_stand[hdb$cluster > 0, , drop = FALSE])
+)
+sil_ward <- silhouette(grupos_ward, dist(X_ward))
 
-p2 <- ggplot(scores_comp, aes(CP1, CP2, color = hdbscan)) +
-  geom_point(alpha = 0.35, size = 1.2) +
-  scale_color_brewer(palette = "Set1") +
-  labs(title = "HDBSCAN (minPts=20)",
-       subtitle = paste0(sum(hdb$cluster == 0), " puntos = ruido"),
-       color = "Cluster") +
-  theme_minimal() + theme(panel.grid.minor = element_blank())
+resumen_metodos <- data.frame(
+  Metodo = c("K-means", "Ward.D2", "HDBSCAN"),
+  Lotes_ajustados = c(nrow(X_stand), length(idx_ward), nrow(X_stand)),
+  Clusters_sin_ruido = c(k_optimo, length(unique(grupos_ward)), n_clusters_hdb),
+  Silhouette_promedio = c(
+    mean(sil_km[, 3]),
+    mean(sil_ward[, 3]),
+    mean(sil_hdb[, 3])
+  ),
+  Nota = c(
+    "Todos los lotes; silhouette en X",
+    "Muestra de 80; silhouette en la muestra",
+    "Silhouette solo en puntos asignados; excluye ruido"
+  )
+)
 
-gridExtra::grid.arrange(p1, p2, ncol = 2)
+resumen_metodos
+cat("ARI K-means / HDBSCAN, 1.070 lotes:", round(ari_km_hdb, 3), "\n")
+cat("ARI K-means / Ward.D2, muestra:", round(ari_km_ward, 3), "\n")
+cat("ARI HDBSCAN / Ward.D2, muestra:", round(ari_hdb_ward, 3), "\n")
 ```
 
-| Criterio              | K-means                        | HDBSCAN                         |
-|-----------------------|--------------------------------|---------------------------------|
-| Nº de clusters        | Fijo (elegido por WSS)         | Automático                      |
-| Forma de clusters     | Esférica (convexos)            | Arbitraria                      |
-| Manejo de ruido       | No — todo punto pertenece a un cluster | Sí — puntos de baja densidad = ruido |
-| Sensible a outliers   | Sí                             | No                              |
-| Parámetro principal   | k                              | minPts                          |
+Las Silhouette de HDBSCAN y Ward no son directamente comparables con la de
+K-means: HDBSCAN excluye el ruido y Ward usa una muestra de 80. Las diferencias
+entre métodos reflejan también sus supuestos: centroides y distancia euclídea
+para K-means, varianza intra-grupo para Ward, y densidad con ruido para HDBSCAN.
 
----
+# 9. Conclusión
 
-> **Conclusión:** completar con la interpretación de los clusters en términos de
-> calidad de café una vez se ejecuten los gráficos y se observe la estructura real.
+El flujo de código sigue el procedimiento visto en clase. La solución k = 3 es
+una elección visual exploratoria del codo, no una certificación de que existan
+tres segmentos naturales. Silhouette, tamaños, estabilidad y perfiles en
+variables originales deben leerse conjuntamente. Los nombres comerciales solo
+se justifican si criterios de calidad externos, definidos antes de ver los
+clusters, muestran una correspondencia clara.
