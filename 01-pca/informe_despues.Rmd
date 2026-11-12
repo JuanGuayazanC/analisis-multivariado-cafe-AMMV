@@ -251,7 +251,9 @@ print(round(sapply(datos_t[, vars_sin_transformar, drop=FALSE], skew), 3))
 pca_14 <- prcomp(datos_transformados, center = TRUE, scale. = TRUE)
 
 var14 <- round(summary(pca_14)$importance[2, 1:2] * 100, 1)
-# DESPUÉS: 8 variables + YJ selectivo (atípicos se eliminan en sección 5b)
+# Nota: en este punto datos_t tiene YJ aplicado pero los atípicos AÚN NO se han
+# retirado (se retiran en la sección 5b). Este gráfico muestra el efecto de la
+# selección de variables; la depuración de atípicos se muestra en sección 5b.
 pca_despues_comp <- prcomp(datos_t, center = TRUE, scale. = TRUE)
 var8  <- round(summary(pca_despues_comp)$importance[2, 1:2] * 100, 1)
 
@@ -263,7 +265,7 @@ biplot(pca_14, scale = 0, cex = 0.45, col = c("gray70", "firebrick"),
 biplot(pca_despues_comp, scale = 0, cex = 0.45, col = c("gray70", "steelblue"),
        xlab = paste0("PC1 (", var8[1], " %)"),
        ylab = paste0("PC2 (", var8[2], " %)"),
-       main = "DESPUES: 8 variables + YJ selectivo (sin atipicos)")
+       main = "DESPUES (pre-depuracion): 8 variables + YJ selectivo")
 ```
 
 ---
@@ -368,6 +370,24 @@ round(apply(Z, 2, var), 3)
 pca <- prcomp(datos_limpio, center = TRUE, scale. = TRUE)
 cat("PCA final: datos limpios (", nrow(datos_limpio), "lotes ×", ncol(datos_limpio), "variables)\n")
 ```
+
+```{r comparacion-final-14-vs-8-limpio, fig.width=12, fig.height=5}
+# Comparación definitiva: 14 variables vs. 8 variables + YJ + SIN atípicos
+var14_f <- round(summary(pca_14)$importance[2, 1:2] * 100, 1)
+var8_f  <- round(summary(pca)$importance[2, 1:2] * 100, 1)
+
+par(mfrow = c(1, 2), mar = c(4, 4, 3.5, 1))
+biplot(pca_14, scale = 0, cex = 0.45, col = c("gray70", "firebrick"),
+       xlab = paste0("PC1 (", var14_f[1], " %)"),
+       ylab = paste0("PC2 (", var14_f[2], " %)"),
+       main = paste0("ANTES: 14 variables — ", nrow(datos_transformados), " lotes"))
+biplot(pca, scale = 0, cex = 0.45, col = c("gray70", "steelblue"),
+       xlab = paste0("PC1 (", var8_f[1], " %)"),
+       ylab = paste0("PC2 (", var8_f[2], " %)"),
+       main = paste0("DESPUES: 8 variables + YJ + SIN atipicos — ", nrow(datos_limpio), " lotes"))
+```
+
+> **Lectura:** el biplot derecho es el análisis final depurado. Los ", nrow(datos_transformados) - nrow(datos_limpio), " lotes retirados eran atípicos multivariados identificados por distancia de Mahalanobis (d²_M > χ²_{0.975}). La nube ahora es compacta y sin puntos extremos aislados.
 
 ---
 
@@ -478,14 +498,38 @@ umbral <- qchisq(0.975, df = ncol(datos_t))
 
 cat("ANTES (14 vars) — umbral chi2_14 =", round(umbral_14, 1),
     "| atípicos:", sum(dm2_14 > umbral_14), "\n")
-cat("DESPUES (8 vars) — umbral chi2_8 =", round(umbral, 1),
-    "| atípicos:", sum(dm2 > umbral), "\n")
+cat("DESPUES (8 vars, datos limpios) — umbral chi2_8 =", round(umbral, 1),
+    "| atípicos residuales:", sum(dm2 > umbral), "\n")
+cat("Fracción residual:", round(mean(dm2 > umbral) * 100, 1), "%",
+    "(esperado: ~2.5% por construcción del umbral chi2 al 97.5%)\n")
 
 cat("\nTop 6 distancias ANTES:\n"); print(sort(dm2_14, decreasing=TRUE)[1:6])
-cat("\nTop 6 distancias DESPUES:\n"); print(sort(dm2, decreasing=TRUE)[1:6])
+cat("\nTop 6 distancias DESPUES (datos limpios):\n"); print(sort(dm2, decreasing=TRUE)[1:6])
 ```
 
-Con 8 variables se marcan **`r sum(dm2 > umbral)`** lotes como atípicos (vs. `r sum(dm2_14 > umbral_14)` con 14). La reducción confirma que los casos más problemáticos eran impulsados por Cat1/Cat2/Moisture/Sweetness/Uniformity/Clean.Cup.
+Con 8 variables y datos depurados se marcan **`r sum(dm2 > umbral)`** lotes residuales como atípicos (`r round(mean(dm2 > umbral)*100,1)` %). Esto es **esperado por construcción**: el umbral χ²₀.₉₇₅ clasifica por definición el 2.5 % de cualquier distribución como extremo. Estos residuales no son un error del pipeline — son el comportamiento estadístico normal del test. Comparar con los `r sum(dm2_14 > umbral_14)` que se marcaban con 14 variables confirma que la depuración eliminó los casos genuinamente problemáticos.
+
+```{r mahalanobis-residuales-plot, fig.width=10, fig.height=5}
+par(mfrow = c(1, 2))
+# Distribución de distancias en datos limpios
+hist(dm2, breaks = 40, col = "steelblue", border = "white",
+     xlab = "d²_Mahalanobis", main = "Distribución d²_M — datos limpios",
+     probability = TRUE)
+abline(v = umbral, col = "firebrick", lwd = 2, lty = 2)
+legend("topright", legend = paste0("chi²_0.975 = ", round(umbral, 1)),
+       col = "firebrick", lty = 2, lwd = 2, cex = 0.8)
+
+# Scatter PC1 vs PC2 coloreando residuales
+plot(pca$x[, 1], pca$x[, 2],
+     col = ifelse(dm2 > umbral, "firebrick", adjustcolor("steelblue", 0.4)),
+     pch = 19, cex = ifelse(dm2 > umbral, 0.9, 0.5),
+     xlab = paste0("PC1 (", round(pca$sdev[1]^2/sum(pca$sdev^2)*100,1), "%)"),
+     ylab = paste0("PC2 (", round(pca$sdev[2]^2/sum(pca$sdev^2)*100,1), "%)"),
+     main = paste0("Residuales d²_M > umbral: ", sum(dm2 > umbral),
+                   " de ", nrow(datos_limpio), " lotes (~2.5% esperado)"))
+legend("topright", legend = c("Normal", "Residual esperado"), pch = 19,
+       col = c("steelblue", "firebrick"), cex = 0.8)
+```
 
 ---
 

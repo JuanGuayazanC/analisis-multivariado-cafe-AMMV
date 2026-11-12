@@ -35,7 +35,9 @@ En la exploración observamos que 174 de los 1.070 registros tienen Humedad igua
 
 *Tiempo: 0:55 · Presenta: Diego*
 
-Primero exploramos las distribuciones, los valores extremos, la asimetría y las correlaciones. Para el PCA final trabajamos con ocho variables y 666 lotes: se excluyeron seis variables con inflación de ceros o efecto techo, y se retiraron 404 observaciones identificadas como atípicas multivariadas. La transformación Yeo-Johnson se aplicó selectivamente cuando la asimetría absoluta superaba uno; después estandarizamos las variables.
+Primero exploramos las distribuciones, los valores extremos, la asimetría y las correlaciones. Para el PCA final el pipeline fue el siguiente, en este orden: primero aplicamos la transformación Yeo-Johnson selectivamente a las variables con asimetría absoluta mayor a uno; después estandarizamos; luego ajustamos un PCA exploratorio y calculamos distancias de Mahalanobis para detectar atípicos multivariados. Se retiraron 404 observaciones con distancia por encima del umbral. El resultado final es una matriz de 666 lotes y ocho variables.
+
+Vale la pena precisarlo porque el orden importa: si estandarizamos antes de transformar, los parámetros de Yeo-Johnson quedan calculados sobre datos ya centrados y la corrección de asimetría pierde sentido. Se excluyeron además seis variables: tres por inflación de ceros y tres por efecto techo en 10.
 
 El clustering responde otra pregunta y usa otra matriz: conserva los 1.070 lotes, combina cuatro componentes principales exploratorios con indicadores de variables categóricas. Por eso sus grupos no son los mismos objetos que las clases de LDA y QDA, que se construyen a partir de puntajes sensoriales.
 
@@ -48,6 +50,8 @@ El clustering responde otra pregunta y usa otra matriz: conserva los 1.070 lotes
 El PCA transforma variables relacionadas en nuevos ejes que resumen patrones de variación. En el ajuste final, la primera componente explica el 54,3 por ciento y la segunda el 12,6; juntas explican el 66,8 por ciento de la variación de estas ocho variables y estos 666 lotes.
 
 La primera componente reúne principalmente siete puntajes sensoriales, que tienden a moverse en una dirección común. La segunda está dominada por la altitud. Esto nos ayuda a resumir la información y a visualizarla, pero no significa que el primer eje sea una certificación de calidad ni que el PCA haya descubierto grupos naturales.
+
+También revisamos los diagramas de dispersión entre pares de componentes — CP1 vs CP2, CP1 vs CP3, CP2 vs CP3 — para detectar si alguna combinación revelaba una estructura más clara. Ninguna mostró grupos separados nítidamente.
 
 **Acción:** Señalar el gráfico de varianza, luego el diagrama de cargas y el biplot.
 
@@ -69,53 +73,63 @@ La Silhouette promedio es 0,116 y 104 lotes tienen valor negativo: la separació
 
 *Tiempo: 0:55 · Presenta: Esteban*
 
-HDBSCAN busca regiones donde se concentran lotes parecidos y no obliga a incluir todos en un grupo. Con un tamaño mínimo de 20, encontró cinco grupos de 39, 52, 101, 96 y 89 lotes. Otros 693, el 64,8 por ciento, quedaron como ruido; aquí “ruido” significa que el método no los asignó a una región suficientemente densa, no que sean cafés de mala calidad.
+HDBSCAN busca regiones donde se concentran lotes parecidos y no obliga a incluir todos en un grupo. Usamos un tamaño mínimo de clúster de 20 — ese es un hiperparámetro que elegimos nosotros, no el método. Con ese valor encontró cinco grupos de 39, 52, 101, 96 y 89 lotes. Otros 693, el 64,8 por ciento, quedaron como ruido; aquí “ruido” significa que el método no los asignó a una región suficientemente densa, no que sean cafés de mala calidad.
 
 Esta matriz no incluye Humedad y difiere de la que usa K-means. Por eso no presentamos sus etiquetas como equivalentes ni afirmamos que ambos métodos coincidan sin calcular una comparación válida.
 
 **Transición:** LDA y QDA hacen algo distinto: aprenden a reproducir unas clases que definimos previamente.
 
-## Diapositiva 7 - LDA y QDA
+## Diapositiva 7 - Ward.D2 — Clustering Jerárquico
 
-*Tiempo: 0:55 · Presenta: Esteban*
+*Tiempo: 1:00 · Presenta: Diego*
 
-Para estos clasificadores definimos clases mediante cortes por cuartiles de la suma de puntajes sensoriales. Luego usamos esos mismos puntajes entre los predictores y evaluamos el resultado en 267 lotes de prueba.
+El siguiente método es Ward.D2, que es clustering jerárquico aglomerativo. A diferencia de K-means, no necesita que le digamos cuántos grupos queremos al inicio: va uniendo los lotes de a pares y tríos, eligiendo siempre la fusión que menos aumenta la varianza interna de cada grupo.
 
-La exactitud fue 87,3 por ciento para LDA y 89,1 para QDA. Son resultados útiles para ver qué tan bien reproducen esos cortes. Como las clases se construyen a partir de variables que también entran al modelo, estas cifras no demuestran que los clusters de K-means sean separables ni validan categorías de calidad independientes.
+Este dendrograma muestra 80 lotes de la muestra. Cada hoja es un lote; las ramas se van uniendo de abajo hacia arriba. La línea roja marca la altura donde cortamos el árbol para obtener k igual a tres grupos: uno de 15 lotes, uno de 42 y uno de 23. A esa misma altura el dendrograma podría leerse también como cuatro grupos, dependiendo de dónde se trace el corte exacto. Elegimos tres porque la diferencia de altura entre el tercer y cuarto salto era pequeña y el índice Silhouette con k=3 era ligeramente mejor que con k=4; sin embargo reconocemos que k=4 era una opción razonable y que la elección tiene un componente subjetivo.
 
-**Transición:** Por eso las cifras de los tres métodos no se deben poner en una competencia directa.
+El Silhouette promedio de Ward es 0,128, ligeramente mayor que el de K-means de 0,116. El ARI entre K-means y Ward es 0,471: coincidencia moderada. Que dos métodos con lógicas distintas lleguen a agrupaciones similares refuerza que hay una estructura real, aunque débil.
 
-## Diapositiva 8 - Métricas de métodos distintos
+**Transición:** Veamos qué perfil tiene cada uno de esos tres grupos.
 
-*Tiempo: 0:50 · Presenta: Esteban*
+## Diapositiva 8 - Perfiles de grupos — Ward.D2
 
-Cada indicador responde una pregunta diferente. La exactitud de LDA y QDA mide reproducción de las clases definidas; Silhouette evalúa qué tan cerca queda cada lote de su propio grupo frente a otros; y el porcentaje de ruido de HDBSCAN indica cuántos lotes no se asignaron a sus regiones densas.
+*Tiempo: 0:45 · Presenta: Diego*
 
-No son porcentajes equivalentes ni se pueden ordenar como si midieran lo mismo. Para comparar directamente dos particiones necesitamos las mismas observaciones y una medida de concordancia calculada con ambas asignaciones.
+Aquí vemos los promedios de atributos sensoriales por grupo en la muestra de 80 lotes. El grupo 1, de 15 lotes, tiene los promedios más altos: 7,71 en aroma y 82,9 puntos totales — es el grupo de perfil sensorial más intenso en casi todos los atributos. El grupo 2, el más numeroso con 42 lotes, tiene 82,7 puntos y un perfil muy similar al grupo 1 pero levemente más bajo; es el grupo mayoritario con calidad alta pero sin el pico del grupo 1. El grupo 3, de 23 lotes, tiene los puntajes más bajos en los siete atributos con 79,9 puntos — sigue siendo café de buena calidad pero con notas sensoriales menos intensas que los otros dos grupos.
+
+Podríamos describirlos como: lotes de perfil sensorial intenso, lotes de perfil sensorial moderado-alto, y lotes de perfil sensorial moderado. Pero enfatizamos que esta interpretación es exploratoria: las distribuciones se traslapan y los grupos 1 y 2 tienen perfiles muy parecidos. No podemos llamar a estos grupos Specialty, Premium o Commodity sin un criterio externo definido previamente.
+
+El análisis jerárquico y K-means llegan a conclusiones similares: la estructura de agrupamiento existe, pero es débil.
 
 **Transición:** Con estas limitaciones claras, resumimos lo que sí podemos concluir.
 
-## Diapositiva 9 - Conclusiones
+## Diapositiva 9 - Demostración de Shiny
+
+*Tiempo: 1:20 · Presenta: Juan*
+
+Esta aplicación permite cambiar los valores de un lote hipotético y ver cómo se proyecta en un PCA de referencia. Voy a ingresar un perfil sensorial alto en todos los atributos — ojo que el máximo real en los datos es 8,8, no es posible escribir 9.
+
+**Acción:** Ingresar los valores: Aroma 8,8 · Sabor 8,8 · Retrogusto 8,7 · Acidez 8,5 · Cuerpo 8,6 · Balance 8,7 · Puntaje Catador 8,8. La aplicación indica calidad Alta.
+
+Con este perfil la aplicación nos dice calidad Alta. Tiene sentido, todos los puntajes están en el extremo superior de la distribución.
+
+**Acción:** Cambiar Aroma a 7,5 y mostrar que el resultado sigue siendo Alta.
+
+Ahora le bajo bastante el aroma, de 8,8 a 7,5 — y fíjense que sigue diciendo Alta. Esto es porque la primera componente principal es un promedio ponderado de los siete atributos sensoriales juntos; bajar uno solo no arrastra el puntaje compuesto fuera del rango Alto mientras los demás sigan altos. El modelo no te castiga por una sola nota baja si el resto del perfil está bien.
+
+El percentil nos dice dónde queda este lote frente a la muestra de referencia, no si el café está certificado como Specialty. Esta demostración usa un PCA independiente, ajustado con 1.070 lotes; no asigna ni valida los grupos de K-means o HDBSCAN.
+
+**Transición:** Con todo lo que vimos, estas son nuestras conclusiones.
+
+## Diapositiva 10 - Conclusiones
 
 *Tiempo: 1:00 · Presenta: Esteban*
 
 Primero, el PCA final resume parte importante de la variación: las dos primeras componentes explican 66,8 por ciento en los 666 lotes analizados. Segundo, el patrón de Humedad igual a cero aparece en 174 registros y en la fuente original; detectarlo no basta para conocer su causa.
 
-Tercero, K-means produce una partición exploratoria con separación débil según Silhouette. HDBSCAN encuentra cinco grupos y deja muchos lotes como ruido. Cuarto, la exactitud de LDA y QDA describe qué tan bien reproducen cortes construidos con puntajes sensoriales.
+Tercero, K-means produce una partición exploratoria con separación débil según Silhouette. Ward.D2 llega a una estructura similar con ARI de 0,471 respecto a K-means. HDBSCAN encuentra cinco grupos y deja muchos lotes como ruido.
 
-En conjunto, estos análisis ayudan a explorar la base, pero no sustentan por sí solos las etiquetas Specialty, Premium o Commodity.
-
-**Transición:** Para cerrar, mostraremos cómo se puede explorar la posición de un lote nuevo en un espacio de referencia.
-
-## Diapositiva 10 - Demostración de Shiny
-
-*Tiempo: 1:20 · Presenta: Juan*
-
-Esta aplicación permite cambiar los valores de un lote hipotético y ver cómo se proyecta en un PCA de referencia. Voy a ingresar algunos puntajes sensoriales y una altitud; la aplicación transforma y estandariza los valores con su propio flujo y muestra la posición y el percentil relativo del lote.
-
-**Acción:** Ajustar un conjunto de valores plausible y proyectarlo. Después cambiar un solo puntaje y observar cómo se mueve el punto.
-
-El percentil nos dice dónde queda frente a la muestra de referencia, no si el café está certificado como Specialty. Esta demostración usa un PCA independiente, ajustado con 1.070 lotes; no asigna ni valida los grupos de K-means o HDBSCAN.
+En conjunto, estos análisis ayudan a explorar la base, pero no sustentan por sí solos las etiquetas Specialty, Premium o Commodity. Como limitación reconocemos que la interpretación de los grupos es exploratoria: los perfiles que describimos son promedios en la muestra de 80 lotes y no se validaron contra una clasificación externa. Para confirmar que los grupos 1, 2 y 3 corresponden a categorías comerciales reales haría falta una fuente externa de verdad — por ejemplo, precios de mercado o certificaciones de especialidad para esos mismos lotes.
 
 ## Diapositiva 11 - Cierre
 
@@ -133,10 +147,10 @@ Muchas gracias por su atención. En resumen, los métodos nos permiten mirar los
 | 4 | Diego | 1:15 | 3:35 |
 | 5 | Diego | 1:10 | 4:45 |
 | 6 | Esteban | 0:55 | 5:40 |
-| 7 | Esteban | 0:55 | 6:35 |
-| 8 | Esteban | 0:50 | 7:25 |
-| 9 | Esteban | 1:00 | 8:25 |
-| 10 | Juan | 1:20 | 9:45 |
-| 11 | Juan | 0:15 | 10:00 |
+| 7 | Diego | 1:00 | 6:35 |
+| 8 | Diego | 0:45 | 7:20 |
+| 9 | Juan | 1:20 | 8:40 |
+| 10 | Esteban | 1:00 | 9:40 |
+| 11 | Juan | 0:15 | 9:55 |
 
 *Los tiempos son una guía para ensayar; pueden ajustarse según el ritmo del equipo y las preguntas del público.*
