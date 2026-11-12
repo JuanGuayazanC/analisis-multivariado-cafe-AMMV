@@ -345,31 +345,16 @@ cat("Lotes retenidos para análisis final:", nrow(datos_t) - length(idx_atipicos
 ```
 
 ```{r datos-limpios}
-# Depuración iterativa: retirar atípicos, refittear PCA, recalcular Mahalanobis,
-# repetir hasta convergencia (ningún lote supera el umbral chi2 al 97.5%).
-# Necesario porque al retirar la primera ronda de atípicos la nube se reajusta
-# y algunos puntos antes "normales" quedan en la periferia.
+# Retirar atípicos — pasada única sobre el PCA exploratorio.
+# El umbral chi²_0.975 marca por definición el 2.5% más extremo de cualquier
+# distribución; iterar hasta cero vaciaría los datos (~86% de remoción en pruebas).
+# La pasada única retira los casos genuinamente problemáticos; los ~16 residuales
+# que quedan (~2.5% de 666) son el comportamiento estadístico esperado del test.
+datos_limpio <- datos_t[-idx_atipicos, ]
 
-umbral_it <- qchisq(0.975, df = ncol(datos_t))
-datos_iter <- datos_t
-iter <- 0
-retirados_total <- integer(0)
-
-repeat {
-  iter <- iter + 1
-  pca_iter <- prcomp(datos_iter, center = TRUE, scale. = TRUE)
-  dm2_iter <- rowSums((pca_iter$x / pca_iter$sdev)^2)
-  nuevos_atipicos <- which(dm2_iter > umbral_it)
-  cat(sprintf("Iteración %d: %d atípicos detectados (umbral = %.1f)\n",
-              iter, length(nuevos_atipicos), umbral_it))
-  if (length(nuevos_atipicos) == 0) break
-  retirados_total <- c(retirados_total, as.integer(rownames(datos_iter)[nuevos_atipicos]))
-  datos_iter <- datos_iter[-nuevos_atipicos, ]
-}
-
-datos_limpio <- datos_iter
-cat(sprintf("\nTotal lotes retirados en %d iteraciones: %d\n", iter - 1, length(retirados_total)))
-cat(sprintf("Lotes retenidos para análisis final: %d\n", nrow(datos_limpio)))
+cat(sprintf("Lotes retirados: %d de %d (%.1f%%)\n",
+            length(idx_atipicos), nrow(datos_t),
+            length(idx_atipicos) / nrow(datos_t) * 100))
 
 # Eliminar columnas con varianza cero (constantes tras la depuración)
 vars_var_cero <- names(which(apply(datos_limpio, 2, var) == 0))
@@ -761,9 +746,7 @@ cluster_bajo <- um[, 2] < -5
 sum(cluster_bajo)
 
 # Comparar contra el subconjunto limpio (sin los atípicos ya retirados)
-# Usar los índices que sobrevivieron TODAS las iteraciones (rownames de datos_limpio)
-idx_supervivientes <- as.integer(rownames(datos_limpio))
-datos_limpio_orig <- datos[idx_supervivientes, ]  # datos originales sin transformar, sin atípicos
+datos_limpio_orig <- datos[-idx_atipicos, ]  # datos originales sin transformar, sin atípicos
 comp <- sapply(datos_limpio_orig, function(v) c(cluster = mean(v[cluster_bajo]), resto = mean(v[!cluster_bajo])))
 round(t(comp), 3)
 ```

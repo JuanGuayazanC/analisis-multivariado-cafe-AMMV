@@ -39,6 +39,8 @@ Primero exploramos las distribuciones, los valores extremos, la asimetría y las
 
 Vale la pena precisarlo porque el orden importa: si estandarizamos antes de transformar, los parámetros de Yeo-Johnson quedan calculados sobre datos ya centrados y la corrección de asimetría pierde sentido. Se excluyeron además seis variables: tres por inflación de ceros y tres por efecto techo en 10.
 
+Una aclaración sobre los 404 lotes retirados: el umbral chi² al 97.5% deja por construcción un ~2.5% residual marcado en la nube final — eso es esperado en cualquier dataset real y no indica un error del pipeline. Los 404 son los casos genuinamente problemáticos de la primera pasada; los ~16 que quedan (~2.5% de 666) no se retiran porque hacerlo iterativamente vaciaría los datos.
+
 El clustering responde otra pregunta y usa otra matriz: conserva los 1.070 lotes, combina cuatro componentes principales exploratorios con indicadores de variables categóricas. Por eso sus grupos no son los mismos objetos que las clases de LDA y QDA, que se construyen a partir de puntajes sensoriales.
 
 **Transición:** Veamos primero qué resume el PCA final.
