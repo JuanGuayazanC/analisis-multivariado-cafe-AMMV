@@ -35,7 +35,7 @@ En la exploración observamos que 174 de los 1.070 registros tienen Humedad igua
 
 *Tiempo: 0:55 · Presenta: Diego*
 
-Primero exploramos las distribuciones, los valores extremos, la asimetría y las correlaciones. Para el PCA final el pipeline fue el siguiente, en este orden: primero aplicamos la transformación Yeo-Johnson selectivamente a las variables con asimetría absoluta mayor a uno; después estandarizamos; luego ajustamos un PCA exploratorio y calculamos distancias de Mahalanobis para detectar atípicos multivariados. Se retiraron 404 observaciones con distancia por encima del umbral. El resultado final es una matriz de 666 lotes y ocho variables.
+Primero exploramos las distribuciones, los valores extremos, la asimetría y las correlaciones. Para el PCA final el proceso fue el siguiente, en ocho pasos y en este orden: primero aplicamos la transformación Yeo-Johnson selectivamente a las variables con asimetría absoluta mayor a uno; segundo, estandarizamos cada variable; tercero, ajustamos un PCA preliminar sobre los 1.070 lotes y calculamos distancias de Mahalanobis sobre sus scores para detectar atípicos multivariados. Se retiraron 404 observaciones por encima del umbral chi-cuadrado al 97,5 % con 8 grados de libertad. Con los 666 lotes restantes repetimos el PCA y la misma regla: aparecen 39 atípicos adicionales, que retiramos. Re-estimamos los parámetros Yeo-Johnson y obtenemos la matriz final de 627 lotes y ocho variables.
 
 Vale la pena precisarlo porque el orden importa: si estandarizamos antes de transformar, los parámetros de Yeo-Johnson quedan calculados sobre datos ya centrados y la corrección de asimetría pierde sentido. Se excluyeron además seis variables: tres por inflación de ceros y tres por efecto techo en 10.
 
@@ -49,7 +49,7 @@ El clustering responde otra pregunta y usa otra matriz: conserva los 1.070 lotes
 
 *Tiempo: 1:15 · Presenta: Diego*
 
-El PCA transforma variables relacionadas en nuevos ejes que resumen patrones de variación. En el ajuste final, la primera componente explica el 54,3 por ciento y la segunda el 12,6; juntas explican el 66,8 por ciento de la variación de estas ocho variables y estos 666 lotes.
+El PCA transforma variables relacionadas en nuevos ejes que resumen patrones de variación. En el ajuste final, la primera componente explica el 55,1 por ciento y la segunda el 12,5; juntas explican el 67,6 por ciento de la variación de estas ocho variables y estos 627 lotes.
 
 La primera componente reúne principalmente siete puntajes sensoriales, que tienden a moverse en una dirección común. La segunda está dominada por la altitud. Esto nos ayuda a resumir la información y a visualizarla, pero no significa que el primer eje sea una certificación de calidad ni que el PCA haya descubierto grupos naturales.
 
@@ -119,7 +119,7 @@ Con este perfil la aplicación nos dice calidad Alta. Tiene sentido, todos los p
 
 Ahora le bajo bastante el aroma, de 8,8 a 7,5 — y fíjense que sigue diciendo Alta. Esto es porque la primera componente principal es un promedio ponderado de los siete atributos sensoriales juntos; bajar uno solo no arrastra el puntaje compuesto fuera del rango Alto mientras los demás sigan altos. El modelo no te castiga por una sola nota baja si el resto del perfil está bien.
 
-El percentil nos dice dónde queda este lote frente a la muestra de referencia, no si el café está certificado como Specialty. Esta demostración usa un PCA independiente, ajustado con 1.070 lotes; no asigna ni valida los grupos de K-means o HDBSCAN.
+El percentil nos dice dónde queda este lote frente a la muestra de referencia, no si el café está certificado como Specialty. Esta demostración usa un PCA independiente, ajustado con los 627 lotes de la matriz final; no asigna ni valida los grupos de K-means o HDBSCAN.
 
 **Transición:** Con todo lo que vimos, estas son nuestras conclusiones.
 
@@ -127,7 +127,7 @@ El percentil nos dice dónde queda este lote frente a la muestra de referencia, 
 
 *Tiempo: 1:00 · Presenta: Esteban*
 
-Primero, el PCA final resume parte importante de la variación: las dos primeras componentes explican 66,8 por ciento en los 666 lotes analizados. Segundo, el patrón de Humedad igual a cero aparece en 174 registros y en la fuente original; detectarlo no basta para conocer su causa.
+Primero, el PCA final resume parte importante de la variación: las dos primeras componentes explican 67,6 por ciento en los 627 lotes de la matriz final. Segundo, el patrón de Humedad igual a cero aparece en 174 registros y en la fuente original; detectarlo no basta para conocer su causa.
 
 Tercero, K-means produce una partición exploratoria con separación débil según Silhouette. Ward.D2 llega a una estructura similar con ARI de 0,471 respecto a K-means. HDBSCAN encuentra cinco grupos y deja muchos lotes como ruido.
 
