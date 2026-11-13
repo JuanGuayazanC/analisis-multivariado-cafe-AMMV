@@ -1,0 +1,149 @@
+---
+title: "Análisis de Correspondencias Múltiples"
+output: html_document
+---
+
+# Análisis de Correspondencias Múltiples
+
+A continuación se realiza el análisis de las variables categóricas.
+
+```{r configuracion, echo=TRUE, eval=TRUE}
+library(dplyr)
+library(FactoMineR)
+library(factoextra)
+library(ggplot2)
+```
+
+## 1. Carga de datos
+
+```{r carga-datos, echo=TRUE, eval=TRUE}
+data_raw <- read.csv("../data/arabica_data_cleaned.csv")
+
+cat("Registros originales:", nrow(data_raw), "\n")
+```
+
+## 2. Preparación de datos
+
+```{r preparacion, echo=TRUE, eval=TRUE}
+datos_cat <- data_raw %>%
+  dplyr::filter(
+    !is.na(altitude_mean_meters),
+    altitude_mean_meters > 0,
+    altitude_mean_meters <= 3000
+  ) %>%
+  dplyr::select(
+    Processing.Method,
+    Color,
+    Country.of.Origin
+  ) %>%
+  dplyr::mutate(
+    dplyr::across(
+      dplyr::everything(),
+      ~ {
+        x <- trimws(as.character(.))
+        x[is.na(x) | x == ""] <- "Desconocido"
+        x
+      }
+    )
+  )
+
+frecuencias <- sort(
+  table(datos_cat$Country.of.Origin),
+  decreasing = TRUE
+)
+
+top5 <- names(frecuencias)[
+  seq_len(min(5, length(frecuencias)))
+]
+
+datos_cat$Country.of.Origin <- ifelse(
+  datos_cat$Country.of.Origin %in% top5,
+  datos_cat$Country.of.Origin,
+  "Otro"
+)
+
+datos_cat <- datos_cat %>%
+  dplyr::rename(
+    Proceso = Processing.Method,
+    Pais = Country.of.Origin
+  ) %>%
+  dplyr::mutate(
+    dplyr::across(dplyr::everything(), as.factor)
+  )
+
+cat("Observaciones finales:", nrow(datos_cat), "\n")
+str(datos_cat)
+```
+
+## 3. Ejecución del ACM
+
+```{r ejecucion-acm, echo=TRUE, eval=TRUE}
+res_mca <- FactoMineR::MCA(
+  datos_cat,
+  ncp = 5,
+  graph = FALSE
+)
+
+print(res_mca$eig)
+```
+
+## 4. Valores propios e inercia
+
+```{r inercia, echo=TRUE, eval=TRUE}
+eig <- factoextra::get_eigenvalue(res_mca)
+
+knitr::kable(
+  round(eig, 4),
+  caption = "Valores propios e inercia explicada"
+)
+```
+
+## 5. Coordenadas de las categorías
+
+```{r coordenadas, echo=TRUE, eval=TRUE}
+knitr::kable(
+  round(as.data.frame(res_mca$var$coord), 4),
+  caption = "Coordenadas de las categorías"
+)
+```
+
+## 6. Contribuciones de las categorías
+
+```{r contribuciones, echo=TRUE, eval=TRUE}
+knitr::kable(
+  round(as.data.frame(res_mca$var$contrib), 4),
+  caption = "Contribuciones de las categorías"
+)
+```
+
+## 7. Calidad de representación
+
+```{r calidad, echo=TRUE, eval=TRUE}
+knitr::kable(
+  round(as.data.frame(res_mca$var$cos2), 4),
+  caption = "Calidad de representación de las categorías"
+)
+```
+
+## 8. Gráfico de sedimentación
+
+```{r grafico-inercia, echo=TRUE, eval=TRUE}
+factoextra::fviz_screeplot(
+  res_mca,
+  addlabels = TRUE
+) +
+  ggplot2::theme_minimal()
+```
+
+## 9. Mapa factorial
+
+```{r mapa-factorial, echo=TRUE, eval=TRUE}
+factoextra::fviz_mca_var(
+  res_mca,
+  repel = TRUE,
+  col.var = "contrib",
+  gradient.cols = c("#2563a8", "#f39c12", "#e74c3c"),
+  title = "ACM: Asociación entre País, Proceso y Color"
+) +
+  ggplot2::theme_minimal()
+```
