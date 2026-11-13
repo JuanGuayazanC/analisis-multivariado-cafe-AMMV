@@ -201,10 +201,10 @@ r2_test <- 1 - sum((datos_test$Puntaje.Total - pred_vals)^2) /
 # Se reporta aparte la correlación al cuadrado; no sustituye al R² predictivo.
 r2_correlacion <- cor(datos_test$Puntaje.Total, pred_vals)^2
 
-cat("RMSE:", round(rmse, 4), "\\n")
-cat("MAE: ", round(mae, 4), "\\n")
-cat("R² predictivo en test:", round(r2_test, 4), "\\n")
-cat("Correlación(real, predicho)^2:", round(r2_correlacion, 4), "\\n")
+cat("RMSE:", round(rmse, 4), "\n")
+cat("MAE: ", round(mae, 4), "\n")
+cat("R² predictivo en test:", round(r2_test, 4), "\n")
+cat("Correlación(real, predicho)^2:", round(r2_correlacion, 4), "\n")
 ```
 
 ```{r prediccion-viz, fig.width=7, fig.height=6}
