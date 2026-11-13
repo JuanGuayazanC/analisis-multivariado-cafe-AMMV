@@ -22,6 +22,12 @@ knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE,
 > de todos los métodos del curso sobre el dataset de calidad de café arábica.
 > Conclusiones generales y valor del análisis multivariado frente a enfoques
 > univariados.
+>
+> **Alcance de los modelos supervisados:** la clase `Calidad` se deriva de los
+> diez atributos sensoriales que también se usan como predictores; el puntaje
+> total de regresión también se construye con esos atributos. En consecuencia,
+> las métricas de clasificación y regresión no representan validación predictiva
+> independiente. Se interpretan como reconstrucción de una regla/puntaje derivado.
 
 ---
 
@@ -104,11 +110,19 @@ fviz_pca_biplot(pca, repel=TRUE, col.var="#e74c3c", col.ind="#2563a8",
 set.seed(42)
 X_std <- scale(datos_t[, vars_11])
 
-# Detección automática del k óptimo
-wss <- sapply(1:10, function(k) kmeans(X_std, centers=k, nstart=15)$tot.withinss)
-caidas_rel <- -diff(wss) / wss[-length(wss)]
-k_opt <- which.max(-diff(caidas_rel)) + 1
-cat("K óptimo (codo):", k_opt, "\n")
+# Curva WSS para inspección del codo. La selección no se automatiza
+# mediante segundas diferencias, porque esa regla puede ser inestable.
+set.seed(42)
+wss <- sapply(1:10, function(k) {
+  kmeans(X_std, centers=k, nstart=25)$tot.withinss
+})
+plot(1:10, wss, type="b", pch=19,
+     xlab="Número de clusters (k)", ylab="WSS",
+     main="Método del codo — solución exploratoria")
+# Candidato de trabajo; debe contrastarse con silhouette, estabilidad
+# e interpretación de perfiles antes de presentarlo como solución final.
+k_opt <- 3L
+cat("K candidato para análisis exploratorio:", k_opt, "\\n")
 
 km <- kmeans(X_std, centers=k_opt, nstart=25)
 datos_t$Cluster <- factor(km$cluster)
@@ -158,14 +172,16 @@ datos_reg <- datos_t[, vars_11]
 datos_reg$Puntaje.Total <- datos$Puntaje.Total
 
 set.seed(42)
-idx_r  <- sample(nrow(datos_reg), 0.75 * nrow(datos_reg))
+idx_r  <- sample(seq_len(nrow(datos_reg)), size = floor(0.75 * nrow(datos_reg)))
 lm_m   <- lm(Puntaje.Total ~ ., data=datos_reg[idx_r, ])
 pred   <- predict(lm_m, datos_reg[-idx_r, ])
 rmse   <- sqrt(mean((datos_reg$Puntaje.Total[-idx_r] - pred)^2))
-r2_reg <- cor(datos_reg$Puntaje.Total[-idx_r], pred)^2
+r2_reg <- 1 - sum((datos_reg$Puntaje.Total[-idx_r] - pred)^2) /
+  sum((datos_reg$Puntaje.Total[-idx_r] -
+         mean(datos_reg$Puntaje.Total[idx_r]))^2)
 
-cat("Regresión lineal múltiple — R²:", round(r2_reg, 4),
-    "  RMSE:", round(rmse, 4), "\n")
+cat("R² predictivo en test:", round(r2_reg, 4),
+    "  RMSE:", round(rmse, 4), "\\n")
 ```
 
 ---
@@ -187,7 +203,7 @@ tabla_comparativa <- data.frame(
                 "Clasificación lineal", "Clasificación cuadrática",
                 "Clasificación ensemble", "Predicción continua"),
   Resultado = c("12 vars → 11 continuas", paste0(k_comp, " CPs retienen ≥75%"),
-                "3 factores", "Stress < 10%",
+                "Ver módulo factorial", "Ver módulo MDS",
                 paste0(k_opt, " clusters"), "Detecta ruido",
                 paste0(round(acc_lda*100, 1), "% exactitud"),
                 paste0(round(acc_qda*100, 1), "% exactitud"),
@@ -207,30 +223,29 @@ cat("
 CONCLUSIONES DEL PROYECTO FINAL
 ================================
 
-1. ESTRUCTURA DE LOS DATOS
-   Los atributos sensoriales del café arábica forman grupos de covariación
-   bien definidos. El PCA resume >75% de la varianza en", k_comp, "componentes,
-   donde CP1 representa la calidad sensorial general.
+1. REDUCCIÓN DE DIMENSIONALIDAD
+   El PCA retiene", k_comp, "componentes para alcanzar al menos 75% de varianza
+   en las variables incluidas. La interpretación de cada componente debe
+   sustentarse en sus cargas, no solo en el porcentaje acumulado.
 
-2. AGRUPAMIENTO NATURAL
-   K-means identifica", k_opt, "grupos con perfiles de calidad diferenciados.
-   HDBSCAN complementa al detectar lotes atípicos (ruido) que K-means asignaría
-   a un cluster por defecto.
+2. AGRUPAMIENTO
+   K-means se ejecuta con", k_opt, "grupos como candidato exploratorio.
+   No se afirma que existan grupos naturales sin contrastar silhouette,
+   estabilidad y perfiles de las observaciones.
 
 3. CLASIFICACIÓN
-   LDA y QDA ofrecen interpretabilidad alta con buenas métricas de exactitud.
-   Random Forest supera a los métodos clásicos en exactitud al capturar
-   no linealidades, a costa de menor interpretabilidad.
+   Las etiquetas se construyen con los mismos atributos sensoriales usados
+   como predictores. Las métricas describen la reconstrucción de esa regla,
+   no una predicción independiente de calidad.
 
-4. PREDICCIÓN
-   La regresión lineal múltiple predice bien el puntaje total (R² > 0.90),
-   confirmando que los atributos sensoriales son predictores directos del
-   puntaje sumatorio — lo que evidencia colinealidad y justifica el PCA previo.
+4. REGRESIÓN
+   El puntaje total se construye con los atributos sensoriales incluidos
+   entre los predictores. El R² de test cuantifica el ajuste de esa relación
+   derivada y no demuestra predicción antes de la catación.
 
-5. VALOR DEL ENFOQUE MULTIVARIADO
-   El análisis univariado por atributo pierde la información de covariación entre
-   variables. El enfoque multivariado (PCA + clustering + clasificación) permite
-   identificar perfiles de calidad, detectar anomalías y construir modelos
-   predictivos más robustos.
+5. ALCANCE DEL ENFOQUE MULTIVARIADO
+   PCA, clustering y los modelos supervisados responden preguntas distintas.
+   Sus resultados deben interpretarse según las variables, transformaciones,
+   muestras y criterios de validación realmente usados en cada módulo.
 ")
 ```
