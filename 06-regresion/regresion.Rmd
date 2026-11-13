@@ -20,13 +20,22 @@ knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE,
 
 > **Semana 14 del programa:** Regresión lineal simple y múltiple, selección de
 > variables, diagnósticos de regresión, predicción y comparación con modelos AA/ML.
+>
+> **Advertencia metodológica importante:** `Total.Cup.Points` es el puntaje total
+> construido a partir de los atributos sensoriales, y el modelo usa esos atributos
+> como predictores. Esto introduce una relación aritmética directa entre entradas
+> y respuesta. El ejercicio estudia esa asociación/reconstrucción, pero un buen
+> ajuste no demuestra que el modelo pueda predecir calidad antes de la catación
+> ni que generalice a una medición independiente.
 
 ---
 
 # 1. Datos y variable respuesta
 
-Se predice el **puntaje total del catador** (`Total.Cup.Points`) a partir de los
-10 atributos sensoriales y la altitud.
+Se modela el **puntaje total del catador** (`Total.Cup.Points`) a partir de los
+10 atributos sensoriales y la altitud. Dado que el puntaje total se construye con
+los atributos sensoriales, el análisis es principalmente explicativo/descriptivo
+de esa relación y no una predicción independiente.
 
 ```{r datos}
 library(dplyr)
@@ -74,7 +83,7 @@ mejor_var <- names(which.max(abs(cors)))
 cat("Variable más correlacionada:", mejor_var,
     "  r =", round(cors[mejor_var,], 4), "\n")
 
-modelo_simple <- lm(Puntaje.Total ~ get(mejor_var), data=datos)
+modelo_simple <- lm(reformulate(mejor_var, response = "Puntaje.Total"), data=datos)
 summary(modelo_simple)
 ```
 
@@ -113,7 +122,7 @@ tidy(modelo_completo, conf.int=TRUE) %>%
   geom_errorbar(aes(ymin=conf.low, ymax=conf.high), width=0.2, color="#333") +
   scale_fill_manual(values=c("TRUE"="#27ae60","FALSE"="#e74c3c"), guide="none") +
   coord_flip() +
-  labs(title="Coeficientes estandarizados — modelo completo",
+  labs(title="Coeficientes estimados — modelo completo",
        x="", y="Estimación (IC 95%)") +
   theme_minimal()
 ```
@@ -175,7 +184,7 @@ data.frame(
 
 ```{r prediccion}
 set.seed(42)
-idx_test   <- sample(nrow(datos), 0.25 * nrow(datos))
+idx_test   <- sample(seq_len(nrow(datos)), size = floor(0.25 * nrow(datos)))
 datos_test <- datos[ idx_test, ]
 datos_tr   <- datos[-idx_test, ]
 
@@ -184,11 +193,18 @@ pred_vals    <- predict(modelo_final, datos_test)
 
 rmse <- sqrt(mean((datos_test$Puntaje.Total - pred_vals)^2))
 mae  <- mean(abs(datos_test$Puntaje.Total - pred_vals))
-r2   <- cor(datos_test$Puntaje.Total, pred_vals)^2
+# R² predictivo en test: 1 - SSE/SST. Puede ser negativo si el modelo
+# predice peor que usar la media observada del conjunto de entrenamiento.
+r2_test <- 1 - sum((datos_test$Puntaje.Total - pred_vals)^2) /
+  sum((datos_test$Puntaje.Total - mean(datos_tr$Puntaje.Total))^2)
 
-cat("RMSE:", round(rmse, 4), "\n")
-cat("MAE: ", round(mae, 4), "\n")
-cat("R²:  ", round(r2, 4), "\n")
+# Se reporta aparte la correlación al cuadrado; no sustituye al R² predictivo.
+r2_correlacion <- cor(datos_test$Puntaje.Total, pred_vals)^2
+
+cat("RMSE:", round(rmse, 4), "\\n")
+cat("MAE: ", round(mae, 4), "\\n")
+cat("R² predictivo en test:", round(r2_test, 4), "\\n")
+cat("Correlación(real, predicho)^2:", round(r2_correlacion, 4), "\\n")
 ```
 
 ```{r prediccion-viz, fig.width=7, fig.height=6}
@@ -197,7 +213,7 @@ data.frame(real=datos_test$Puntaje.Total, pred=pred_vals) %>%
   geom_point(alpha=0.3, color="#2563a8", size=1.5) +
   geom_abline(slope=1, intercept=0, color="red", linetype="dashed") +
   labs(title="Valores reales vs predichos — modelo lineal múltiple",
-       subtitle=paste0("R² = ", round(r2,4), "  |  RMSE = ", round(rmse,4)),
+       subtitle=paste0("R² predictivo = ", round(r2_test,4), "  |  RMSE = ", round(rmse,4)),
        x="Puntaje real", y="Puntaje predicho") +
   theme_minimal()
 ```
