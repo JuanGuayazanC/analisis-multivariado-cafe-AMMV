@@ -122,7 +122,7 @@ plot(1:10, wss, type="b", pch=19,
 # Candidato de trabajo; debe contrastarse con silhouette, estabilidad
 # e interpretación de perfiles antes de presentarlo como solución final.
 k_opt <- 3L
-cat("K candidato para análisis exploratorio:", k_opt, "\\n")
+cat("K candidato para análisis exploratorio:", k_opt, "\n")
 
 km <- kmeans(X_std, centers=k_opt, nstart=25)
 datos_t$Cluster <- factor(km$cluster)
@@ -181,7 +181,7 @@ r2_reg <- 1 - sum((datos_reg$Puntaje.Total[-idx_r] - pred)^2) /
          mean(datos_reg$Puntaje.Total[idx_r]))^2)
 
 cat("R² predictivo en test:", round(r2_reg, 4),
-    "  RMSE:", round(rmse, 4), "\\n")
+    "  RMSE:", round(rmse, 4), "\n")
 ```
 
 ---
