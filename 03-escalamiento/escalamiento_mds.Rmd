@@ -83,11 +83,11 @@ if (length(eig_positivos) < 2) {
   stop("No hay al menos dos autovalores positivos para representar el MDS en 2D.")
 }
 var_exp <- mds_clasico$eig[1:2] / sum(eig_positivos)
-cat("Proporción de inercia positiva representada por las 2 dimensiones:\\n")
+cat("Proporción de inercia positiva representada por las 2 dimensiones:\n")
 cat("Dim1:", round(var_exp[1]*100, 1), "%  Dim2:", round(var_exp[2]*100, 1),
-    "%  Total:", round(sum(var_exp[1:2])*100, 1), "%\\n")
+    "%  Total:", round(sum(var_exp[1:2])*100, 1), "%\n")
 cat("Autovalores negativos:", sum(mds_clasico$eig < 0),
-    "(indican que la matriz de distancias no es perfectamente euclídea).\\n")
+    "(indican que la matriz de distancias no es perfectamente euclídea).\n")
 ```
 
 ```{r mds-clasico-viz, fig.width=9, fig.height=7}
@@ -177,7 +177,7 @@ D_mds <- as.vector(dist(mds_clasico$points))
 D_pca <- as.vector(dist(pca_ref$x[, 1:2, drop = FALSE]))
 
 cat("Correlación entre distancias por pares (MDS 2D vs PCA 2D):",
-    round(cor(D_mds, D_pca), 4), "\\n")
+    round(cor(D_mds, D_pca), 4), "\n")
 cat("Esta correlación describe la semejanza de las configuraciones 2D; no prueba",
-    "que ambas representaciones conserven toda la distancia original.\\n")
+    "que ambas representaciones conserven toda la distancia original.\n")
 ```
