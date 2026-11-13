@@ -41,6 +41,7 @@ library(MASS)
 library(factoextra)
 library(randomForest)
 library(caret)
+library(cluster)   # silhouette()
 
 data_raw <- read.csv("../data/arabica_data_cleaned.csv")
 
@@ -110,19 +111,31 @@ fviz_pca_biplot(pca, repel=TRUE, col.var="#e74c3c", col.ind="#2563a8",
 set.seed(42)
 X_std <- scale(datos_t[, vars_11])
 
-# Curva WSS para inspección del codo. La selección no se automatiza
-# mediante segundas diferencias, porque esa regla puede ser inestable.
+# Examinar WSS y silhouette para k = 2,...,10.
+# El codo se inspecciona visualmente; silhouette aporta un criterio cuantitativo
+# complementario, no una garantía de que existan grupos naturales.
 set.seed(42)
+k_grid <- 2:10
 wss <- sapply(1:10, function(k) {
   kmeans(X_std, centers=k, nstart=25)$tot.withinss
 })
 plot(1:10, wss, type="b", pch=19,
      xlab="Número de clusters (k)", ylab="WSS",
-     main="Método del codo — solución exploratoria")
-# Candidato de trabajo; debe contrastarse con silhouette, estabilidad
-# e interpretación de perfiles antes de presentarlo como solución final.
-k_opt <- 3L
-cat("K candidato para análisis exploratorio:", k_opt, "\n")
+     main="Método del codo")
+
+sil_prom <- sapply(k_grid, function(k) {
+  set.seed(42)
+  ajuste <- kmeans(X_std, centers=k, nstart=25)
+  sil <- cluster::silhouette(ajuste$cluster, dist(X_std))
+  mean(sil[, "sil_width"])
+})
+plot(k_grid, sil_prom, type="b", pch=19,
+     xlab="Número de clusters (k)", ylab="Silhouette promedio",
+     main="Validación complementaria por silhouette")
+
+k_opt <- k_grid[which.max(sil_prom)]
+cat("K candidato según silhouette promedio:", k_opt, "\n")
+cat("Silhouette promedio:", round(max(sil_prom), 3), "\n")
 
 km <- kmeans(X_std, centers=k_opt, nstart=25)
 datos_t$Cluster <- factor(km$cluster)
