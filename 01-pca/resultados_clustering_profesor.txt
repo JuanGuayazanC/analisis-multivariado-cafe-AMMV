@@ -1,0 +1,26 @@
+== Tendencia al agrupamiento (1.070 lotes estandarizados) ==
+ k    WSS silueta_k   gap gap_se
+ 1 8552.0        NA 1.383  0.010
+ 2 5533.0     0.303 1.202  0.007
+ 3 4488.2     0.259 1.156  0.005
+ 4 3953.3     0.213 1.150  0.006
+ 5 3539.0     0.215 1.130  0.006
+ 6 3181.0     0.214 1.157  0.006
+ 7 2950.3     0.184 1.166  0.006
+ 8 2819.2     0.163 1.175  0.005
+k sugerido por gap (regla firstSEmax): 1
+k con mayor silueta promedio (k >= 2): 2
+
+== Ward.D2 (muestra 80 lotes, k = 3) ==
+Silueta promedio: 0.298
+Silueta por grupo: G1=0.315, G2=0.273, G3=0.000
+
+== K-means (k = 3, semilla 2026, nstart = 50) ==
+Tamaños: 615, 236, 219
+Silueta promedio: 0.259
+Lotes con silueta negativa: 20 (1.9 %)
+
+== Prueba de proporciones (Washed / Wet), grupos K-means 1 vs 2 ==
+Proporciones: 0.668 vs 0.780
+Chi-cuadrado = 9.53, gl = 1, p = 0.002016
+IC 95 % de la diferencia: -0.179 a -0.044

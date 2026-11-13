@@ -1,0 +1,57 @@
+n inicial 1070 = 1070; atipicos 1a pasada = 404; 2a pasada = 39; n final = 627
+Verificacion contra datos_final_627.rds: TRUE
+
+== Simetria (medcouple) y tipo de diagrama de cajas ==
+        variable medcouple asimetria                 boxplot atipicos_clasico
+           Aroma     0.030    -7.218 robusto MAD (simetrico)               55
+           Sabor     0.000    -6.041 robusto MAD (simetrico)               31
+      Retrogusto    -0.059    -5.636 robusto MAD (simetrico)               63
+          Acidez     0.000    -6.902 robusto MAD (simetrico)               19
+          Cuerpo     0.000    -8.231 robusto MAD (simetrico)               23
+         Balance     0.000    -5.405 robusto MAD (simetrico)               35
+ Puntaje.Catador     0.000    -3.838 robusto MAD (simetrico)               25
+         Altitud     0.112    -0.827   ajustado (asimetrico)               47
+ atipicos_robusto_usado
+                      4
+                      1
+                      9
+                      4
+                      2
+                      7
+                      6
+                     73
+
+== Yeo-Johnson: solo variables con |asimetria| > 1 (lambdas de base_1070) ==
+Variables transformadas: Aroma, Sabor, Retrogusto, Acidez, Cuerpo, Balance, Puntaje.Catador
+Lambdas: 3.59, 2.739, 2.619, 3.291, 3.079, 2.295, 2.177
+Asimetria antes (raw, 627): Aroma -0.06 | Sabor -0.28 | Retrogusto -0.2 | Acidez -0.07 | Cuerpo -0.1 | Balance -0.18 | Puntaje.Catador -0.23 | Altitud -0.43
+Asimetria despues (transformada, 627): Aroma 0.14 | Sabor -0.14 | Retrogusto -0.08 | Acidez 0.09 | Cuerpo 0.03 | Balance -0.09 | Puntaje.Catador -0.14 | Altitud -0.43
+
+== Supuestos del PCA (627 lotes) ==
+prcomp centra internamente (center = TRUE); Altitud tiene media ~1351 m antes de centrar
+Atipicos multivariados restantes (d2 > chi2 0.975, 8 g.l.): 34 de 627 (esperados por azar ~16)
+
+== Varianza por componente con IC 95 % (bootstrap B = 2000) ==
+ componente varianza ic_inf ic_sup acum_CP1_CP2
+        CP1     55.0   52.5   57.5         67.5
+        CP2     12.5   12.3   12.9         67.5
+        CP3      8.9    7.9   10.1         67.5
+        CP4      6.8    6.2    7.6         67.5
+        CP5      6.1    5.3    6.7         67.5
+        CP6      3.9    3.5    4.5         67.5
+        CP7      3.7    3.1    4.1         67.5
+        CP8      3.1    2.6    3.4         67.5
+IC acumulado CP1+CP2: 65.1 a 70.1 %
+
+== Cargas CP1-CP3 ==
+                  PC1   PC2   PC3
+Aroma           -0.33 -0.09  0.51
+Sabor           -0.41  0.10  0.27
+Retrogusto      -0.40 -0.01 -0.17
+Acidez          -0.35  0.00  0.42
+Cuerpo          -0.34  0.07 -0.57
+Balance         -0.40  0.01 -0.36
+Puntaje.Catador -0.41  0.03 -0.05
+Altitud         -0.05 -0.99 -0.06
+
+t-SNE: perplejidad 30, semilla 2026. UMAP: 15 vecinos, min_dist 0.1, semilla 2026. Exploratorios.

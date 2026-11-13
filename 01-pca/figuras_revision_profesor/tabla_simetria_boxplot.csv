@@ -1,0 +1,9 @@
+"variable","medcouple","asimetria","boxplot","atipicos_clasico","atipicos_robusto_usado"
+"Aroma",0.03,-7.218,"robusto MAD (simetrico)",55,4
+"Sabor",0,-6.041,"robusto MAD (simetrico)",31,1
+"Retrogusto",-0.059,-5.636,"robusto MAD (simetrico)",63,9
+"Acidez",0,-6.902,"robusto MAD (simetrico)",19,4
+"Cuerpo",0,-8.231,"robusto MAD (simetrico)",23,2
+"Balance",0,-5.405,"robusto MAD (simetrico)",35,7
+"Puntaje.Catador",0,-3.838,"robusto MAD (simetrico)",25,6
+"Altitud",0.112,-0.827,"ajustado (asimetrico)",47,73
