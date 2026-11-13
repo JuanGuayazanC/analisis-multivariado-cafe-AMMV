@@ -5,57 +5,35 @@ library(car)
 
 # ── Preprocesamiento ──────────────────────────────────────────────────────────
 
-data_raw <- read.csv("../data/arabica_data_cleaned.csv")
+# ── Matriz final de 627 lotes (pipeline oficial, misma que el informe) ─────
+# Cargada desde 01-pca/datos_final_627.rds: ya incluye la depuración de atípicos
+# y las lambdas Yeo-Johnson estimadas sobre la matriz final.
+obj_final <- readRDS("../01-pca/datos_final_627.rds")
 
-vars_originales <- c("Aroma", "Flavor", "Aftertaste", "Acidity", "Body",
-                     "Balance", "Uniformity", "Clean.Cup", "Sweetness",
-                     "Cupper.Points", "Moisture", "Category.One.Defects",
-                     "Category.Two.Defects", "altitude_mean_meters")
-
-datos_full <- data_raw %>%
-  filter(!is.na(altitude_mean_meters),
-         altitude_mean_meters > 0,
-         altitude_mean_meters <= 3000) %>%
-  select(all_of(vars_originales)) %>%
-  filter(complete.cases(.)) %>%
-  # ── Renombrar al español — punto central, el resto del código usa estos nombres ──
-  rename(
-    Sabor           = Flavor,
-    Retrogusto      = Aftertaste,
-    Acidez          = Acidity,
-    Cuerpo          = Body,
-    Uniformidad     = Uniformity,
-    Taza.Limpia     = Clean.Cup,
-    Dulzura         = Sweetness,
-    Puntaje.Catador = Cupper.Points,
-    Humedad         = Moisture,
-    Defectos.Cat1   = Category.One.Defects,
-    Defectos.Cat2   = Category.Two.Defects,
-    Altitud         = altitude_mean_meters
-  )
-
-# ── Pipeline oficial: 8 variables (excluye 3 infladas-cero + 3 infladas-máximo) ──
-# Excluidas: Moisture, Cat1, Cat2 (inflación ceros) + Sweetness, Uniformity, Clean.Cup (>88% en 10)
+rename_map <- c(Aroma = "Aroma", Flavor = "Sabor", Aftertaste = "Retrogusto",
+                Acidity = "Acidez", Body = "Cuerpo", Balance = "Balance",
+                Cupper.Points = "Puntaje.Catador", altitude_mean_meters = "Altitud")
 vars_8 <- c("Aroma", "Sabor", "Retrogusto", "Acidez",
             "Cuerpo", "Balance", "Puntaje.Catador", "Altitud")
-datos_t <- datos_full[, vars_8]
 
-# YJ selectivo: solo donde |sesgo| > 1
-skew_fn <- function(x) mean((x - mean(x))^3) / sd(x)^3
-skew_pre <- sapply(datos_t, skew_fn)
-vars_yj  <- names(skew_pre[abs(skew_pre) > 1])
+datos_t <- obj_final$datos_limpio
+names(datos_t) <- rename_map[names(datos_t)]
+datos_t <- datos_t[, vars_8]
 
-lambdas_8 <- setNames(rep(1, length(vars_8)), vars_8)  # lambda=1 = sin transformar
-if (length(vars_yj) > 0) {
-  pt_sel       <- powerTransform(datos_t[, vars_yj, drop = FALSE], family = "yjPower")
-  lambdas_yj   <- coef(pt_sel, round = FALSE)
-  lambdas_8[vars_yj] <- lambdas_yj
-  for (v in vars_yj) datos_t[[v]] <- yjPower(datos_t[[v]], lambdas_yj[v])
-}
+# lambda = 1 para las variables que no se transforman
+lambdas_8 <- setNames(rep(1, length(vars_8)), vars_8)
+lam <- obj_final$lambdas
+names(lam) <- rename_map[names(lam)]
+lambdas_8[names(lam)] <- lam
 
 pca       <- prcomp(datos_t, center = TRUE, scale. = TRUE)
 scores_df <- as.data.frame(pca$x)
 var_exp   <- round(pca$sdev^2 / sum(pca$sdev^2) * 100, 1)
+
+# valores crudos de los 627 lotes, para rangos y percentiles
+datos_full <- obj_final$datos_originales
+names(datos_full)[match(names(rename_map), names(datos_full))] <- rename_map[names(rename_map)]
+datos_full <- datos_full[, vars_8]
 
 rangos <- lapply(vars_8, function(v) {
   x <- datos_full[[v]]
@@ -258,9 +236,9 @@ ui <- fluidPage(
   div(class = "app-header",
     h2("Explorador PCA — Calidad de Café Arábica · CQI"),
     p(class = "subtitle",
-      "Ajusta los atributos sensoriales y agroclimáticos de un lote nuevo para ubicarlo en el espacio de componentes principales respecto a los 1,070 lotes de referencia"),
+      "Ajusta los atributos sensoriales y agroclimáticos de un lote nuevo para ubicarlo en el espacio de componentes principales respecto a los 627 lotes de referencia"),
     div(class = "stat-chips",
-      span(class = "chip", "1,070 lotes · Coffee Quality Institute"),
+      span(class = "chip", "627 lotes · matriz final"),
       span(class = "chip", "8 variables (7 sensoriales + altitud)"),
       span(class = "chip", paste0("CP1 explica ", var_exp[1], "% de la varianza")),
       span(class = "chip", paste0("CP1+CP2 = ", var_exp[1] + var_exp[2], "%"))
@@ -299,7 +277,7 @@ ui <- fluidPage(
         div(class = "info-box",
           tags$b("¿Cómo funciona?"), " Ajusta los puntajes del lote que quieres analizar.
           Al presionar «Proyectar», el lote se transforma con el mismo preprocesamiento
-          del modelo (Yeo-Johnson) y se ubica en el espacio PCA de los 1.070 lotes de referencia."
+          del modelo (Yeo-Johnson) y se ubica en el espacio PCA de los 627 lotes de referencia."
         ),
 
         div(class = "group-label", "Puntajes sensoriales  ·  escala 0 – 10"),
@@ -343,6 +321,32 @@ ui <- fluidPage(
             uiOutput("interpretacion_ui")
           )
         )
+      ),
+      fluidRow(
+        column(4,
+          div(class = "card",
+            div(class = "card-title", "Varianza por componente"),
+            plotOutput("scree", height = "320px"),
+            div(style = "font-size:12px; color:#666;",
+              "Cada barra es el porcentaje de varianza que explica el componente. CP1 y CP2 suman 66,8 %.")
+          )
+        ),
+        column(4,
+          div(class = "card",
+            div(class = "card-title", "Cargas de las variables (CP1–CP4)"),
+            plotOutput("cargas", height = "320px"),
+            div(style = "font-size:12px; color:#666;",
+              "CP1 agrupa los puntajes sensoriales; CP2 es principalmente altitud.")
+          )
+        ),
+        column(4,
+          div(class = "card",
+            div(class = "card-title", "Distribución de CP1 y tu lote"),
+            plotOutput("dens", height = "320px"),
+            div(style = "font-size:12px; color:#666;",
+              "La línea roja marca la posición de tu lote dentro de los 627 de referencia.")
+          )
+        )
       )
     )
   )
@@ -384,7 +388,7 @@ server <- function(input, output, session) {
       labs(
         x = paste0("CP", e[1], "  (", var_exp[e[1]], " % de la varianza)"),
         y = paste0("CP", e[2], "  (", var_exp[e[2]], " % de la varianza)"),
-        caption = "Cada punto es uno de los 1.070 lotes del Coffee Quality Institute (CQI)"
+        caption = "Cada punto es uno de los 627 lotes del Coffee Quality Institute (CQI)"
       ) +
       theme_minimal(base_size = 13) +
       theme(
@@ -414,6 +418,51 @@ server <- function(input, output, session) {
                  size = 3.2, color = "#c0392b",
                  fill = "white", label.size = 0.3,
                  label.padding = unit(0.3, "lines"))
+    }
+    p
+  }, bg = "white")
+
+  output$scree <- renderPlot({
+    df <- data.frame(PC = factor(paste0("CP", seq_along(var_exp)), levels = paste0("CP", seq_along(var_exp))),
+                     pct = var_exp)
+    ggplot(df, aes(x = PC, y = pct)) +
+      geom_col(fill = "#2563a8", width = 0.7) +
+      geom_text(aes(label = paste0(pct, " %")), vjust = -0.4, size = 3.4, color = "#333") +
+      labs(x = NULL, y = "Varianza explicada (%)") +
+      theme_minimal(base_size = 12) +
+      theme(panel.grid.minor = element_blank(),
+            plot.background = element_rect(fill = "white", color = NA))
+  }, bg = "white")
+
+  output$cargas <- renderPlot({
+    rot <- pca$rotation[, 1:4]
+    df <- data.frame(
+      Variable = rep(rownames(rot), times = 4),
+      Componente = factor(rep(paste0("CP", 1:4), each = nrow(rot)), levels = paste0("CP", 1:4)),
+      Carga = as.vector(rot)
+    )
+    df$Variable <- factor(df$Variable, levels = rev(rownames(rot)))
+    ggplot(df, aes(x = Componente, y = Variable, fill = Carga)) +
+      geom_tile(color = "white") +
+      geom_text(aes(label = sprintf("%.2f", Carga)), size = 3.3, color = "#222") +
+      scale_fill_gradient2(low = "#2563a8", mid = "white", high = "#c0392b",
+                           limits = c(-1, 1), name = "Carga") +
+      labs(x = NULL, y = NULL) +
+      theme_minimal(base_size = 12) +
+      theme(panel.grid = element_blank(),
+            plot.background = element_rect(fill = "white", color = NA))
+  }, bg = "white")
+
+  output$dens <- renderPlot({
+    ns <- nuevo_score()
+    p <- ggplot(scores_df, aes(x = PC1)) +
+      geom_density(fill = "#9fc3e6", alpha = 0.6, color = "#2563a8") +
+      labs(x = paste0("CP1 (", var_exp[1], " %)  ·  más bajo = mayor calidad sensorial"), y = "Densidad") +
+      theme_minimal(base_size = 12) +
+      theme(panel.grid.minor = element_blank(),
+            plot.background = element_rect(fill = "white", color = NA))
+    if (!is.null(ns)) {
+      p <- p + geom_vline(xintercept = ns[1], color = "#c0392b", linewidth = 1)
     }
     p
   }, bg = "white")
@@ -448,7 +497,7 @@ server <- function(input, output, session) {
         )
       }),
       div(style = "font-size:11px; color:#aaa; margin-top:8px;",
-          "p = percentil dentro de los 1.070 lotes de referencia")
+          "p = percentil dentro de los 627 lotes de referencia")
     )
   })
 
