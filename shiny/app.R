@@ -25,6 +25,8 @@ lambdas_8 <- setNames(rep(1, length(vars_8)), vars_8)
 lam <- obj_final$lambdas
 names(lam) <- rename_map[names(lam)]
 lambdas_8[names(lam)] <- lam
+# variables transformadas con Yeo-Johnson (las que tienen lambda estimada)
+vars_yj <- names(lam)
 
 pca       <- prcomp(datos_t, center = TRUE, scale. = TRUE)
 scores_df <- as.data.frame(pca$x)
