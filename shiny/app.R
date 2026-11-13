@@ -5,10 +5,10 @@ library(car)
 
 # ── Preprocesamiento ──────────────────────────────────────────────────────────
 
-# ── Matriz final de 1.070 lotes (pipeline oficial, misma que el informe) ─────
-# Cargada desde 01-pca/datos_final_1070.rds: ya incluye la depuración de atípicos
+# ── Matriz final de 627 lotes (pipeline oficial, misma que el informe) ─────
+# Cargada desde 01-pca/datos_final_627.rds: ya incluye la depuración de atípicos
 # y las lambdas Yeo-Johnson estimadas sobre la matriz final.
-obj_final <- readRDS("../01-pca/datos_final_1070.rds")
+obj_final <- readRDS("../01-pca/datos_final_627.rds")
 
 rename_map <- c(Aroma = "Aroma", Flavor = "Sabor", Aftertaste = "Retrogusto",
                 Acidity = "Acidez", Body = "Cuerpo", Balance = "Balance",
@@ -30,7 +30,7 @@ pca       <- prcomp(datos_t, center = TRUE, scale. = TRUE)
 scores_df <- as.data.frame(pca$x)
 var_exp   <- round(pca$sdev^2 / sum(pca$sdev^2) * 100, 1)
 
-# valores crudos de los 1.070 lotes, para rangos y percentiles
+# valores crudos de los 627 lotes, para rangos y percentiles
 datos_full <- obj_final$datos_originales
 names(datos_full)[match(names(rename_map), names(datos_full))] <- rename_map[names(rename_map)]
 datos_full <- datos_full[, vars_8]
@@ -236,9 +236,9 @@ ui <- fluidPage(
   div(class = "app-header",
     h2("Explorador PCA — Calidad de Café Arábica · CQI"),
     p(class = "subtitle",
-      "Ajusta los atributos sensoriales y agroclimáticos de un lote nuevo para ubicarlo en el espacio de componentes principales respecto a los 1.070 lotes de referencia"),
+      "Ajusta los atributos sensoriales y agroclimáticos de un lote nuevo para ubicarlo en el espacio de componentes principales respecto a los 627 lotes de referencia"),
     div(class = "stat-chips",
-      span(class = "chip", "1.070 lotes · matriz final"),
+      span(class = "chip", "627 lotes · matriz final"),
       span(class = "chip", "8 variables (7 sensoriales + altitud)"),
       span(class = "chip", paste0("CP1 explica ", var_exp[1], "% de la varianza")),
       span(class = "chip", paste0("CP1+CP2 = ", var_exp[1] + var_exp[2], "%"))
@@ -277,7 +277,7 @@ ui <- fluidPage(
         div(class = "info-box",
           tags$b("¿Cómo funciona?"), " Ajusta los puntajes del lote que quieres analizar.
           Al presionar «Proyectar», el lote se transforma con el mismo preprocesamiento
-          del modelo (Yeo-Johnson) y se ubica en el espacio PCA de los 1.070 lotes de referencia."
+          del modelo (Yeo-Johnson) y se ubica en el espacio PCA de los 627 lotes de referencia."
         ),
 
         div(class = "group-label", "Puntajes sensoriales  ·  escala 0 – 10"),
@@ -344,7 +344,7 @@ ui <- fluidPage(
             div(class = "card-title", "Distribución de CP1 y tu lote"),
             plotOutput("dens", height = "320px"),
             div(style = "font-size:12px; color:#666;",
-              "La línea roja marca la posición de tu lote dentro de los 1.070 de referencia.")
+              "La línea roja marca la posición de tu lote dentro de los 627 de referencia.")
           )
         )
       )
@@ -388,7 +388,7 @@ server <- function(input, output, session) {
       labs(
         x = paste0("CP", e[1], "  (", var_exp[e[1]], " % de la varianza)"),
         y = paste0("CP", e[2], "  (", var_exp[e[2]], " % de la varianza)"),
-        caption = "Cada punto es uno de los 1.070 lotes del Coffee Quality Institute (CQI)"
+        caption = "Cada punto es uno de los 627 lotes del Coffee Quality Institute (CQI)"
       ) +
       theme_minimal(base_size = 13) +
       theme(
@@ -497,7 +497,7 @@ server <- function(input, output, session) {
         )
       }),
       div(style = "font-size:11px; color:#aaa; margin-top:8px;",
-          "p = percentil dentro de los 1.070 lotes de referencia")
+          "p = percentil dentro de los 627 lotes de referencia")
     )
   })
 
