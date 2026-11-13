@@ -21,13 +21,22 @@ knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE,
 > **Semanas 12-13 del programa:** Clasificación y discriminación — enfoque clásico
 > (LDA, QDA), métodos de AA/ML (SVM, Random Forest), métricas de desempeño,
 > validación y comparación.
+>
+> **Advertencia metodológica importante:** en este ejercicio, la clase `Calidad`
+> se construye a partir de la suma de los diez atributos sensoriales y esos mismos
+> diez atributos se incluyen como predictores. Por tanto, existe circularidad:
+> los modelos aprenden a reconstruir una regla definida con sus propias entradas.
+> Las métricas de test miden qué tan bien reproducen esa regla, pero **no son
+> evidencia de capacidad para predecir una calidad independiente o futura**.
 
 ---
 
-# 1. Datos y variable objetivo
+# 1. Datos y variable objetivo — regla de clasificación construida
 
-Se clasifica cada lote en tres niveles de calidad según su puntaje total
-(suma de los 10 atributos sensoriales):
+Para el ejercicio se define una etiqueta operativa de tres niveles a partir del
+puntaje total (suma de los 10 atributos sensoriales). Como esos atributos también
+se usan como entradas, esta actividad debe interpretarse como **reconstrucción
+de una regla**, no como predicción independiente de calidad:
 
 - **Alta:** percentil > 75 del puntaje total
 - **Media:** percentil 25–75
@@ -180,7 +189,7 @@ imp %>%
 
 ---
 
-# 7. Comparación de clasificadores
+# 7. Comparación de clasificadores — reconstrucción de la regla
 
 ```{r comparacion}
 resultados <- data.frame(
@@ -192,6 +201,10 @@ resultados <- data.frame(
 ) %>% mutate(across(c(Exactitud, Kappa), ~ round(.*100, 1)))
 
 resultados %>% arrange(desc(Exactitud))
+
+# Estas métricas describen la reconstrucción de la etiqueta derivada de los
+# mismos atributos sensoriales usados como predictores; no estiman desempeño
+# predictivo frente a una medición externa e independiente de calidad.
 ```
 
 ```{r comparacion-viz, fig.width=8, fig.height=4}
