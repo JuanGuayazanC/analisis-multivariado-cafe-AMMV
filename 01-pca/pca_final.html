@@ -1552,7 +1552,7 @@ out_txt &lt;- character()
 add &lt;- function(...) out_txt &lt;&lt;- c(out_txt, paste0(...))</code></pre>
 </div>
 <div id="datos-y-cadena-de-depuración-idéntica-a-proceso_depuracion.r" class="section level1">
-<h1>2. 1. Datos y cadena de depuración (idéntica a
+<h1>2. Datos y cadena de depuración (idéntica a
 proceso_depuracion.R)</h1>
 <pre class="r"><code>d &lt;- read.csv(&quot;../data/arabica_data_cleaned.csv&quot;)
 vars14 &lt;- c(&quot;Aroma&quot;,&quot;Flavor&quot;,&quot;Aftertaste&quot;,&quot;Acidity&quot;,&quot;Body&quot;,&quot;Balance&quot;,&quot;Uniformity&quot;,&quot;Clean.Cup&quot;,&quot;Sweetness&quot;,&quot;Cupper.Points&quot;,&quot;Moisture&quot;,&quot;Category.One.Defects&quot;,&quot;Category.Two.Defects&quot;,&quot;altitude_mean_meters&quot;)
@@ -1581,7 +1581,7 @@ add(&quot;n inicial 1070 = &quot;, nrow(X8), &quot;; atipicos 1a pasada = &quot;
 add(&quot;Verificacion contra datos_final_627.rds: &quot;, nrow(readRDS(&quot;../datos/datos_final_627.rds&quot;)$datos_limpio) == nrow(F627))</code></pre>
 </div>
 <div id="simetría-y-diagrama-de-cajas-clásico-vs-ajustado" class="section level1">
-<h1>3. 2. Simetría y diagrama de cajas (clásico vs ajustado)</h1>
+<h1>3. Simetría y diagrama de cajas (clásico vs ajustado)</h1>
 <pre class="r"><code>mc &lt;- sapply(X8, function(x) mc(x))
 sk &lt;- sapply(X8, function(x) mean((x - mean(x))^3) / sd(x)^3)
 # Regla literal de la recomendación: si la variable es simétrica (|MC| &lt;= 0.1) se usa
@@ -1614,7 +1614,7 @@ dev.off()</code></pre>
 ##   2</code></pre>
 </div>
 <div id="justificación-de-yeo-johnson" class="section level1">
-<h1>4. 3. Justificación de Yeo-Johnson</h1>
+<h1>4. Justificación de Yeo-Johnson</h1>
 <pre class="r"><code>add(&quot;\n== Yeo-Johnson: solo variables con |asimetria| &gt; 1 en la base de 1.070 ==&quot;)
 add(&quot;Variables transformadas: &quot;, paste(names(base$lambdas), collapse = &quot;, &quot;))
 add(&quot;Lambdas estimadas sobre 1.070 (PCA preliminar): &quot;, paste(round(base$lambdas, 3), collapse = &quot;, &quot;))
@@ -1625,7 +1625,7 @@ add(&quot;Asimetria antes (raw, 627): &quot;, paste(names(skew_627_raw), round(s
 add(&quot;Asimetria despues (transformada, 627): &quot;, paste(names(skew_627_trans), round(skew_627_trans, 2), collapse = &quot; | &quot;))</code></pre>
 </div>
 <div id="supuestos-del-pca" class="section level1">
-<h1>5. 4. Supuestos del PCA</h1>
+<h1>5. Supuestos del PCA</h1>
 <pre class="r"><code>Zf &lt;- scale(F627, center = TRUE, scale = TRUE)
 add(&quot;\n== Supuestos del PCA (627 lotes) ==&quot;)
 add(&quot;prcomp centra internamente (center = TRUE); Altitud tiene media ~&quot;, round(mean(F627[, 8])), &quot; m antes de centrar&quot;)
@@ -1633,7 +1633,7 @@ md627 &lt;- mahalanobis(Zf, colMeans(Zf), cov(Zf))
 add(&quot;Atipicos multivariados restantes (d2 &gt; chi2 0.975, 8 g.l.): &quot;, sum(md627 &gt; lim), &quot; de &quot;, nrow(Zf), &quot; (esperados por azar ~&quot;, round(0.025 * nrow(Zf)), &quot;)&quot;)</code></pre>
 </div>
 <div id="pca-final-codo-con-ic-bootstrap" class="section level1">
-<h1>6. 5. PCA final, codo con IC bootstrap</h1>
+<h1>6. PCA final, codo con IC bootstrap</h1>
 <pre class="r"><code>pca &lt;- prcomp(F627, center = TRUE, scale. = TRUE)
 prop &lt;- pca$sdev^2 / sum(pca$sdev^2)
 B &lt;- 2000
@@ -1661,7 +1661,7 @@ dev.off()</code></pre>
 ##   2</code></pre>
 </div>
 <div id="dispersión-de-scores-antes-de-las-cargas" class="section level1">
-<h1>7. 6. Dispersión de scores ANTES de las cargas</h1>
+<h1>7. Dispersión de scores ANTES de las cargas</h1>
 <pre class="r"><code>sc &lt;- data.frame(CP1 = pca$x[, 1], CP2 = pca$x[, 2], CP3 = pca$x[, 3], Proceso = meta627$Processing.Method)
 sc$Proceso[is.na(sc$Proceso) | sc$Proceso == &quot;&quot;] &lt;- &quot;Sin dato&quot;
 top &lt;- names(sort(table(sc$Proceso), decreasing = TRUE))[1:5]
@@ -1672,7 +1672,7 @@ p_sc &lt;- ggplot(sc, aes(CP1, CP2, color = Proceso)) + geom_point(alpha = 0.7, 
 ggsave(&quot;figuras/revision_profesor/dispersion_CP1_CP2.png&quot;, p_sc, width = 8, height = 6, dpi = 200)</code></pre>
 </div>
 <div id="cargas-de-cp1-cp3-y-biplot" class="section level1">
-<h1>8. 7. Cargas de CP1-CP3 y biplot</h1>
+<h1>8. Cargas de CP1-CP3 y biplot</h1>
 <pre class="r"><code>L &lt;- round(pca$rotation[, 1:3], 2)
 write.csv(L, &quot;figuras/revision_profesor/cargas_CP1_CP3.csv&quot;)
 add(&quot;\n== Cargas CP1-CP3 ==&quot;)
@@ -1684,7 +1684,7 @@ dev.off()</code></pre>
 ##   2</code></pre>
 </div>
 <div id="t-sne-y-umap-exploratorios" class="section level1">
-<h1>9. 8. t-SNE y UMAP exploratorios</h1>
+<h1>9. t-SNE y UMAP exploratorios</h1>
 <pre class="r"><code>set.seed(2026)
 ts &lt;- Rtsne(Zf, perplexity = 30, check_duplicates = FALSE, verbose = FALSE, max_iter = 1000)
 dt &lt;- data.frame(X = ts$Y[, 1], Y = ts$Y[, 2], Proceso = sc$Proceso)

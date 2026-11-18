@@ -31,7 +31,11 @@ d <- read.csv("../data/arabica_data_cleaned.csv")
 vars14 <- c("Aroma","Flavor","Aftertaste","Acidity","Body","Balance","Uniformity","Clean.Cup","Sweetness","Cupper.Points","Moisture","Category.One.Defects","Category.Two.Defects","altitude_mean_meters")
 b <- d[!is.na(d$altitude_mean_meters) & d$altitude_mean_meters > 0 & d$altitude_mean_meters <= 3000, ]
 b <- b[complete.cases(b[, vars14]), ]
-X8 <- b[, c("Aroma","Flavor","Aftertaste","Acidity","Body","Balance","Cupper.Points","altitude_mean_meters")]
+d0 <- read.csv("../data/arabica_data_cleaned.csv")
+vars14 <- c("Aroma","Flavor","Aftertaste","Acidity","Body","Balance","Uniformity","Clean.Cup","Sweetness","Cupper.Points","Moisture","Category.One.Defects","Category.Two.Defects","altitude_mean_meters")
+bb <- d0[!is.na(d0$altitude_mean_meters) & d0$altitude_mean_meters > 0 & d0$altitude_mean_meters <= 3000, ]
+bb <- bb[complete.cases(bb[, vars14]), ]
+X8 <- bb[, c("Aroma","Flavor","Aftertaste","Acidity","Body","Balance","Cupper.Points","altitude_mean_meters")]
 names(X8) <- c("Aroma","Sabor","Retrogusto","Acidez","Cuerpo","Balance","Puntaje.Catador","Altitud")
 
 preprocess <- function(R) {
@@ -163,4 +167,36 @@ saveRDS(list(datos_limpio = datos_limpio,
              idx_atipicos = idx_atipicos,
              datos_originales = datos[-idx_atipicos, ]),
         "../datos/datos_final_666.rds")
+```
+
+```{r keep627}
+base1070 <- readRDS("../datos/base_1070.rds")
+lim <- qchisq(0.975, 8)
+pre1070 <- prcomp(base1070$trans, center = TRUE, scale. = TRUE)
+out1 <- rowSums((pre1070$x / pre1070$sdev)^2) > lim
+Mtr <- base1070$trans[!out1, ]; Zm <- scale(Mtr)
+out2 <- mahalanobis(Zm, colMeans(Zm), cov(Zm)) > lim
+keep_idx627 <- which(!out1)[!out2]
+d0 <- read.csv("../data/arabica_data_cleaned.csv")
+vars14 <- c("Aroma","Flavor","Aftertaste","Acidity","Body","Balance","Uniformity","Clean.Cup","Sweetness","Cupper.Points","Moisture","Category.One.Defects","Category.Two.Defects","altitude_mean_meters")
+bb <- d0[!is.na(d0$altitude_mean_meters) & d0$altitude_mean_meters > 0 & d0$altitude_mean_meters <= 3000, ]
+bb <- bb[complete.cases(bb[, vars14]), ]
+X8 <- bb[, c("Aroma","Flavor","Aftertaste","Acidity","Body","Balance","Cupper.Points","altitude_mean_meters")]
+```
+
+# 5. Matriz final de 627 lotes (`datos/datos_final_627.rds`)
+
+Reconstruye el objeto final de 627 lotes a partir de la cadena anterior. Las variables transformadas son las 7 que tenían |asimetría| > 1 en la base de 1.070; sus λ se re-estiman sobre los 627 lotes. El chunk compara el resultado con el archivo existente y **no lo sobrescribe**.
+
+```{r final627}
+suppressMessages(library(car))
+R <- as.data.frame(X8[keep_idx627, ])
+old <- readRDS("../datos/datos_final_627.rds")
+cat("Filas originales iguales:", isTRUE(all.equal(as.matrix(old$datos_originales), as.matrix(R), check.attributes = FALSE)), "\n")
+yj627 <- c("Aroma","Flavor","Aftertaste","Acidity","Body","Balance","Cupper.Points")
+lam627 <- coef(powerTransform(R[, yj627], family = "yjPower"), round = FALSE)
+T627 <- R
+for (v in yj627) T627[[v]] <- yjPower(R[[v]], lam627[v])
+cat("Diferencia máxima en λ:", max(abs(lam627 - old$lambdas[yj627])), "\n")
+cat("Diferencia máxima en datos_limpio:", max(abs(as.matrix(T627) - as.matrix(old$datos_limpio))), "\n")
 ```

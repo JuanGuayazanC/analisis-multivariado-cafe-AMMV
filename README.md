@@ -67,7 +67,7 @@ intermedios compartidos están en `datos/`.
 │   ├── pca_final.Rmd/.html             ← PCA final oficial: 627 lotes, 8 variables (demo y anexo)
 │   ├── historico/                      ← informes del método anterior (11 y 8 variables); no son el oficial
 │   ├── guia_teorica_reduccion_dimensional.Rmd/.html
-│   ├── depuracion.Rmd/.html            ← cadena de depuración 1.070 → 666 → 627 y base de datos
+│   ├── depuracion.Rmd/.html            ← cadena de depuración 1.070 → 666 → 627; reconstruye y verifica datos_final_627.rds
 │   ├── figuras_pca.Rmd/.html           ← figuras de la secuencia y justificación (en figuras/secuencia/)
 │   ├── metodos_exploratorios.Rmd/.html ← Kernel PCA (10 núcleos), UMAP, t-SNE y MDS sobre todas las bases (en figuras/exploratorios/)
 │   └── historico/                      ← scripts fuente ya incluidos en los Rmd de 01-pca y 00-eda, y el método anterior

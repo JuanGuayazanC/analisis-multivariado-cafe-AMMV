@@ -1527,7 +1527,11 @@ d &lt;- read.csv(&quot;../data/arabica_data_cleaned.csv&quot;)
 vars14 &lt;- c(&quot;Aroma&quot;,&quot;Flavor&quot;,&quot;Aftertaste&quot;,&quot;Acidity&quot;,&quot;Body&quot;,&quot;Balance&quot;,&quot;Uniformity&quot;,&quot;Clean.Cup&quot;,&quot;Sweetness&quot;,&quot;Cupper.Points&quot;,&quot;Moisture&quot;,&quot;Category.One.Defects&quot;,&quot;Category.Two.Defects&quot;,&quot;altitude_mean_meters&quot;)
 b &lt;- d[!is.na(d$altitude_mean_meters) &amp; d$altitude_mean_meters &gt; 0 &amp; d$altitude_mean_meters &lt;= 3000, ]
 b &lt;- b[complete.cases(b[, vars14]), ]
-X8 &lt;- b[, c(&quot;Aroma&quot;,&quot;Flavor&quot;,&quot;Aftertaste&quot;,&quot;Acidity&quot;,&quot;Body&quot;,&quot;Balance&quot;,&quot;Cupper.Points&quot;,&quot;altitude_mean_meters&quot;)]
+d0 &lt;- read.csv(&quot;../data/arabica_data_cleaned.csv&quot;)
+vars14 &lt;- c(&quot;Aroma&quot;,&quot;Flavor&quot;,&quot;Aftertaste&quot;,&quot;Acidity&quot;,&quot;Body&quot;,&quot;Balance&quot;,&quot;Uniformity&quot;,&quot;Clean.Cup&quot;,&quot;Sweetness&quot;,&quot;Cupper.Points&quot;,&quot;Moisture&quot;,&quot;Category.One.Defects&quot;,&quot;Category.Two.Defects&quot;,&quot;altitude_mean_meters&quot;)
+bb &lt;- d0[!is.na(d0$altitude_mean_meters) &amp; d0$altitude_mean_meters &gt; 0 &amp; d0$altitude_mean_meters &lt;= 3000, ]
+bb &lt;- bb[complete.cases(bb[, vars14]), ]
+X8 &lt;- bb[, c(&quot;Aroma&quot;,&quot;Flavor&quot;,&quot;Aftertaste&quot;,&quot;Acidity&quot;,&quot;Body&quot;,&quot;Balance&quot;,&quot;Cupper.Points&quot;,&quot;altitude_mean_meters&quot;)]
 names(X8) &lt;- c(&quot;Aroma&quot;,&quot;Sabor&quot;,&quot;Retrogusto&quot;,&quot;Acidez&quot;,&quot;Cuerpo&quot;,&quot;Balance&quot;,&quot;Puntaje.Catador&quot;,&quot;Altitud&quot;)
 
 preprocess &lt;- function(R) {
@@ -1664,6 +1668,40 @@ print(round(summary(pca_check)$importance[2, 1:3] * 100, 1))</code></pre>
              idx_atipicos = idx_atipicos,
              datos_originales = datos[-idx_atipicos, ]),
         &quot;../datos/datos_final_666.rds&quot;)</code></pre>
+<pre class="r"><code>base1070 &lt;- readRDS(&quot;../datos/base_1070.rds&quot;)
+lim &lt;- qchisq(0.975, 8)
+pre1070 &lt;- prcomp(base1070$trans, center = TRUE, scale. = TRUE)
+out1 &lt;- rowSums((pre1070$x / pre1070$sdev)^2) &gt; lim
+Mtr &lt;- base1070$trans[!out1, ]; Zm &lt;- scale(Mtr)
+out2 &lt;- mahalanobis(Zm, colMeans(Zm), cov(Zm)) &gt; lim
+keep_idx627 &lt;- which(!out1)[!out2]
+d0 &lt;- read.csv(&quot;../data/arabica_data_cleaned.csv&quot;)
+vars14 &lt;- c(&quot;Aroma&quot;,&quot;Flavor&quot;,&quot;Aftertaste&quot;,&quot;Acidity&quot;,&quot;Body&quot;,&quot;Balance&quot;,&quot;Uniformity&quot;,&quot;Clean.Cup&quot;,&quot;Sweetness&quot;,&quot;Cupper.Points&quot;,&quot;Moisture&quot;,&quot;Category.One.Defects&quot;,&quot;Category.Two.Defects&quot;,&quot;altitude_mean_meters&quot;)
+bb &lt;- d0[!is.na(d0$altitude_mean_meters) &amp; d0$altitude_mean_meters &gt; 0 &amp; d0$altitude_mean_meters &lt;= 3000, ]
+bb &lt;- bb[complete.cases(bb[, vars14]), ]
+X8 &lt;- bb[, c(&quot;Aroma&quot;,&quot;Flavor&quot;,&quot;Aftertaste&quot;,&quot;Acidity&quot;,&quot;Body&quot;,&quot;Balance&quot;,&quot;Cupper.Points&quot;,&quot;altitude_mean_meters&quot;)]</code></pre>
+</div>
+<div id="matriz-final-de-627-lotes-datosdatos_final_627.rds" class="section level1">
+<h1>5. Matriz final de 627 lotes
+(<code>datos/datos_final_627.rds</code>)</h1>
+<p>Reconstruye el objeto final de 627 lotes a partir de la cadena
+anterior. Las variables transformadas son las 7 que tenían |asimetría|
+&gt; 1 en la base de 1.070; sus λ se re-estiman sobre los 627 lotes. El
+chunk compara el resultado con el archivo existente y <strong>no lo
+sobrescribe</strong>.</p>
+<pre class="r"><code>suppressMessages(library(car))
+R &lt;- as.data.frame(X8[keep_idx627, ])
+old &lt;- readRDS(&quot;../datos/datos_final_627.rds&quot;)
+cat(&quot;Filas originales iguales:&quot;, isTRUE(all.equal(as.matrix(old$datos_originales), as.matrix(R), check.attributes = FALSE)), &quot;\n&quot;)</code></pre>
+<pre><code>## Filas originales iguales: TRUE</code></pre>
+<pre class="r"><code>yj627 &lt;- c(&quot;Aroma&quot;,&quot;Flavor&quot;,&quot;Aftertaste&quot;,&quot;Acidity&quot;,&quot;Body&quot;,&quot;Balance&quot;,&quot;Cupper.Points&quot;)
+lam627 &lt;- coef(powerTransform(R[, yj627], family = &quot;yjPower&quot;), round = FALSE)
+T627 &lt;- R
+for (v in yj627) T627[[v]] &lt;- yjPower(R[[v]], lam627[v])
+cat(&quot;Diferencia máxima en λ:&quot;, max(abs(lam627 - old$lambdas[yj627])), &quot;\n&quot;)</code></pre>
+<pre><code>## Diferencia máxima en λ: 0</code></pre>
+<pre class="r"><code>cat(&quot;Diferencia máxima en datos_limpio:&quot;, max(abs(as.matrix(T627) - as.matrix(old$datos_limpio))), &quot;\n&quot;)</code></pre>
+<pre><code>## Diferencia máxima en datos_limpio: 0</code></pre>
 </div>
 
 

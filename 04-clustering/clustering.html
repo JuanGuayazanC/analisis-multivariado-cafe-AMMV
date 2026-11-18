@@ -2859,7 +2859,7 @@ border-radius: 0px;
 <h3 class="subtitle">K-means y Ward.D2 · Análisis en R</h3>
 <h4 class="author">Juan Sebastián Guayazán · Esteban Valente · Diego
 Nocua</h4>
-<h4 class="date">03 de noviembre de 2026</h4>
+<h4 class="date">17 de noviembre de 2026</h4>
 
 </div>
 
@@ -3310,6 +3310,44 @@ estabilidad y perfiles en variables originales deben leerse
 conjuntamente. Los nombres comerciales solo se justifican si criterios
 de calidad externos, definidos antes de ver los clusters, muestran una
 correspondencia clara.</p>
+</div>
+<div id="anexo-robustez-del-agrupamiento-1.070-lotes-vs.-sin-atípicos" class="section level1">
+<h1>Anexo: robustez del agrupamiento (1.070 lotes vs. sin atípicos)</h1>
+<p>Compara K-means (k = 2 a 6), Ward.D2 y HDBSCAN (minPts = 15) sobre
+las dos bases de 1.070 lotes. Sirve para ver si la estructura cambia al
+quitar los atípicos.</p>
+<pre class="r"><code>suppressMessages(library(cluster))
+has_db &lt;- requireNamespace(&quot;dbscan&quot;, quietly = TRUE)
+res &lt;- list()
+for (base in c(&quot;../datos/base_1070.rds&quot;, &quot;../datos/base_sin_atipicos.rds&quot;)) {
+  tag &lt;- if (base == &quot;../datos/base_1070.rds&quot;) &quot;1070&quot; else &quot;sin_atip&quot;
+  X &lt;- as.matrix(readRDS(base)$Z); n &lt;- nrow(X); D &lt;- dist(X)
+  cat(&quot;\n== base&quot;, tag, &quot;n =&quot;, n, &quot;\n&quot;)
+  set.seed(2026)
+  sil_k &lt;- sapply(2:6, function(k) { km &lt;- kmeans(X, k, nstart = 25); mean(silhouette(km$cluster, D)[, 3]) })
+  cat(&quot;K-means silueta k=2..6:&quot;, round(sil_k, 3), &quot;\n&quot;)
+  km3 &lt;- kmeans(X, 3, nstart = 25)
+  cat(&quot;K-means k=3 silueta:&quot;, round(mean(silhouette(km3$cluster, D)[, 3]), 3), &quot; negativas:&quot;, sum(silhouette(km3$cluster, D)[, 3] &lt; 0), &quot;(&quot;, round(mean(silhouette(km3$cluster, D)[, 3] &lt; 0) * 100, 1), &quot;%)\n&quot;)
+  hc &lt;- hclust(D, method = &quot;ward.D2&quot;)
+  cw &lt;- cutree(hc, 3)
+  cat(&quot;Ward.D2 k=3 silueta:&quot;, round(mean(silhouette(cw, D)[, 3]), 3), &quot; tamaños:&quot;, table(cw), &quot;\n&quot;)
+  if (has_db) {
+    hdb &lt;- dbscan::hdbscan(X, minPts = 15)
+    cat(&quot;HDBSCAN minPts=15: grupos =&quot;, length(unique(hdb$cluster[hdb$cluster &gt; 0])), &quot; ruido =&quot;, sum(hdb$cluster == 0), &quot; (&quot;, round(mean(hdb$cluster == 0) * 100, 1), &quot;%)\n&quot;)
+  } else cat(&quot;HDBSCAN: paquete dbscan no instalado\n&quot;)
+}</code></pre>
+<pre><code>## 
+## == base 1070 n = 1070 
+## K-means silueta k=2..6: 0.303 0.259 0.213 0.213 0.214 
+## K-means k=3 silueta: 0.259  negativas: 20 ( 1.9 %)
+## Ward.D2 k=3 silueta: 0.274  tamaños: 68 648 354 
+## HDBSCAN minPts=15: grupos = 0  ruido = 1070  ( 100 %)
+## 
+## == base sin_atip n = 970 
+## K-means silueta k=2..6: 0.343 0.258 0.199 0.199 0.182 
+## K-means k=3 silueta: 0.258  negativas: 24 ( 2.5 %)
+## Ward.D2 k=3 silueta: 0.227  tamaños: 254 544 172 
+## HDBSCAN minPts=15: grupos = 0  ruido = 970  ( 100 %)</code></pre>
 </div>
 
 

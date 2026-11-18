@@ -40,7 +40,7 @@ add <- function(...) out_txt <<- c(out_txt, paste0(...))
 
 ```
 
-# 2. 1. Datos y cadena de depuración (idéntica a proceso_depuracion.R)
+# 2. Datos y cadena de depuración (idéntica a proceso_depuracion.R)
 
 ```{r sec2}
 d <- read.csv("../data/arabica_data_cleaned.csv")
@@ -71,7 +71,7 @@ add("Verificacion contra datos_final_627.rds: ", nrow(readRDS("../datos/datos_fi
 
 ```
 
-# 3. 2. Simetría y diagrama de cajas (clásico vs ajustado)
+# 3. Simetría y diagrama de cajas (clásico vs ajustado)
 
 ```{r sec3}
 mc <- sapply(X8, function(x) mc(x))
@@ -105,7 +105,7 @@ dev.off()
 
 ```
 
-# 4. 3. Justificación de Yeo-Johnson
+# 4. Justificación de Yeo-Johnson
 
 ```{r sec4}
 add("\n== Yeo-Johnson: solo variables con |asimetria| > 1 en la base de 1.070 ==")
@@ -119,7 +119,7 @@ add("Asimetria despues (transformada, 627): ", paste(names(skew_627_trans), roun
 
 ```
 
-# 5. 4. Supuestos del PCA
+# 5. Supuestos del PCA
 
 ```{r sec5}
 Zf <- scale(F627, center = TRUE, scale = TRUE)
@@ -130,7 +130,7 @@ add("Atipicos multivariados restantes (d2 > chi2 0.975, 8 g.l.): ", sum(md627 > 
 
 ```
 
-# 6. 5. PCA final, codo con IC bootstrap
+# 6. PCA final, codo con IC bootstrap
 
 ```{r sec6}
 pca <- prcomp(F627, center = TRUE, scale. = TRUE)
@@ -159,7 +159,7 @@ dev.off()
 
 ```
 
-# 7. 6. Dispersión de scores ANTES de las cargas
+# 7. Dispersión de scores ANTES de las cargas
 
 ```{r sec7}
 sc <- data.frame(CP1 = pca$x[, 1], CP2 = pca$x[, 2], CP3 = pca$x[, 3], Proceso = meta627$Processing.Method)
@@ -173,7 +173,7 @@ ggsave("figuras/revision_profesor/dispersion_CP1_CP2.png", p_sc, width = 8, heig
 
 ```
 
-# 8. 7. Cargas de CP1-CP3 y biplot
+# 8. Cargas de CP1-CP3 y biplot
 
 ```{r sec8}
 L <- round(pca$rotation[, 1:3], 2)
@@ -186,7 +186,7 @@ dev.off()
 
 ```
 
-# 9. 8. t-SNE y UMAP exploratorios
+# 9. t-SNE y UMAP exploratorios
 
 ```{r sec9}
 set.seed(2026)
