@@ -67,10 +67,9 @@ intermedios compartidos están en `datos/`.
 │   ├── pca_final.Rmd/.html             ← PCA final oficial: 627 lotes, 8 variables (demo y anexo)
 │   ├── historico/                      ← informes del método anterior (11 y 8 variables); no son el oficial
 │   ├── guia_teorica_reduccion_dimensional.Rmd/.html
-│   ├── *.R + *.html                    ← pipeline: prep_metodos, proceso_depuracion, mah_log,
-│   │                                     matriz_final_666, var627, figuras_* y humedad_vecinos
-│   │                                     (todos con HTML; pendientes de unir por tema)
-│   └── historico/                      ← taller de 11 variables, informe antiguo y figuras del método anterior
+│   ├── depuracion.Rmd/.html            ← cadena de depuración 1.070 → 666 → 627 y base de datos
+│   ├── figuras_pca.Rmd/.html           ← figuras de la secuencia y justificación (en figuras/secuencia/)
+│   └── historico/                      ← scripts fuente ya incluidos en depuracion.Rmd y figuras_pca.Rmd, y el método anterior
 ├── 02-factorial-correspondencias/      ← Semana 7: AF + análisis de correspondencias
 ├── 03-escalamiento/                    ← Semana 8: MDS y representación de proximidades
 ├── 04-clustering/                      ← K-means, Ward.D2, HDBSCAN y revisión del agrupamiento (R y Python)
