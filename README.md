@@ -56,7 +56,7 @@ intermedios compartidos están en `datos/`.
 ├── presentacion/                       ← guion de la presentación (texto y PDF)
 ├── clean_coffee_data.R/.html           ← limpieza inicial del CSV
 │
-├── 00-eda/                             ← Semanas 2-3: EDA (eda.Rmd) y eda_coffee.R, con HTML
+├── 00-eda/                             ← Semanas 2-3: EDA (eda.Rmd, incluye el EDA complementario)
 ├── 01-pca/                             ← PCA, Kernel PCA, t-SNE, UMAP
 │   ├── figuras/                        ← figuras generadas, por tema
 │   │   ├── revision_profesor/          ← revisión del profesor (PCA y agrupamiento)
@@ -69,7 +69,8 @@ intermedios compartidos están en `datos/`.
 │   ├── guia_teorica_reduccion_dimensional.Rmd/.html
 │   ├── depuracion.Rmd/.html            ← cadena de depuración 1.070 → 666 → 627 y base de datos
 │   ├── figuras_pca.Rmd/.html           ← figuras de la secuencia y justificación (en figuras/secuencia/)
-│   └── historico/                      ← scripts fuente ya incluidos en depuracion.Rmd y figuras_pca.Rmd, y el método anterior
+│   ├── metodos_exploratorios.Rmd/.html ← Kernel PCA (10 núcleos), UMAP, t-SNE y MDS sobre todas las bases (en figuras/exploratorios/)
+│   └── historico/                      ← scripts fuente ya incluidos en los Rmd de 01-pca y 00-eda, y el método anterior
 ├── 02-factorial-correspondencias/      ← Semana 7: AF + análisis de correspondencias
 ├── 03-escalamiento/                    ← Semana 8: MDS y representación de proximidades
 ├── 04-clustering/                      ← K-means, Ward.D2, HDBSCAN y revisión del agrupamiento (R y Python)
