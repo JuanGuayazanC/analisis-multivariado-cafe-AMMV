@@ -64,9 +64,8 @@ intermedios compartidos están en `datos/`.
 │   │   ├── taller_666/                 ← taller PCA (666 lotes)
 │   │   ├── pca_revision/               ← revisión PCA
 │   │   └── proceso/                    ← proceso de depuración de atípicos
-│   ├── informe_taller_pca.Rmd/.html    ← informe del PCA (demo de GitHub)
-│   ├── informe_antes.Rmd/.html         ← PCA con 14 variables (estado previo)
-│   ├── informe_despues.Rmd/.html       ← PCA corregido: 11 variables + YJ
+│   ├── pca_final.Rmd/.html             ← PCA final oficial: 627 lotes, 8 variables (demo y anexo)
+│   ├── historico/                      ← informes del método anterior (11 y 8 variables); no son el oficial
 │   ├── guia_teorica_reduccion_dimensional.Rmd/.html
 │   └── *.R + *.html                    ← cada script tiene su HTML (código con secciones)
 ├── 02-factorial-correspondencias/      ← Semana 7: AF + análisis de correspondencias
