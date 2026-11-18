@@ -61,7 +61,7 @@ vars_originales <- c("Aroma","Flavor","Aftertaste","Acidity","Body","Balance",
 datos <- data_raw %>%
   filter(!is.na(altitude_mean_meters),
          altitude_mean_meters > 0, altitude_mean_meters <= 3000) %>%
-  select(all_of(vars_originales)) %>%
+  dplyr::select(all_of(vars_originales)) %>%
   filter(complete.cases(.)) %>%
   rename(Sabor=Flavor, Retrogusto=Aftertaste, Acidez=Acidity, Cuerpo=Body,
          Uniformidad=Uniformity, Taza.Limpia=Clean.Cup, Dulzura=Sweetness,
@@ -138,7 +138,14 @@ ggplot(scores_lda, aes(LD1, LD2, color=Calidad)) +
 # 4. QDA — Análisis Discriminante Cuadrático
 
 ```{r qda}
-modelo_qda <- qda(Calidad ~ ., data=train)
+# QDA estima una covarianza por clase: una variable constante dentro de una clase
+# (p. ej., Uniformidad = 10 en todos los lotes "Alta") la vuelve singular.
+# Se excluyen solo esas variables y se informa cuáles.
+vars_pred <- setdiff(names(train), "Calidad")
+var_ok <- sapply(vars_pred, function(v) all(tapply(train[[v]], train$Calidad, var) > 1e-8))
+cat("Variables excluidas en QDA (constantes dentro de alguna clase):",
+    paste(vars_pred[!var_ok], collapse = ", "), "\n")
+modelo_qda <- qda(reformulate(vars_pred[var_ok], response = "Calidad"), data=train)
 pred_qda   <- predict(modelo_qda, test)
 
 cm_qda <- confusionMatrix(pred_qda$class, test$Calidad)

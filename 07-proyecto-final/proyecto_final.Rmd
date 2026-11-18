@@ -53,7 +53,7 @@ vars_orig <- c("Aroma","Flavor","Aftertaste","Acidity","Body","Balance",
 datos <- data_raw %>%
   filter(!is.na(altitude_mean_meters),
          altitude_mean_meters > 0, altitude_mean_meters <= 3000) %>%
-  select(all_of(vars_orig)) %>%
+  dplyr::select(all_of(vars_orig)) %>%
   filter(complete.cases(.)) %>%
   rename(Sabor=Flavor, Retrogusto=Aftertaste, Acidez=Acidity, Cuerpo=Body,
          Uniformidad=Uniformity, Taza.Limpia=Clean.Cup, Dulzura=Sweetness,
@@ -164,7 +164,10 @@ lda_m  <- lda(Calidad ~ ., data=tr)
 acc_lda <- mean(predict(lda_m, te)$class == te$Calidad)
 
 # QDA
-qda_m  <- qda(Calidad ~ ., data=tr)
+# Variables constantes dentro de alguna clase vuelven singular la covarianza de QDA
+vars_q <- setdiff(names(tr), "Calidad")
+ok_q   <- sapply(vars_q, function(v) all(tapply(tr[[v]], tr$Calidad, var) > 1e-8))
+qda_m  <- qda(reformulate(vars_q[ok_q], response = "Calidad"), data=tr)
 acc_qda <- mean(predict(qda_m, te)$class == te$Calidad)
 
 # Random Forest

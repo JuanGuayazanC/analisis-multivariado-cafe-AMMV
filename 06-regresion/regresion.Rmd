@@ -55,7 +55,7 @@ vars_originales <- c("Aroma","Flavor","Aftertaste","Acidity","Body","Balance",
 datos <- data_raw %>%
   filter(!is.na(altitude_mean_meters),
          altitude_mean_meters > 0, altitude_mean_meters <= 3000) %>%
-  select(all_of(vars_originales)) %>%
+  dplyr::select(all_of(vars_originales)) %>%
   filter(complete.cases(.)) %>%
   rename(Sabor=Flavor, Retrogusto=Aftertaste, Acidez=Acidity, Cuerpo=Body,
          Uniformidad=Uniformity, Taza.Limpia=Clean.Cup, Dulzura=Sweetness,
@@ -79,7 +79,7 @@ Exploración del predictor más correlacionado con el puntaje total.
 
 ```{r regresion-simple}
 cors <- cor(datos[, vars_pred], datos$Puntaje.Total)
-mejor_var <- names(which.max(abs(cors)))
+mejor_var <- rownames(cors)[which.max(abs(cors[,1]))]
 cat("Variable más correlacionada:", mejor_var,
     "  r =", round(cors[mejor_var,], 4), "\n")
 
@@ -88,7 +88,7 @@ summary(modelo_simple)
 ```
 
 ```{r regresion-simple-viz, fig.width=8, fig.height=5}
-ggplot(datos, aes_string(x=mejor_var, y="Puntaje.Total")) +
+ggplot(datos, aes(x=.data[[mejor_var]], y=.data$Puntaje.Total)) +
   geom_point(alpha=0.2, color="#2563a8", size=1.2) +
   geom_smooth(method="lm", color="#e74c3c", se=TRUE) +
   labs(title=paste0("Regresión simple: Puntaje.Total ~ ", mejor_var),
@@ -171,7 +171,7 @@ data.frame(
 ) %>%
   tidyr::pivot_longer(-k, names_to="Métrica", values_to="Valor") %>%
   ggplot(aes(k, Valor, color=Métrica)) +
-  geom_line(size=1) + geom_point(size=2) +
+  geom_line(linewidth=1) + geom_point(size=2) +
   facet_wrap(~Métrica, scales="free_y") +
   labs(title="Criterios de selección de subconjunto",
        x="Número de variables", y="") +
