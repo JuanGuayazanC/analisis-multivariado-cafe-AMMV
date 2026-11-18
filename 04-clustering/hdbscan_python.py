@@ -99,7 +99,10 @@ def build_feature_matrix(data_path: Path) -> tuple[pd.DataFrame, np.ndarray, np.
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--data", type=Path, default=DEFAULT_DATA, help="Ruta al CSV limpio")
-    parser.add_argument("--min-cluster-size", type=int, default=20)
+    # Por defecto igual que clustering_HDBSCAN.Rmd (dbscan::hdbscan, minPts = 10).
+    # En dbscan, minPts fija tanto la densidad como el tamaño mínimo de grupo.
+    parser.add_argument("--min-cluster-size", type=int, default=10)
+    parser.add_argument("--min-samples", type=int, default=10)
     parser.add_argument("--output-dir", type=Path, default=Path(__file__).resolve().parent)
     parser.add_argument("--no-plot", action="store_true", help="No guardar el gráfico")
     args = parser.parse_args()
@@ -107,7 +110,7 @@ def main() -> None:
         parser.error("--min-cluster-size debe ser al menos 2")
 
     data, X, scores, feature_names, transform_columns = build_feature_matrix(args.data)
-    model = hdbscan.HDBSCAN(min_cluster_size=args.min_cluster_size)
+    model = hdbscan.HDBSCAN(min_cluster_size=args.min_cluster_size, min_samples=args.min_samples)
     labels = model.fit_predict(X)
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
@@ -129,7 +132,7 @@ def main() -> None:
     print("Bloque: 4 componentes PCA + dummies de método, color y país.")
     print(f"Variables transformadas con Yeo-Johnson (|sesgo| > 1): "
           f"{', '.join(transform_columns) if transform_columns else 'ninguna'}")
-    print(f"Parámetro min_cluster_size: {args.min_cluster_size}")
+    print(f"Parámetros: min_cluster_size = {args.min_cluster_size}, min_samples = {args.min_samples}")
     print("\nTamaños de grupo (%):")
     print(summary.round(1).to_string())
     print(f"\nResultados por lote: {labels_path}")

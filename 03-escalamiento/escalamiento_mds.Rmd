@@ -112,13 +112,16 @@ ggplot(mds_df, aes(Dim1, Dim2)) +
 # 3. MDS No Métrico (Kruskal)
 
 El MDS no métrico solo preserva el **orden** de las distancias (no sus magnitudes).
-La función `MASS::isoMDS` reporta Stress en escala porcentual (0–100);
-por eso el umbral orientativo del 10% se expresa como 10, no como 0.1.
+La función `MASS::isoMDS` reporta Stress en escala porcentual (0–100).
+Escala orientativa de Kruskal (1964): < 5 % excelente; 5–10 % bueno;
+10–20 % aceptable; > 20 % pobre.
 
 ```{r mds-nometrico}
 mds_nm <- MASS::isoMDS(D, k=2)
-cat("Stress (MDS no métrico):", round(mds_nm$stress, 3),
-    ifelse(mds_nm$stress < 10, "— Bueno (< 10%)", "— Revisar"), "\n")
+cat("Stress (MDS no métrico):", round(mds_nm$stress, 1),
+    ifelse(mds_nm$stress < 5, "— Excelente (< 5%)",
+    ifelse(mds_nm$stress < 10, "— Bueno (5–10%)",
+    ifelse(mds_nm$stress < 20, "— Aceptable (10–20%)", "— Pobre (> 20%)"))), "\n")
 ```
 
 ```{r mds-nometrico-viz, fig.width=9, fig.height=7}
