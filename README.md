@@ -54,6 +54,7 @@ intermedios compartidos están en `datos/`.
 ├── data/                               ← CSV original (no modificar)
 ├── datos/                              ← .rds intermedios compartidos (leídos por 01-pca y shiny)
 ├── presentacion/                       ← guion de la presentación (texto y PDF)
+├── clean_coffee_data.R/.html           ← limpieza inicial del CSV
 │
 ├── 00-eda/                             ← Semanas 2-3: EDA, matrices, distancias
 ├── 01-pca/                             ← PCA, Kernel PCA, t-SNE, UMAP
@@ -68,15 +69,16 @@ intermedios compartidos están en `datos/`.
 │   ├── informe_antes.Rmd/.html         ← PCA con 14 variables (estado previo)
 │   ├── informe_despues.Rmd/.html       ← PCA corregido: 11 variables + YJ
 │   ├── guia_teorica_reduccion_dimensional.Rmd/.html
-│   └── *.R, *.py                       ← scripts de figuras, depuración y revisión
+│   └── *.R + *.html                    ← cada script tiene su HTML (código con secciones)
 ├── 02-factorial-correspondencias/      ← Semana 7: AF + análisis de correspondencias
 ├── 03-escalamiento/                    ← Semana 8: MDS y representación de proximidades
-├── 04-clustering/                      ← K-means, Ward.D2 y HDBSCAN (R y Python)
+├── 04-clustering/                      ← K-means, Ward.D2 y HDBSCAN (R y Python; .py con .html)
 ├── 05-clasificacion/                   ← Semanas 12-13: LDA, QDA, SVM, Random Forest
 ├── 06-regresion/                       ← Semana 14: regresión lineal multivariada
 ├── 07-proyecto-final/                  ← Semanas 15-17: comparación integrada
+├── scraper/                            ← scripts Python de extracción (cada uno con .html)
 ├── shiny/
-│   └── app.R                           ← explorador PCA interactivo
+│   ├── app.R / app.html                ← explorador PCA interactivo
 └── imagenes_presentacion/              ← imágenes usadas en la presentación
 ```
 

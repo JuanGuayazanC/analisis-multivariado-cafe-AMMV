@@ -1,0 +1,102 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><title>cqi_bot_session.py</title>
+<style>body{font-family:system-ui,sans-serif;margin:24px;max-width:960px}pre{background:#f6f8fa;padding:14px;overflow-x:auto;border-radius:6px;font-size:13px}</style>
+</head><body><h2>cqi_bot_session.py</h2><p>Código fuente (sin ejecutar). Ejecutar desde la carpeta del script.</p><pre><code>from selenium import webdriver
+from selenium.webdriver.common.by import By
+from bs4 import BeautifulSoup
+import pandas as pd
+import time
+
+login_email = &#x27;your_email_here&#x27;
+login_password = &#x27;your_password_here&#x27;
+
+# open chromedriver
+driver = webdriver.Chrome(&#x27;your_chromedriver_location_here&#x27;)
+time.sleep(2)
+
+# navigate to login page
+driver.get(&#x27;https://database.coffeeinstitute.org/login&#x27;)
+time.sleep(2)
+
+# submit login credentials 
+form = driver.find_element_by_xpath(&#x27;//html/body/content[@class=&quot;scrollable&quot;]/div[@class=&quot;container page&quot;]/div[@class=&quot;form short&quot;]/div[@class=&quot;login panel&quot;]/form&#x27;)
+username = driver.find_element_by_name(&quot;username&quot;)
+password = driver.find_element_by_name(&quot;password&quot;)
+time.sleep(2)
+
+username.send_keys(login_email)
+password.send_keys(login_password)
+driver.find_element_by_class_name(&quot;submit&quot;).click()
+time.sleep(2)
+
+
+# navigate to coffees page, then to arabicas page containing links to all quality reports 
+coffees = driver.find_element_by_xpath(&#x27;//html/body/header/nav[@id=&quot;main&quot;]/div[@class=&quot;container&quot;]/div[@class=&quot;in&quot;]/a[@href=&quot;/coffees&quot;]&#x27;).click()
+time.sleep(3)
+driver.find_element_by_link_text(&#x27;Arabica Coffees&#x27;).click()
+time.sleep(3)
+
+# these values can be changed if this breaks midway through collecting data to pick up close to where you left off
+page = 0
+coffeenum = 0
+
+while True:
+	print(&#x27;page {}&#x27;.format(page))
+
+	# 50 rows in these tables * 7 columns per row = 350 cells. Every 7th cell clicks through to that coffee&#x27;s data page
+	for i in range(0,350,7):
+		time.sleep(4)
+
+		# paginate back to the desired page number
+		# don&#x27;t think there&#x27;s a way around this - the back() option goes too far back
+		# some page numbers aren&#x27;t available in the ui, but &#x27;next&#x27; always is unless you&#x27;ve reached the end 
+		for p_num in range(page):
+			page_buttons = driver.find_elements_by_class_name(&#x27;paginate_button&#x27;)
+			page_buttons[-1].click() # the &#x27;next&#x27; button
+			time.sleep(1)
+			page_buttons = driver.find_elements_by_class_name(&#x27;paginate_button&#x27;)
+
+		# select the cell to click through to the next coffee-data page
+		time.sleep(2) # this next line errors out sometimes, maybe it needs more of a time buffer 
+		test_page=driver.find_elements_by_xpath(&#x27;//td&#x27;)[i].click()
+		time.sleep(2)
+		print(&#x27;rows: &#x27;)
+		print(len(driver.find_elements_by_xpath(&quot;//tr&quot;)))
+		tables = driver.find_elements(By.TAG_NAME, &quot;table&quot;)
+
+		# loop over all coffee reports on the page, processing each one and writing to csv
+		print(&#x27;tables: &#x27;)
+		print(len(tables))
+		j = 0
+		for tab in tables:
+			try:
+				t = BeautifulSoup(tab.get_attribute(&#x27;outerHTML&#x27;), &quot;html.parser&quot;)
+				#print(t)
+				df = pd.read_html(str(t))
+				name = &#x27;coffee_{}_table_{}.csv&#x27;.format(coffeenum,j)
+				df[0].to_csv(name)
+				print(name)
+			except:
+				# only one&#x27;s needed but I want this to be onoxious since it&#x27;s the only way I&#x27;m logging this currently
+				print(&#x27;ERROR: {} failed&#x27;.format(name))
+				print(&#x27;ERROR: {} failed&#x27;.format(name))
+				print(&#x27;ERROR: {} failed&#x27;.format(name))
+				print(&#x27;ERROR: {} failed&#x27;.format(name))
+			j += 1
+
+		# go back to page with all other coffee results
+		#driver.back() # note: this isn&#x27;t working as expected, manually going back to pg 1 via url instead
+		driver.get(&#x27;https://database.coffeeinstitute.org/coffees/arabica&#x27;)
+		time.sleep(2)
+		coffeenum += 1
+
+	page += 1
+	if page == 27:
+		break
+
+
+# close the driver
+driver.close()
+
+
+
+</code></pre></body></html>
