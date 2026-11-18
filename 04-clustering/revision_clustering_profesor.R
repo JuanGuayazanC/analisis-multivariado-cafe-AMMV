@@ -6,10 +6,9 @@
 #  - tendencia al agrupamiento: codo, silueta promedio y estadístico gap
 #  - dendrograma con número de grupos y silueta por grupo
 #  - prueba de proporciones entre grupos con una variable que NO entra al agrupamiento
-# Salida: figuras/revision_profesor/ y resultados_clustering_profesor.txt
+# Salida: figuras/revision_profesor/ (dentro de 04-clustering) y resultados_clustering_profesor.txt
 
 suppressMessages({ library(dplyr); library(car); library(cluster) })
-dir.create("figuras_revision_profesor", showWarnings = FALSE)
 out_txt <- character()
 add <- function(...) out_txt <<- c(out_txt, paste0(...))
 

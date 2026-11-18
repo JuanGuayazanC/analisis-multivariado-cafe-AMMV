@@ -56,12 +56,11 @@ intermedios compartidos están en `datos/`.
 ├── presentacion/                       ← guion de la presentación (texto y PDF)
 ├── clean_coffee_data.R/.html           ← limpieza inicial del CSV
 │
-├── 00-eda/                             ← Semanas 2-3: EDA, matrices, distancias
+├── 00-eda/                             ← Semanas 2-3: EDA (eda.Rmd) y eda_coffee.R, con HTML
 ├── 01-pca/                             ← PCA, Kernel PCA, t-SNE, UMAP
 │   ├── figuras/                        ← figuras generadas, por tema
 │   │   ├── revision_profesor/          ← revisión del profesor (PCA y agrupamiento)
-│   │   ├── presentacion/               ← figuras usadas en la presentación
-│   │   ├── kpca_666/                   ← Kernel PCA (666 lotes)
+│   │   │   ├── kpca_666/                   ← Kernel PCA (666 lotes)
 │   │   ├── taller_666/                 ← taller PCA (666 lotes)
 │   │   ├── pca_revision/               ← revisión PCA
 │   │   └── proceso/                    ← proceso de depuración de atípicos
@@ -72,7 +71,8 @@ intermedios compartidos están en `datos/`.
 │   └── *.R + *.html                    ← cada script tiene su HTML (código con secciones)
 ├── 02-factorial-correspondencias/      ← Semana 7: AF + análisis de correspondencias
 ├── 03-escalamiento/                    ← Semana 8: MDS y representación de proximidades
-├── 04-clustering/                      ← K-means, Ward.D2 y HDBSCAN (R y Python; .py con .html)
+├── 04-clustering/                      ← K-means, Ward.D2, HDBSCAN y revisión del agrupamiento (R y Python)
+│   └── figuras/revision_profesor/      ← figuras de la revisión de agrupamiento
 ├── 05-clasificacion/                   ← Semanas 12-13: LDA, QDA, SVM, Random Forest
 ├── 06-regresion/                       ← Semana 14: regresión lineal multivariada
 ├── 07-proyecto-final/                  ← Semanas 15-17: comparación integrada
