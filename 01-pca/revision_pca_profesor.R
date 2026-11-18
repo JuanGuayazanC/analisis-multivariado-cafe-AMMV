@@ -6,7 +6,7 @@
 #  - gráfico del codo con intervalos de confianza bootstrap
 #  - dispersión de scores ANTES de las cargas, cargas de CP1-CP3 y biplot
 #  - t-SNE y UMAP exploratorios coloreados por método de proceso
-# Salida: figuras_revision_profesor/ y resultados_revision_profesor.txt
+# Salida: figuras/revision_profesor/ y resultados_revision_profesor.txt
 
 suppressMessages({ library(ggplot2); library(robustbase); library(Rtsne); library(uwot) })
 set.seed(2026)
@@ -31,7 +31,11 @@ M <- T1070[!out1, ]
 Zm <- scale(M)
 out2 <- mahalanobis(Zm, colMeans(Zm), cov(Zm)) > lim
 keep_idx <- which(!out1)[!out2]
-F627 <- T1070[keep_idx, ]
+# Matriz final oficial: mismos 627 lotes (mismo orden), con λ Yeo-Johnson re-estimados sobre los 627
+fin <- readRDS("datos_final_627.rds")
+F627 <- fin$datos_limpio
+names(F627) <- names(X8)
+stopifnot(isTRUE(all.equal(as.matrix(fin$datos_originales), as.matrix(X8[keep_idx, ]), check.attributes = FALSE)))
 meta627 <- meta[keep_idx, ]
 raw627 <- X8[keep_idx, ]
 add("n inicial 1070 = ", nrow(X8), "; atipicos 1a pasada = ", sum(out1), "; 2a pasada = ", sum(out2), "; n final = ", nrow(F627))
@@ -49,11 +53,11 @@ n_ad <- sapply(X8, function(x) sum(x < adjboxStats(x)$stats[1] | x > adjboxStats
 n_usado <- ifelse(abs(mc) > 0.1, n_ad, n_mad)
 tab_sim <- data.frame(variable = names(X8), medcouple = round(mc, 3), asimetria = round(sk, 3),
                       boxplot = tipo, atipicos_clasico = n_cl, atipicos_robusto_usado = n_usado)
-write.csv(tab_sim, "figuras_revision_profesor/tabla_simetria_boxplot.csv", row.names = FALSE)
+write.csv(tab_sim, "figuras/revision_profesor/tabla_simetria_boxplot.csv", row.names = FALSE)
 add("\n== Simetria (medcouple) y tipo de diagrama de cajas ==")
 add(paste(capture.output(print(tab_sim, row.names = FALSE)), collapse = "\n"))
 
-png("figuras_revision_profesor/boxplot_clasico_vs_ajustado.png", width = 2000, height = 1100, res = 180)
+png("figuras/revision_profesor/boxplot_clasico_vs_ajustado.png", width = 2000, height = 1100, res = 180)
 par(mfrow = c(2, 4), mar = c(4, 4, 3, 1))
 for (v in names(X8)) {
   x <- X8[[v]]
@@ -68,9 +72,10 @@ for (v in names(X8)) {
 dev.off()
 
 # ---- 3. Justificación de Yeo-Johnson ----
-add("\n== Yeo-Johnson: solo variables con |asimetria| > 1 (lambdas de base_1070) ==")
+add("\n== Yeo-Johnson: solo variables con |asimetria| > 1 en la base de 1.070 ==")
 add("Variables transformadas: ", paste(names(base$lambdas), collapse = ", "))
-add("Lambdas: ", paste(round(base$lambdas, 3), collapse = ", "))
+add("Lambdas estimadas sobre 1.070 (PCA preliminar): ", paste(round(base$lambdas, 3), collapse = ", "))
+add("Lambdas re-estimadas sobre 627 (PCA final): ", paste(round(fin$lambdas, 3), collapse = ", "))
 skew_627_raw <- sapply(raw627, function(x) mean((x - mean(x))^3) / sd(x)^3)
 skew_627_trans <- sapply(F627, function(x) mean((x - mean(x))^3) / sd(x)^3)
 add("Asimetria antes (raw, 627): ", paste(names(skew_627_raw), round(skew_627_raw, 2), collapse = " | "))
@@ -97,12 +102,12 @@ ci <- t(apply(boot_prop, 2, quantile, c(0.025, 0.975)))
 tab_var <- data.frame(componente = paste0("CP", 1:8), varianza = round(prop * 100, 1),
                       ic_inf = round(ci[, 1] * 100, 1), ic_sup = round(ci[, 2] * 100, 1))
 tab_var$acum_CP1_CP2 <- round(sum(prop[1:2]) * 100, 1)
-write.csv(tab_var, "figuras_revision_profesor/tabla_varianza_IC.csv", row.names = FALSE)
+write.csv(tab_var, "figuras/revision_profesor/tabla_varianza_IC.csv", row.names = FALSE)
 add("\n== Varianza por componente con IC 95 % (bootstrap B = 2000) ==")
 add(paste(capture.output(print(tab_var, row.names = FALSE)), collapse = "\n"))
 add("IC acumulado CP1+CP2: ", paste(round(quantile(rowSums(boot_prop[, 1:2]), c(0.025, 0.975)) * 100, 1), collapse = " a "), " %")
 
-png("figuras_revision_profesor/codo_IC.png", width = 1800, height = 1100, res = 180)
+png("figuras/revision_profesor/codo_IC.png", width = 1800, height = 1100, res = 180)
 bp <- barplot(prop[1:6] * 100, names.arg = paste0("CP", 1:6), col = "#1f4e79", ylim = c(0, 65), ylab = "Varianza explicada (%)", main = "Codo con IC 95 % (bootstrap)")
 arrows(bp, ci[1:6, 1] * 100, bp, ci[1:6, 2] * 100, angle = 90, code = 3, length = 0.05, col = "#c0392b")
 text(bp, prop[1:6] * 100 + 3, paste0(round(prop[1:6] * 100, 1), "%"))
@@ -116,14 +121,14 @@ sc$Proceso[!(sc$Proceso %in% top)] <- "Otro"
 p_sc <- ggplot(sc, aes(CP1, CP2, color = Proceso)) + geom_point(alpha = 0.7, size = 1.6) +
   labs(title = "Dispersión de los lotes en CP1 y CP2 (627 lotes)", x = sprintf("CP1 (%.1f %%)", prop[1] * 100), y = sprintf("CP2 (%.1f %%)", prop[2] * 100), color = "Método de proceso") +
   theme_minimal(base_size = 13)
-ggsave("figuras_revision_profesor/dispersion_CP1_CP2.png", p_sc, width = 8, height = 6, dpi = 200)
+ggsave("figuras/revision_profesor/dispersion_CP1_CP2.png", p_sc, width = 8, height = 6, dpi = 200)
 
 # ---- 7. Cargas de CP1-CP3 y biplot ----
 L <- round(pca$rotation[, 1:3], 2)
-write.csv(L, "figuras_revision_profesor/cargas_CP1_CP3.csv")
+write.csv(L, "figuras/revision_profesor/cargas_CP1_CP3.csv")
 add("\n== Cargas CP1-CP3 ==")
 add(paste(capture.output(print(L)), collapse = "\n"))
-png("figuras_revision_profesor/biplot.png", width = 1800, height = 1400, res = 180)
+png("figuras/revision_profesor/biplot.png", width = 1800, height = 1400, res = 180)
 biplot(pca, choices = 1:2, cex = c(0.4, 0.9), col = c("grey40", "#c0392b"), xlab = sprintf("CP1 (%.1f %%)", prop[1] * 100), ylab = sprintf("CP2 (%.1f %%)", prop[2] * 100), main = "Biplot (627 lotes)")
 dev.off()
 
@@ -131,13 +136,13 @@ dev.off()
 set.seed(2026)
 ts <- Rtsne(Zf, perplexity = 30, check_duplicates = FALSE, verbose = FALSE, max_iter = 1000)
 dt <- data.frame(X = ts$Y[, 1], Y = ts$Y[, 2], Proceso = sc$Proceso)
-ggsave("figuras_revision_profesor/tsne_perp30.png", ggplot(dt, aes(X, Y, color = Proceso)) + geom_point(alpha = 0.7, size = 1.4) +
+ggsave("figuras/revision_profesor/tsne_perp30.png", ggplot(dt, aes(X, Y, color = Proceso)) + geom_point(alpha = 0.7, size = 1.4) +
   labs(title = "t-SNE (perplejidad 30), exploratorio", subtitle = "Ejes no interpretables; no son PC1 ni PC2", x = "Dim 1", y = "Dim 2", color = "Método de proceso") + theme_minimal(base_size = 13),
   width = 8, height = 6, dpi = 200)
 set.seed(2026)
 um <- umap(Zf, n_neighbors = 15, min_dist = 0.1, n_components = 2)
 du <- data.frame(X = um[, 1], Y = um[, 2], Proceso = sc$Proceso)
-ggsave("figuras_revision_profesor/umap_vecinos15.png", ggplot(du, aes(X, Y, color = Proceso)) + geom_point(alpha = 0.7, size = 1.4) +
+ggsave("figuras/revision_profesor/umap_vecinos15.png", ggplot(du, aes(X, Y, color = Proceso)) + geom_point(alpha = 0.7, size = 1.4) +
   labs(title = "UMAP (15 vecinos), exploratorio", subtitle = "Ejes no interpretables; la estructura depende de los parámetros", x = "UMAP1", y = "UMAP2", color = "Método de proceso") + theme_minimal(base_size = 13),
   width = 8, height = 6, dpi = 200)
 add("\nt-SNE: perplejidad 30, semilla 2026. UMAP: 15 vecinos, min_dist 0.1, semilla 2026. Exploratorios.")

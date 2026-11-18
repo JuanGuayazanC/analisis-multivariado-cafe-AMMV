@@ -1,26 +1,26 @@
-== Tendencia al agrupamiento (1.070 lotes estandarizados) ==
- k    WSS silueta_k   gap gap_se
- 1 8552.0        NA 1.383  0.010
- 2 5533.0     0.303 1.202  0.007
- 3 4488.2     0.259 1.156  0.005
- 4 3953.3     0.213 1.150  0.006
- 5 3539.0     0.215 1.130  0.006
- 6 3181.0     0.214 1.157  0.006
- 7 2950.3     0.184 1.166  0.006
- 8 2819.2     0.163 1.175  0.005
-k sugerido por gap (regla firstSEmax): 1
-k con mayor silueta promedio (k >= 2): 2
+Matriz de agrupamiento (igual a clustering.Rmd): 1070 lotes x 19 columnas
+K-means k = 3 (semilla 42): tamaños 247, 382, 441; silueta promedio 0.116; silueta negativa 104 (9.7 %)
+Silueta por grupo K-means: G1=0.088, G2=0.168, G3=0.086
 
-== Ward.D2 (muestra 80 lotes, k = 3) ==
-Silueta promedio: 0.298
-Silueta por grupo: G1=0.315, G2=0.273, G3=0.000
+== Tendencia al agrupamiento ==
+ k    WSS silueta   gap gap_se
+ 1 1651.6      NA 1.024  0.006
+ 2 1465.9   0.151 0.948  0.007
+ 3 1319.8   0.115 0.926  0.006
+ 4 1223.5   0.114 0.901  0.006
+ 5 1156.8   0.111 0.880  0.005
+ 6 1107.2   0.111 0.865  0.004
+ 7 1052.8   0.139 0.874  0.004
+ 8 1006.3   0.136 0.869  0.004
+k por gap: primer máximo (firstSEmax) = 1; máximo global = 1
+k con mayor silueta promedio: 2
 
-== K-means (k = 3, semilla 2026, nstart = 50) ==
-Tamaños: 615, 236, 219
-Silueta promedio: 0.259
-Lotes con silueta negativa: 20 (1.9 %)
+== Ward.D2 (muestra de 80, misma semilla) ==
+Tamaños: 15, 42, 23; silueta promedio 0.128
+Silueta por grupo Ward: G1=0.111, G2=0.136, G3=0.123
+Alturas de las últimas fusiones (de 1 a 4 grupos): 5.53, 4.5, 3.75, 3.17; el corte en k = 3 queda entre 3.75 y 4.5. El mayor salto es entre 1 y 2 grupos, coherente con la silueta máxima en k = 2.
+ARI K-means / Ward en la muestra: 0.471
 
-== Prueba de proporciones (Washed / Wet), grupos K-means 1 vs 2 ==
-Proporciones: 0.668 vs 0.780
-Chi-cuadrado = 9.53, gl = 1, p = 0.002016
-IC 95 % de la diferencia: -0.179 a -0.044
+== Prueba de proporciones: lotes con Humedad = 0 por grupo de K-means ==
+Proporciones: G1=21.1 % (52 de 247); G2=6.0 % (23 de 382); G3=22.4 % (99 de 441)
+Chi-cuadrado = 45.98, gl = 2, p = 1.04e-10

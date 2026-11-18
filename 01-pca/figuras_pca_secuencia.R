@@ -16,7 +16,7 @@ p1 <- data.frame(CP1 = pre$x[, 1], CP2 = pre$x[, 2], Lote = ifelse(out1, "Atípi
 g1 <- ggplot(p1, aes(CP1, CP2, color = Lote)) + geom_point(alpha = 0.7, size = 1.6) +
   scale_color_manual(values = c("Conservado" = "#1f4e79", "Atípico (404)" = "#c0392b")) +
   labs(title = sprintf("PCA de 1.070 lotes: %d atípicos", sum(out1)), x = sprintf("CP1 (%.1f %%)", 100 * summary(pre)$importance[2, 1]), y = sprintf("CP2 (%.1f %%)", 100 * summary(pre)$importance[2, 2]), color = NULL) + th
-ggsave("figuras_revision_profesor/seq1_pca1070_atipicos.png", g1, width = 8, height = 6, dpi = 200)
+ggsave("figuras/revision_profesor/seq1_pca1070_atipicos.png", g1, width = 8, height = 6, dpi = 200)
 
 M <- T1070[!out1, ]
 p666 <- prcomp(M, center = TRUE, scale. = TRUE)
@@ -26,9 +26,13 @@ p2 <- data.frame(CP1 = p666$x[, 1], CP2 = p666$x[, 2], Lote = ifelse(out2, "Atí
 g2 <- ggplot(p2, aes(CP1, CP2, color = Lote)) + geom_point(alpha = 0.7, size = 1.6) +
   scale_color_manual(values = c("Conservado" = "#1f4e79", "Atípico (39)" = "#c0392b")) +
   labs(title = sprintf("PCA de 666 lotes: %d atípicos más", sum(out2)), x = sprintf("CP1 (%.1f %%)", 100 * summary(p666)$importance[2, 1]), y = sprintf("CP2 (%.1f %%)", 100 * summary(p666)$importance[2, 2]), color = NULL) + th
-ggsave("figuras_revision_profesor/seq2_pca666_atipicos.png", g2, width = 8, height = 6, dpi = 200)
+ggsave("figuras/revision_profesor/seq2_pca666_atipicos.png", g2, width = 8, height = 6, dpi = 200)
 
-F627 <- M[!out2, ]
+# PCA final oficial: 627 lotes con λ re-estimados (datos_final_627.rds)
+fin <- readRDS("datos_final_627.rds")
+F627 <- fin$datos_limpio
+names(F627) <- names(T1070)
+stopifnot(nrow(F627) == sum(!out2))
 pf <- prcomp(F627, center = TRUE, scale. = TRUE)
 L <- as.data.frame(as.table(pf$rotation[, 1:3]))
 names(L) <- c("Variable", "Componente", "Carga")
@@ -38,5 +42,5 @@ g4 <- ggplot(L, aes(Componente, Variable, fill = Carga)) + geom_tile(color = "wh
   geom_text(aes(label = sprintf("%.2f", Carga)), size = 5) +
   scale_fill_gradient2(low = "#2166ac", mid = "white", high = "#b2182b", limits = c(-1, 1)) +
   labs(title = "Cargas de CP1, CP2 y CP3 (627 lotes)", x = NULL, y = NULL) + theme_minimal(base_size = 14)
-ggsave("figuras_revision_profesor/seq4_cargas_mapa.png", g4, width = 6.5, height = 6, dpi = 200)
+ggsave("figuras/revision_profesor/seq4_cargas_mapa.png", g4, width = 6.5, height = 6, dpi = 200)
 cat("n1070", length(out1), "out1", sum(out1), "out2", sum(out2), "final", nrow(F627), "\n")

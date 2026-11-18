@@ -1,0 +1,33 @@
+import json, urllib.request
+
+B = "https://www.canva.com/_blob/upload/ingress/upload/file/agent-tool?_sat="
+pares = [
+    ("transparentes/01_cajas_ajustadas_14_t.png", "eyJhbGciOiJFUzI1NiJ9.eyJqdGkiOiJtQ1Z2bG5nRVYxRHVyQTltYUstZTF3Iiwic3ViIjoiVUFFOTAzc1VfNHc6QkFFOTB4WjZ0Z1EiLCJpYXQiOjE3OTQ1NDQ1MTgsImV4cCI6MTc5NDU0NjMxOCwidXNnIjoxLCJhY3QiOiIvX2Jsb2IvdXBsb2FkL2luZ3Jlc3MvdXBsb2FkL2ZpbGUvYWdlbnQtdG9vbCIsIm1vZGUiOiJTSU5HTEVfUkVRVUVTVCJ9.1h6_xbFmvP9U3KPzS2pYHXh8fWk2nGoLqkx-029x5FrLoIlYqkJZ8Eo4YtIQkPVjKtifyK5uLCYmjYD7mg7vPQ"),
+    ("transparentes/02_ceros_y_maximos_t.png", "eyJhbGciOiJFUzI1NiJ9.eyJqdGkiOiIzSGtGbjhwcHdvdUFTMVBsck1aUUV3Iiwic3ViIjoiVUFFOTAzc1VfNHc6QkFFOTB4WjZ0Z1EiLCJpYXQiOjE3OTQ1NDQ1MTksImV4cCI6MTc5NDU0NjMxOSwidXNnIjoxLCJhY3QiOiIvX2Jsb2IvdXBsb2FkL2luZ3Jlc3MvdXBsb2FkL2ZpbGUvYWdlbnQtdG9vbCIsIm1vZGUiOiJTSU5HTEVfUkVRVUVTVCJ9.rpwWqRDY3huxqTIwTfC_5yVksWz8-KeHicRNjh5tDvc4LdKVkmajAAhpghMRCk09t_nNdMhbD3UT0KDcQ6Tteg"),
+    ("transparentes/03_asimetria_antes_despues_YJ_t.png", "eyJhbGciOiJFUzI1NiJ9.eyJqdGkiOiJWWTNpTFBDc3BvZTAzbFZZdnJnUU5BIiwic3ViIjoiVUFFOTAzc1VfNHc6QkFFOTB4WjZ0Z1EiLCJpYXQiOjE3OTQ1NDQ1MjAsImV4cCI6MTc5NDU0NjMyMCwidXNnIjoxLCJhY3QiOiIvX2Jsb2IvdXBsb2FkL2luZ3Jlc3MvdXBsb2FkL2ZpbGUvYWdlbnQtdG9vbCIsIm1vZGUiOiJTSU5HTEVfUkVRVUVTVCJ9.qSKHcLD9qKF63K6SgsX1O7A5JCvLFsGsCAW1Z6mKc_jvtgdirP5dpKhWxw-FchYVVTRib5blFyQwhXKnvbNPiA"),
+    ("transparentes/04_varianzas_covarianzas_t.png", "eyJhbGciOiJFUzI1NiJ9.eyJqdGkiOiJtRllSdEZadDFib3NVX2pYeE5tbmpRIiwic3ViIjoiVUFFOTAzc1VfNHc6QkFFOTB4WjZ0Z1EiLCJpYXQiOjE3OTQ1NDQ1MjAsImV4cCI6MTc5NDU0NjMyMCwidXNnIjoxLCJhY3QiOiIvX2Jsb2IvdXBsb2FkL2luZ3Jlc3MvdXBsb2FkL2ZpbGUvYWdlbnQtdG9vbCIsIm1vZGUiOiJTSU5HTEVfUkVRVUVTVCJ9.4x0ZSkn0iKv_a7iduZv4exWbECFpzI7E2SmOjoMvDrLB8S8TQ7JIcQeV5RiL98Df28ocjR5rFoVd83eutqlGxw"),
+    ("transparentes/06_mahalanobis_t.png", "eyJhbGciOiJFUzI1NiJ9.eyJqdGkiOiJmVWFQUVVrSnQ0Yk1tMEh5YXlHRU9nIiwic3ViIjoiVUFFOTAzc1VfNHc6QkFFOTB4WjZ0Z1EiLCJpYXQiOjE3OTQ1NDQ1MjIsImV4cCI6MTc5NDU0NjMyMiwidXNnIjoxLCJhY3QiOiIvX2Jsb2IvdXBsb2FkL2luZ3Jlc3MvdXBsb2FkL2ZpbGUvYWdlbnQtdG9vbCIsIm1vZGUiOiJTSU5HTEVfUkVRVUVTVCJ9.HANhpxzlZkjfDp9gqfa__G7jjveZe_Ntp6wqnWF_gGviqpViT0-ZXe0Kc6mz2qPO-tuqaGvnAAXu6S_clsnrFQ"),
+    ("transparentes/pca_pairs_t.png", "eyJhbGciOiJFUzI1NiJ9.eyJqdGkiOiJoQmk3SDVzTnU1bzZTM195UFlsWU9nIiwic3ViIjoiVUFFOTAzc1VfNHc6QkFFOTB4WjZ0Z1EiLCJpYXQiOjE3OTQ1NDQ1MjMsImV4cCI6MTc5NDU0NjMyMywidXNnIjoxLCJhY3QiOiIvX2Jsb2IvdXBsb2FkL2luZ3Jlc3MvdXBsb2FkL2ZpbGUvYWdlbnQtdG9vbCIsIm1vZGUiOiJTSU5HTEVfUkVRVUVTVCJ9.Z2fmHB8JjM6VjPS-vBXXzq-epBfSA96KqNw6JooVRJQeRKZvv5-qgQ1jl3-L13jNXUGAymLQmWd_fPUbqkgHYw"),
+    ("transparentes/pca_biplot_t.png", "eyJhbGciOiJFUzI1NiJ9.eyJqdGkiOiI1NFgtMVM0S002RVYzUU9XU0RpeWx3Iiwic3ViIjoiVUFFOTAzc1VfNHc6QkFFOTB4WjZ0Z1EiLCJpYXQiOjE3OTQ1NDQ1MjQsImV4cCI6MTc5NDU0NjMyNCwidXNnIjoxLCJhY3QiOiIvX2Jsb2IvdXBsb2FkL2luZ3Jlc3MvdXBsb2FkL2ZpbGUvYWdlbnQtdG9vbCIsIm1vZGUiOiJTSU5HTEVfUkVRVUVTVCJ9.VRUJbfu7XREe-7HdjIBNrRxpHiO19FGFtiCTN0P7GT21nO-VUQ7d1tBdbhsTmuT6LfZHQzmb8VDyaoaO8Qltvw"),
+    ("transparentes/kpca_rbf_pairs_t.png", "eyJhbGciOiJFUzI1NiJ9.eyJqdGkiOiJXRmk4MWthTk8zQmFTN3dvNDlmZU1nIiwic3ViIjoiVUFFOTAzc1VfNHc6QkFFOTB4WjZ0Z1EiLCJpYXQiOjE3OTQ1NDQ1MjQsImV4cCI6MTc5NDU0NjMyNCwidXNnIjoxLCJhY3QiOiIvX2Jsb2IvdXBsb2FkL2luZ3Jlc3MvdXBsb2FkL2ZpbGUvYWdlbnQtdG9vbCIsIm1vZGUiOiJTSU5HTEVfUkVRVUVTVCJ9.TCrC_4Tl4snu0mo4BHnRjmNBd_Jm04lFcZPauk87Isy01PMj3XZr_3Hg8M6EwqQsAGYgDSdibvRe7bHfkvkHgA"),
+    ("transparentes/tsne_perp30_t.png", "eyJhbGciOiJFUzI1NiJ9.eyJqdGkiOiJEWTJKMS15c1hHelR5VzJkYW5tU3pBIiwic3ViIjoiVUFFOTAzc1VfNHc6QkFFOTB4WjZ0Z1EiLCJpYXQiOjE3OTQ1NDQ1MjUsImV4cCI6MTc5NDU0NjMyNSwidXNnIjoxLCJhY3QiOiIvX2Jsb2IvdXBsb2FkL2luZ3Jlc3MvdXBsb2FkL2ZpbGUvYWdlbnQtdG9vbCIsIm1vZGUiOiJTSU5HTEVfUkVRVUVTVCJ9.oi5IeO3df2d3K9ljDqiVMjqiWd4kc7N5EVnCgJwMMma0_JQT00PbBEuuGNI1u1MpU6JQGvUPeSm5ZCNMVrU9Lg"),
+    ("transparentes/tsne_perp5_t.png", "eyJhbGciOiJFUzI1NiJ9.eyJqdGkiOiJURkc1WG5TNnJoU0dZYjRUVFJpdXN3Iiwic3ViIjoiVUFFOTAzc1VfNHc6QkFFOTB4WjZ0Z1EiLCJpYXQiOjE3OTQ1NDQ1MjYsImV4cCI6MTc5NDU0NjMyNiwidXNnIjoxLCJhY3QiOiIvX2Jsb2IvdXBsb2FkL2luZ3Jlc3MvdXBsb2FkL2ZpbGUvYWdlbnQtdG9vbCIsIm1vZGUiOiJTSU5HTEVfUkVRVUVTVCJ9.8GALbEgXv3FQAt511vhmUmdUXlovW3SKZvg0R5Cci6_yngo94-NEHpG7pNVasrQb9-NpUbI6f2eRO8kxLzvs0w"),
+    ("transparentes/umap_vecinos15_t.png", "eyJhbGciOiJFUzI1NiJ9.eyJqdGkiOiJnTXQ3TjBrOE56V1FISmNXaHgyWWxnIiwic3ViIjoiVUFFOTAzc1VfNHc6QkFFOTB4WjZ0Z1EiLCJpYXQiOjE3OTQ1NDQ1MjcsImV4cCI6MTc5NDU0NjMyNywidXNnIjoxLCJhY3QiOiIvX2Jsb2IvdXBsb2FkL2luZ3Jlc3MvdXBsb2FkL2ZpbGUvYWdlbnQtdG9vbCIsIm1vZGUiOiJTSU5HTEVfUkVRVUVTVCJ9.fE0qgH4_DJmhhh1uKL9jXBckYPRzyH34_Ia3QFWiTt8sSGMIgbk6jA6_wBraDO8BRodK2R8gBXWfZT3aZbdSXg"),
+    ("transparentes/umap_vecinos5_t.png", "eyJhbGciOiJFUzI1NiJ9.eyJqdGkiOiJwNW16dlRBWTkweXhqTmtFS2YxNTlBIiwic3ViIjoiVUFFOTAzc1VfNHc6QkFFOTB4WjZ0Z1EiLCJpYXQiOjE3OTQ1NDQ1MjksImV4cCI6MTc5NDU0NjMyOSwidXNnIjoxLCJhY3QiOiIvX2Jsb2IvdXBsb2FkL2luZ3Jlc3MvdXBsb2FkL2ZpbGUvYWdlbnQtdG9vbCIsIm1vZGUiOiJTSU5HTEVfUkVRVUVTVCJ9.dKwvFP4177xuxL3ayT61hzSrwxYOqt4cgheFy1AEIMRl4vrbk1vrwFuKFKDuhiY7QM8ZPIwzqu6u5DRfV9QOYg"),
+]
+
+resultado = {}
+for archivo, tok in pares:
+    with open(archivo, "rb") as f:
+        data = f.read()
+    req = urllib.request.Request(B + tok, data=data, method="POST",
+                                 headers={"Content-Type": "application/octet-stream", "User-Agent": "curl/8.0"})
+    try:
+        with urllib.request.urlopen(req, timeout=120) as r:
+            resultado[archivo] = json.loads(r.read().decode())
+        print("OK", archivo, resultado[archivo])
+    except Exception as e:
+        print("ERROR", archivo, e)
+
+with open("ids_figuras2.json", "w", encoding="utf-8") as f:
+    json.dump(resultado, f, ensure_ascii=False, indent=1)

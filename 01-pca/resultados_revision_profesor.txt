@@ -21,35 +21,36 @@ Verificacion contra datos_final_627.rds: TRUE
                       6
                      73
 
-== Yeo-Johnson: solo variables con |asimetria| > 1 (lambdas de base_1070) ==
+== Yeo-Johnson: solo variables con |asimetria| > 1 en la base de 1.070 ==
 Variables transformadas: Aroma, Sabor, Retrogusto, Acidez, Cuerpo, Balance, Puntaje.Catador
-Lambdas: 3.59, 2.739, 2.619, 3.291, 3.079, 2.295, 2.177
+Lambdas estimadas sobre 1.070 (PCA preliminar): 3.59, 2.739, 2.619, 3.291, 3.079, 2.295, 2.177
+Lambdas re-estimadas sobre 627 (PCA final): 1.08, 3.805, 1.793, 1.514, 0.929, 0.343, 2.293
 Asimetria antes (raw, 627): Aroma -0.06 | Sabor -0.28 | Retrogusto -0.2 | Acidez -0.07 | Cuerpo -0.1 | Balance -0.18 | Puntaje.Catador -0.23 | Altitud -0.43
-Asimetria despues (transformada, 627): Aroma 0.14 | Sabor -0.14 | Retrogusto -0.08 | Acidez 0.09 | Cuerpo 0.03 | Balance -0.09 | Puntaje.Catador -0.14 | Altitud -0.43
+Asimetria despues (transformada, 627): Aroma -0.05 | Sabor -0.06 | Retrogusto -0.14 | Acidez -0.03 | Cuerpo -0.1 | Balance -0.22 | Puntaje.Catador -0.13 | Altitud -0.43
 
 == Supuestos del PCA (627 lotes) ==
 prcomp centra internamente (center = TRUE); Altitud tiene media ~1351 m antes de centrar
-Atipicos multivariados restantes (d2 > chi2 0.975, 8 g.l.): 34 de 627 (esperados por azar ~16)
+Atipicos multivariados restantes (d2 > chi2 0.975, 8 g.l.): 32 de 627 (esperados por azar ~16)
 
 == Varianza por componente con IC 95 % (bootstrap B = 2000) ==
  componente varianza ic_inf ic_sup acum_CP1_CP2
-        CP1     55.0   52.5   57.5         67.5
-        CP2     12.5   12.3   12.9         67.5
-        CP3      8.9    7.9   10.1         67.5
-        CP4      6.8    6.2    7.6         67.5
-        CP5      6.1    5.3    6.7         67.5
-        CP6      3.9    3.5    4.5         67.5
-        CP7      3.7    3.1    4.1         67.5
-        CP8      3.1    2.6    3.4         67.5
-IC acumulado CP1+CP2: 65.1 a 70.1 %
+        CP1     55.1   52.6   57.7         67.6
+        CP2     12.5   12.3   12.9         67.6
+        CP3      8.9    7.9   10.0         67.6
+        CP4      6.7    6.1    7.6         67.6
+        CP5      6.1    5.3    6.7         67.6
+        CP6      3.9    3.5    4.5         67.6
+        CP7      3.7    3.1    4.0         67.6
+        CP8      3.1    2.6    3.4         67.6
+IC acumulado CP1+CP2: 65.2 a 70.3 %
 
 == Cargas CP1-CP3 ==
                   PC1   PC2   PC3
-Aroma           -0.33 -0.09  0.51
+Aroma           -0.33 -0.08  0.51
 Sabor           -0.41  0.10  0.27
 Retrogusto      -0.40 -0.01 -0.17
 Acidez          -0.35  0.00  0.42
-Cuerpo          -0.34  0.07 -0.57
+Cuerpo          -0.34  0.07 -0.56
 Balance         -0.40  0.01 -0.36
 Puntaje.Catador -0.41  0.03 -0.05
 Altitud         -0.05 -0.99 -0.06
