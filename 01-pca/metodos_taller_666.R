@@ -3,7 +3,7 @@ library(Rtsne)
 library(uwot)
 
 set.seed(2026)
-obj <- readRDS("datos_final_666.rds")
+obj <- readRDS("../datos/datos_final_666.rds")
 datos <- obj$datos_limpio
 X <- scale(datos)
 p <- ncol(datos)
@@ -71,7 +71,7 @@ plot(um5[, 1], um5[, 2], pch = 19, cex = 0.5, col = adjustcolor("purple", 0.5),
      xlab = "UMAP1", ylab = "UMAP2", main = "UMAP (vecinos = 5)")
 dev.off()
 
-saveRDS(res, "resultados_taller_666.rds")
+saveRDS(res, "../datos/resultados_taller_666.rds")
 cat("Varianza total:", round(res$varianza_total, 3), "\n")
 cat("Varianza generalizada:", signif(res$varianza_generalizada, 3), "\n")
 cat("PCA % varianza:", round(res$pca_var[1:4], 1), "\n")

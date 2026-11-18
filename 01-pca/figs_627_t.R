@@ -1,5 +1,5 @@
 suppressMessages({library(ggplot2)})
-obj <- readRDS("datos_final_627.rds")
+obj <- readRDS("../datos/datos_final_627.rds")
 Z <- scale(obj$datos_limpio); R <- obj$datos_originales; T <- obj$datos_limpio
 pca <- prcomp(Z, center = TRUE, scale. = TRUE); sc <- as.data.frame(pca$x); n <- nrow(Z)
 ve <- round(summary(pca)$importance[2, ] * 100, 1)

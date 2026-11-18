@@ -4,10 +4,10 @@ b <- d[!is.na(d$altitude_mean_meters) & d$altitude_mean_meters > 0 & d$altitude_
 b <- b[complete.cases(b[, vars14]), ]
 z0 <- b$Moisture == 0
 cat("Humedad=0 en base:", sum(z0), "de", nrow(b), "=", round(mean(z0) * 100, 1), "%\n")
-for (base in c("base_1070.rds", "base_sin_atipicos.rds")) {
+for (base in c("../datos/base_1070.rds", "../datos/base_sin_atipicos.rds")) {
   obj <- readRDS(base); X <- as.matrix(obj$Z)
   # rows of the base correspond to b (1070) or b[keep] (sin atipicos): use names via matching on the 8 raw columns
-  if (base == "base_1070.rds") idx <- seq_len(nrow(b)) else {
+  if (base == "../datos/base_1070.rds") idx <- seq_len(nrow(b)) else {
     md <- mahalanobis(X, colMeans(X), cov(X)); idx <- which(md <= qchisq(0.975, 8)) }
   zz <- z0[idx]
   D <- as.matrix(dist(X))

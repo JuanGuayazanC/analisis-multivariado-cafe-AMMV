@@ -1,4 +1,4 @@
-obj <- readRDS("datos_final_666.rds")
+obj <- readRDS("../datos/datos_final_666.rds")
 datos <- obj$datos_limpio
 dir.create("figuras_presentacion", showWarnings = FALSE)
 

@@ -12,8 +12,8 @@ configs <- list(
   list(name = "anovadot", kernel = "anovadot", kpar = list(sigma = 1, degree = 1)),
   list(name = "splinedot", kernel = "splinedot", kpar = list())
 )
-for (base in c("base_1070.rds", "base_sin_atipicos.rds")) {
-  tag <- if (base == "base_1070.rds") "1070" else "sin_atip"
+for (base in c("../datos/base_1070.rds", "../datos/base_sin_atipicos.rds")) {
+  tag <- if (base == "../datos/base_1070.rds") "1070" else "sin_atip"
   X <- psi <- readRDS(base)$Z
   p <- ncol(X)
   dir.create(paste0("figuras_kpca_", tag), showWarnings = FALSE)

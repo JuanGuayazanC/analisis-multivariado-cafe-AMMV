@@ -46,4 +46,4 @@ saveRDS(list(datos_limpio = datos_limpio,
              lambdas = lambdas_sel,
              idx_atipicos = idx_atipicos,
              datos_originales = datos[-idx_atipicos, ]),
-        "datos_final_666.rds")
+        "../datos/datos_final_666.rds")

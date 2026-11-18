@@ -8,7 +8,7 @@ dir.create("figuras_revision_profesor", showWarnings = FALSE)
 th <- theme_minimal(base_size = 14) + theme(legend.position = "bottom")
 lim <- qchisq(0.975, 8)
 
-base <- readRDS("base_1070.rds")
+base <- readRDS("../datos/base_1070.rds")
 T1070 <- base$trans
 pre <- prcomp(T1070, center = TRUE, scale. = TRUE)
 out1 <- rowSums((pre$x / pre$sdev)^2) > lim
@@ -29,7 +29,7 @@ g2 <- ggplot(p2, aes(CP1, CP2, color = Lote)) + geom_point(alpha = 0.7, size = 1
 ggsave("figuras/revision_profesor/seq2_pca666_atipicos.png", g2, width = 8, height = 6, dpi = 200)
 
 # PCA final oficial: 627 lotes con λ re-estimados (datos_final_627.rds)
-fin <- readRDS("datos_final_627.rds")
+fin <- readRDS("../datos/datos_final_627.rds")
 F627 <- fin$datos_limpio
 names(F627) <- names(T1070)
 stopifnot(nrow(F627) == sum(!out2))

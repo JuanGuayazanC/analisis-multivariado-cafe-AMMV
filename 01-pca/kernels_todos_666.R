@@ -1,7 +1,7 @@
 library(kernlab)
 
 set.seed(2026)
-obj <- readRDS("datos_final_666.rds")
+obj <- readRDS("../datos/datos_final_666.rds")
 X <- as.data.frame(scale(obj$datos_limpio))
 p <- ncol(X)
 dir.create("figuras_kpca_666", showWarnings = FALSE)

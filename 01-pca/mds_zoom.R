@@ -1,5 +1,5 @@
 suppressMessages(library(MASS))
-X <- as.matrix(readRDS("base_1070.rds")$Z)
+X <- as.matrix(readRDS("../datos/base_1070.rds")$Z)
 set.seed(2026)
 nm <- isoMDS(dist(X), k = 2, trace = FALSE)
 p <- nm$points

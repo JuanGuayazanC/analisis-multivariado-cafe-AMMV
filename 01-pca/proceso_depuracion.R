@@ -1,5 +1,5 @@
 suppressMessages(library(ggplot2))
-b <- readRDS("base_1070.rds")
+b <- readRDS("../datos/base_1070.rds")
 T <- b$trans
 pre <- prcomp(T, center = TRUE, scale. = TRUE)
 dm2_pre <- rowSums((pre$x / pre$sdev)^2)

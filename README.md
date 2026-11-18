@@ -46,23 +46,24 @@ un solo dataset para las 17 semanas del semestre.
 
 ## Estructura del proyecto
 
+Cada tema tiene su carpeta con su `.Rmd` (el HTML generado es el anexo que se
+abre si preguntan por ese tema), sus scripts y sus figuras. Los datos
+intermedios compartidos están en `datos/`.
+
 ```
-├── data/
-│   └── arabica_data_cleaned.csv        ← dataset original (no modificar)
-│
-├── docs/
-│   ├── guion_presentacion.txt          ← guion de la presentación (texto)
-│   └── guion_presentacion_AMMV.pdf     ← guion de la presentación (PDF)
+├── data/                               ← CSV original (no modificar)
+├── datos/                              ← .rds intermedios compartidos (leídos por 01-pca y shiny)
+├── presentacion/                       ← guion de la presentación (texto y PDF)
 │
 ├── 00-eda/                             ← Semanas 2-3: EDA, matrices, distancias
-├── 01-pca/                             ← PCA, Kernel PCA, t-SNE, UMAP, Shiny (ver abajo)
-│   ├── figuras/                        ← todas las figuras generadas, por tema
-│   │   ├── revision_profesor/          ← figuras de la revisión del profesor (PCA y agrupamiento)
+├── 01-pca/                             ← PCA, Kernel PCA, t-SNE, UMAP
+│   ├── figuras/                        ← figuras generadas, por tema
+│   │   ├── revision_profesor/          ← revisión del profesor (PCA y agrupamiento)
 │   │   ├── presentacion/               ← figuras usadas en la presentación
-│   │   ├── kpca_666/                   ← Kernel PCA (matriz de 666 lotes)
-│   │   ├── taller_666/                 ← figuras del taller PCA (666 lotes)
-│   │   ├── pca_revision/               ← figuras de revisión PCA
-│   │   └── proceso/                    ← figuras del proceso de depuración
+│   │   ├── kpca_666/                   ← Kernel PCA (666 lotes)
+│   │   ├── taller_666/                 ← taller PCA (666 lotes)
+│   │   ├── pca_revision/               ← revisión PCA
+│   │   └── proceso/                    ← proceso de depuración de atípicos
 │   ├── informe_taller_pca.Rmd/.html    ← informe del PCA (demo de GitHub)
 │   ├── informe_antes.Rmd/.html         ← PCA con 14 variables (estado previo)
 │   ├── informe_despues.Rmd/.html       ← PCA corregido: 11 variables + YJ
@@ -75,7 +76,7 @@ un solo dataset para las 17 semanas del semestre.
 ├── 06-regresion/                       ← Semana 14: regresión lineal multivariada
 ├── 07-proyecto-final/                  ← Semanas 15-17: comparación integrada
 ├── shiny/
-│   └── app.R                           ← Explorador PCA interactivo
+│   └── app.R                           ← explorador PCA interactivo
 └── imagenes_presentacion/              ← imágenes usadas en la presentación
 ```
 

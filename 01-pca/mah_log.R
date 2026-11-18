@@ -1,5 +1,5 @@
 suppressMessages(library(ggplot2))
-Z <- readRDS("base_1070.rds")$Z
+Z <- readRDS("../datos/base_1070.rds")$Z
 md2 <- mahalanobis(Z, colMeans(Z), cov(Z)); lim <- qchisq(0.975, 8)
 df <- data.frame(l = log10(md2), out = md2 > lim)
 g <- ggplot(df, aes(l, fill = out)) + geom_histogram(bins = 45, color = "white") +

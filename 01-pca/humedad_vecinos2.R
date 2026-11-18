@@ -3,9 +3,9 @@ vars14 <- c("Aroma","Flavor","Aftertaste","Acidity","Body","Balance","Uniformity
 b <- d[!is.na(d$altitude_mean_meters) & d$altitude_mean_meters > 0 & d$altitude_mean_meters <= 3000, ]
 b <- b[complete.cases(b[, vars14]), ]
 z0 <- b$Moisture == 0
-X1 <- as.matrix(readRDS("base_1070.rds")$Z)
+X1 <- as.matrix(readRDS("../datos/base_1070.rds")$Z)
 md1 <- mahalanobis(X1, colMeans(X1), cov(X1)); keep <- md1 <= qchisq(0.975, 8)
-Xs <- as.matrix(readRDS("base_sin_atipicos.rds")$Z)
+Xs <- as.matrix(readRDS("../datos/base_sin_atipicos.rds")$Z)
 stats <- function(X, zz) {
   D <- as.matrix(dist(X)); diag(D) <- Inf
   nb <- t(apply(D, 1, function(r) order(r)[1:15]))

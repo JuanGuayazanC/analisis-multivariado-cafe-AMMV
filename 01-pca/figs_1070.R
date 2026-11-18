@@ -1,5 +1,5 @@
 suppressMessages({library(ggplot2); library(car)})
-obj <- readRDS("base_1070.rds")
+obj <- readRDS("../datos/base_1070.rds")
 Z <- obj$Z; R <- obj$raw; T <- obj$trans; n <- nrow(Z)
 pca <- prcomp(Z, center = TRUE, scale. = TRUE)
 sc <- as.data.frame(pca$x)

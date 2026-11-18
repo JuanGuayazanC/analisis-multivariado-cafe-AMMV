@@ -6,9 +6,9 @@ library(car)
 # ── Preprocesamiento ──────────────────────────────────────────────────────────
 
 # ── Matriz final de 627 lotes (pipeline oficial, misma que el informe) ─────
-# Cargada desde 01-pca/datos_final_627.rds: ya incluye la depuración de atípicos
+# Cargada desde datos/datos_final_627.rds: ya incluye la depuración de atípicos
 # y las lambdas Yeo-Johnson estimadas sobre la matriz final.
-obj_final <- readRDS("../01-pca/datos_final_627.rds")
+obj_final <- readRDS("../datos/datos_final_627.rds")
 
 rename_map <- c(Aroma = "Aroma", Flavor = "Sabor", Aftertaste = "Retrogusto",
                 Acidity = "Acidez", Body = "Cuerpo", Balance = "Balance",

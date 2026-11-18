@@ -15,7 +15,7 @@ data_f <- data %>%
   filter(!is.na(altitude_mean_meters))
 datos14 <- data_f %>% select(all_of(vars14))
 
-obj <- readRDS("datos_final_666.rds")
+obj <- readRDS("../datos/datos_final_666.rds")
 datos666 <- obj$datos_limpio
 vars8 <- names(datos666)
 

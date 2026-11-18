@@ -1,6 +1,6 @@
 suppressMessages({library(uwot); library(Rtsne)})
-for (base in c("base_1070.rds", "base_sin_atipicos.rds")) {
-  tag <- if (base == "base_1070.rds") "1070" else "sin_atip"
+for (base in c("../datos/base_1070.rds", "../datos/base_sin_atipicos.rds")) {
+  tag <- if (base == "../datos/base_1070.rds") "1070" else "sin_atip"
   X <- as.matrix(readRDS(base)$Z)
   n <- nrow(X)
   dir.create(paste0("figuras_umap_tsne_", tag), showWarnings = FALSE)

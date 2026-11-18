@@ -1,8 +1,8 @@
 suppressMessages(library(cluster))
 has_db <- requireNamespace("dbscan", quietly = TRUE)
 res <- list()
-for (base in c("base_1070.rds", "base_sin_atipicos.rds")) {
-  tag <- if (base == "base_1070.rds") "1070" else "sin_atip"
+for (base in c("../datos/base_1070.rds", "../datos/base_sin_atipicos.rds")) {
+  tag <- if (base == "../datos/base_1070.rds") "1070" else "sin_atip"
   X <- as.matrix(readRDS(base)$Z); n <- nrow(X); D <- dist(X)
   cat("\n== base", tag, "n =", n, "\n")
   set.seed(2026)

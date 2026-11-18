@@ -1,4 +1,4 @@
-obj <- readRDS("datos_final_627.rds")
+obj <- readRDS("../datos/datos_final_627.rds")
 R <- obj$datos_originales[, c("Aroma","Flavor","Aftertaste","Acidity","Body","Balance","Cupper.Points","altitude_mean_meters")]
 names(R) <- c("Aroma","Flavor","Aftertaste","Acidity","Body","Balance","Cupper.Points","Altitud")
 S <- cov(R); Rc <- cor(R)

@@ -22,7 +22,7 @@ b <- b[complete.cases(b[, vars14]), ]
 meta <- b[, c("Processing.Method", "Color")]
 X8 <- b[, c("Aroma","Flavor","Aftertaste","Acidity","Body","Balance","Cupper.Points","altitude_mean_meters")]
 names(X8) <- c("Aroma","Sabor","Retrogusto","Acidez","Cuerpo","Balance","Puntaje.Catador","Altitud")
-base <- readRDS("base_1070.rds")
+base <- readRDS("../datos/base_1070.rds")
 T1070 <- base$trans
 lim <- qchisq(0.975, 8)
 pre <- prcomp(T1070, center = TRUE, scale. = TRUE)
@@ -32,14 +32,14 @@ Zm <- scale(M)
 out2 <- mahalanobis(Zm, colMeans(Zm), cov(Zm)) > lim
 keep_idx <- which(!out1)[!out2]
 # Matriz final oficial: mismos 627 lotes (mismo orden), con λ Yeo-Johnson re-estimados sobre los 627
-fin <- readRDS("datos_final_627.rds")
+fin <- readRDS("../datos/datos_final_627.rds")
 F627 <- fin$datos_limpio
 names(F627) <- names(X8)
 stopifnot(isTRUE(all.equal(as.matrix(fin$datos_originales), as.matrix(X8[keep_idx, ]), check.attributes = FALSE)))
 meta627 <- meta[keep_idx, ]
 raw627 <- X8[keep_idx, ]
 add("n inicial 1070 = ", nrow(X8), "; atipicos 1a pasada = ", sum(out1), "; 2a pasada = ", sum(out2), "; n final = ", nrow(F627))
-add("Verificacion contra datos_final_627.rds: ", nrow(readRDS("datos_final_627.rds")$datos_limpio) == nrow(F627))
+add("Verificacion contra datos_final_627.rds: ", nrow(readRDS("../datos/datos_final_627.rds")$datos_limpio) == nrow(F627))
 
 # ---- 2. Simetría y diagrama de cajas (clásico vs ajustado) ----
 mc <- sapply(X8, function(x) mc(x))
