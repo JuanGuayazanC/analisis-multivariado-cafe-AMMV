@@ -14,12 +14,32 @@ output:
 knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, fig.align = "center")
 ```
 
-> Este documento reúne la cadena de depuración que usan todos los análisis de PCA y métodos posteriores. Para el resultado final del PCA ver `pca_final.Rmd`.
+> Este documento explica cómo se construyó y verificó la matriz utilizada por el PCA. El resultado estadístico que se presenta como definitivo está desarrollado en [pca_final.Rmd](pca_final.Rmd).
+
+## Cómo leer este informe
+
+La ruta principal tiene tres momentos: **(1) caracterizar la base inicial de 1.070 lotes, (2) documentar la selección sucesiva de observaciones hasta llegar a 627 y (3) reconstruir y contrastar el objeto final guardado en `datos/datos_final_627.rds`**.
+
+Hay dos procedimientos que conviene distinguir:
+
+- La primera sección genera objetos de preparación y una selección exploratoria basada en Mahalanobis sobre la matriz estandarizada de 1.070 lotes. Es una rama de preparación y diagnóstico.
+- La secuencia que se presenta como **1.070 → 666 → 627** se desarrolla en las secciones 3 y 5. Allí se calculan distancias a partir de scores del PCA preliminar y, después, sobre la matriz de 666 lotes.
+
+Por tanto, no se deben intercambiar automáticamente los objetos `base_sin_atipicos.rds`, `datos_final_666.rds` y `datos_final_627.rds`: corresponden a etapas y construcciones distintas del documento.
+
+**Alcance:** los bloques de código de este informe se conservan como fuente del procedimiento. Las explicaciones que siguen describen lo que ejecuta cada bloque; no implican que se haya vuelto a ejecutar R al editar este documento.
 
 
-# 1. Base de 1.070 lotes y transformación Yeo-Johnson selectiva
+# 1. Preparación inicial de la base de 1.070 lotes
 
-Filtro original (altitud entre 0 y 3.000 m, sin NA), 8 variables, Yeo-Johnson solo en las variables con |asimetría| > 1, y estandarización. Se guardan `base_1070.rds` y `base_sin_atipicos.rds` en `datos/`.
+Se parte del archivo original y se aplica el filtro de altitud (mayor que 0 y hasta 3.000 metros), junto con la eliminación de registros incompletos en las 14 variables indicadas en el código. Para el preprocesamiento de esta sección se seleccionan después **8 variables**: siete atributos sensoriales y la altitud.
+
+La transformación Yeo-Johnson se aplica selectivamente a las variables cuya asimetría absoluta supera 1. Después se estandariza la matriz. El bloque estima los parámetros sobre la base que recibe y construye dos objetos:
+
+- `base_1070.rds`: matriz inicial transformada y estandarizada.
+- `base_sin_atipicos.rds`: subconjunto obtenido mediante el umbral de Mahalanobis aplicado directamente a esa matriz estandarizada.
+
+**Nota metodológica:** esta selección inicial no debe confundirse con la secuencia posterior 1.070 → 666 → 627, que utiliza el procedimiento descrito en la sección 3.
 
 ```{r 1-cadena}
 # Preprocesamiento común para todos los métodos.
@@ -61,9 +81,13 @@ cat("1070:", nrow(p1070$Z), " YJ:", p1070$yj, "\n")
 cat("sin atipicos:", nrow(psin$Z), " eliminados:", sum(!keep), " YJ:", psin$yj, "\n")
 ```
 
-# 2. Distancia de Mahalanobis en la base de 1.070
+# 2. Diagnóstico de Mahalanobis sobre la base inicial
 
-Umbral χ² al 97,5 % con 8 grados de libertad. Las figuras de este documento se guardan en `figuras/proceso/`.
+Se calcula la distancia de Mahalanobis para los 1.070 registros de la matriz estandarizada y se compara con el cuantil 97,5 % de una distribución chi-cuadrado con 8 grados de libertad. El histograma representa las distancias en escala logarítmica y marca el umbral utilizado.
+
+Esta sección permite visualizar cuántos registros quedan por encima del criterio en esta matriz. **Estar por encima del umbral significa ser identificado como atípico bajo este diagnóstico; la interpretación de su exclusión debe leerse dentro de la secuencia de depuración documentada más adelante.**
+
+Las figuras generadas por el bloque se guardan en `figuras/proceso/`.
 
 ```{r 2-cadena}
 suppressMessages(library(ggplot2))
@@ -79,9 +103,26 @@ ggsave("figuras/proceso/1070_mahalanobis.png", g, width = 8, height = 6.5, dpi =
 cat("ok\n")
 ```
 
-# 3. Cadena de depuración: 1.070 → 666 → 627
+# 3. Secuencia principal de depuración: 1.070 → 666 → 627
 
-Cuatro pasos: PCA preliminar, PCA sobre 666, Mahalanobis sobre la matriz de 666 y PCA final. El PCA final oficial de 627 lotes está en `pca_final.Rmd`.
+Esta es la sección central para explicar la reducción de la muestra. El código sigue cuatro momentos:
+
+1. **PCA preliminar sobre 1.070 lotes:** calcula scores y obtiene una distancia basada en los scores estandarizados por la desviación de cada componente. Los registros que superan el umbral chi-cuadrado se marcan en esta primera etapa.
+2. **Matriz de 666 lotes:** se retiran los 404 registros identificados en el primer paso y se ajusta un nuevo PCA sobre los 666 restantes.
+3. **Segundo diagnóstico:** se calcula Mahalanobis sobre la matriz de 666 lotes estandarizada. El criterio identifica 39 registros por encima del umbral.
+4. **Matriz de 627 lotes:** se conservan los registros que no superan el segundo umbral y se ajusta el PCA correspondiente a esta etapa.
+
+La secuencia documentada queda así:
+
+| Etapa | Lotes | Cambio |
+|---|---:|---:|
+| Base inicial | 1.070 | — |
+| Después del primer criterio | 666 | 404 identificados |
+| Después del segundo criterio | 627 | 39 identificados |
+
+El código imprime los conteos y las varianzas explicadas en cada ajuste. Los porcentajes de varianza de los PCA preliminares pertenecen a sus respectivas matrices y **no deben presentarse como porcentajes del PCA final**.
+
+El PCA final oficial, con la preparación reestimada sobre los 627 registros, se desarrolla en [pca_final.Rmd](pca_final.Rmd).
 
 ```{r 3-cadena}
 suppressMessages(library(ggplot2))
@@ -113,9 +154,13 @@ ggsave("figuras/proceso/paso3_mahalanobis_666.png", ggplot(data.frame(l = log10(
   width = 8, height = 6.5, dpi = 200, bg = "transparent")
 ```
 
-# 4. Matriz final de 666 lotes
+# 4. Reconstrucción del objeto de 666 lotes
 
-Yeo-Johnson con λ re-estimados sobre la matriz de 8 variables, retiro de atípicos y guardado en `datos/datos_final_666.rds`.
+Este bloque vuelve a construir la matriz de análisis de 8 variables desde el CSV, aplica la transformación Yeo-Johnson a las variables que cumplen el criterio de asimetría y utiliza el diagnóstico basado en los scores del PCA preliminar para identificar los registros que se retiran.
+
+El objeto resultante se guarda en `datos/datos_final_666.rds` e incluye la matriz transformada, las variables transformadas, los parámetros estimados y los índices de los registros identificados. También conserva los datos originales correspondientes a los registros retenidos.
+
+Esta reconstrucción permite disponer de un objeto intermedio explícito para los análisis posteriores. Sus cifras de varianza corresponden al PCA de 666 lotes, no al PCA final de 627.
 
 ```{r 4-cadena}
 library(dplyr)
@@ -184,9 +229,21 @@ bb <- bb[complete.cases(bb[, vars14]), ]
 X8 <- bb[, c("Aroma","Flavor","Aftertaste","Acidity","Body","Balance","Cupper.Points","altitude_mean_meters")]
 ```
 
-# 5. Matriz final de 627 lotes (`datos/datos_final_627.rds`)
+# 5. Reconstrucción y verificación de la matriz final de 627 lotes
 
-Reconstruye el objeto final de 627 lotes a partir de la cadena anterior. Las variables transformadas son las 7 que tenían |asimetría| > 1 en la base de 1.070; sus λ se re-estiman sobre los 627 lotes. El chunk compara el resultado con el archivo existente y **no lo sobrescribe**.
+El último bloque reconstruye los índices de retención de la secuencia anterior y recupera las filas correspondientes desde la base original. Luego toma el objeto existente `datos_final_627.rds` y realiza tres comprobaciones:
+
+1. **Correspondencia de filas originales:** compara los datos originales conservados en el objeto con las filas reconstruidas.
+2. **Parámetros Yeo-Johnson:** reestima los parámetros sobre los 627 registros para las variables transformadas y calcula la diferencia frente a los parámetros almacenados.
+3. **Matriz transformada:** compara la matriz reconstruida con `datos_limpio` del objeto guardado.
+
+El bloque imprime las diferencias y **no sobrescribe** el archivo RDS existente. Esto permite verificar la correspondencia entre la reconstrucción y el objeto que utiliza el PCA final.
+
+## Lectura final para la sustentación
+
+La muestra que llega al PCA oficial contiene **627 lotes y 8 variables**. La transformación Yeo-Johnson se vuelve a estimar sobre esos 627 registros y, posteriormente, se estandarizan las variables para ajustar el PCA. Para interpretar la selección de componentes, las cargas y los scores, continúa con [PCA final](pca_final.Rmd).
+
+**Precaución:** los objetos de 1.070, 666 y 627 registros representan etapas diferentes. No combines sus porcentajes de varianza, scores o cargas como si provinieran de un mismo ajuste.
 
 ```{r final627}
 suppressMessages(library(car))
