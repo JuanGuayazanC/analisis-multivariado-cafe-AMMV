@@ -26,8 +26,8 @@ Las figuras de esta sección se guardan en `figuras/secuencia/`.
 # Figuras de la secuencia de depuración, en el orden en que se presentan:
 # 1) PCA de 1.070 lotes con atípicos marcados (404)
 # 2) PCA de 666 lotes con atípicos marcados (39)
-# 3) PCA final de 627 lotes
-# 4) Cargas CP1-CP3 como mapa de calor
+# 3) Ajuste del PCA final sobre 627 lotes (sin dispersión de scores en este bloque)
+# 4) Cargas CP1-CP3 del PCA final como mapa de calor
 suppressMessages(library(ggplot2))
 
 th <- theme_minimal(base_size = 14) + theme(legend.position = "bottom")
