@@ -14,9 +14,13 @@ output:
 knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, fig.align = "center")
 ```
 
-# 1. PCA de 1.070 lotes, 666 y 627: secuencia de atípicos
+# 1. Secuencia de depuración: 1.070 → 666 → 627 lotes
 
-Muestra en qué paso sale cada grupo de atípicos. Las figuras se guardan en `figuras/secuencia/`.
+Esta sección reconstruye las dos etapas de identificación multivariada de observaciones extremas. La primera dispersión corresponde al PCA preliminar de 1.070 lotes y marca los 404 registros identificados en esa etapa. La segunda corresponde al PCA ajustado sobre los 666 registros restantes y marca los 39 identificados en la segunda etapa.
+
+**Alcance de la figura final:** el código también ajusta un PCA sobre `datos_final_627.rds`, pero en este bloque no dibuja la dispersión de sus scores. La salida correspondiente a 627 es un mapa de calor de las cargas de CP1–CP3. Para la varianza explicada, los scores, el biplot y la interpretación del modelo definitivo, utiliza [PCA final](pca_final.Rmd).
+
+Las figuras de esta sección se guardan en `figuras/secuencia/`.
 
 ```{r fig1}
 # Figuras de la secuencia de depuración, en el orden en que se presentan:
@@ -49,7 +53,7 @@ g2 <- ggplot(p2, aes(CP1, CP2, color = Lote)) + geom_point(alpha = 0.7, size = 1
   labs(title = sprintf("PCA de 666 lotes: %d atípicos más", sum(out2)), x = sprintf("CP1 (%.1f %%)", 100 * summary(p666)$importance[2, 1]), y = sprintf("CP2 (%.1f %%)", 100 * summary(p666)$importance[2, 2]), color = NULL) + th
 ggsave("figuras/secuencia/seq2_pca666_atipicos.png", g2, width = 8, height = 6, dpi = 200)
 
-# PCA final oficial: 627 lotes con λ re-estimados (datos_final_627.rds)
+# PCA final oficial: 627 lotes con λ reestimados (`datos_final_627.rds`). En este bloque se obtienen las cargas; no se genera una gráfica de scores para esta muestra.
 fin <- readRDS("../datos/datos_final_627.rds")
 F627 <- fin$datos_limpio
 names(F627) <- names(T1070)
@@ -68,9 +72,11 @@ cat("n1070", length(out1), "out1", sum(out1), "out2", sum(out2), "final", nrow(F
 
 ```
 
-# 2. Justificación: cajas ajustadas, correlaciones, varianzas y biplot
+# 2. Diagnósticos y figuras de etapas exploratorias
 
-Figuras de la justificación del preprocesamiento y del biplot limpio. Escriben en `figuras/secuencia/` y no reemplazan las figuras de `imagenes_presentacion/`.
+Esta sección **no corresponde a un único ajuste PCA ni a una única muestra**. Combina diagnósticos descriptivos de la base inicial filtrada (1.070 lotes), resúmenes calculados sobre la matriz intermedia de 666 lotes y un diagnóstico exploratorio adicional que mezcla datos de 1.070 con lambdas almacenadas en el objeto de 666. Por tanto, sus gráficas no deben leerse como resultados homogéneos del PCA final de 627.
+
+Las salidas se guardan en `figuras/secuencia/` y no reemplazan las figuras de `imagenes_presentacion/`.
 
 ```{r fig2}
 library(dplyr)
@@ -114,7 +120,7 @@ barplot(c(Sweetness = mean(datos14$Sweetness == 10), Uniformity = mean(datos14$U
         ylab = "% de lotes con valor 10", main = "Inflación de máximos")
 dev.off()
 
-# 3. Asimetría antes y después de Yeo-Johnson (8 variables)
+# 3. Asimetría: base inicial frente a matriz intermedia de 666 lotes (8 variables)
 skew <- function(x) mean((x - mean(x))^3) / sd(x)^3
 datos8_pre <- datos14[, vars8]
 sk_pre <- sapply(datos8_pre, skew)
@@ -124,12 +130,12 @@ barplot(sk_pre, las = 2, col = ifelse(abs(sk_pre) > 1, "firebrick", "steelblue")
         main = "Asimetría antes de Yeo-Johnson", ylab = "Asimetría")
 abline(h = c(-1, 1), lty = 2)
 sk_post <- sapply(datos666, skew)
-barplot(sk_post, las = 2, col = "steelblue", main = "Asimetría en la matriz final (666 lotes)",
+barplot(sk_post, las = 2, col = "steelblue", main = "Asimetría en la matriz intermedia (666 lotes)",
         ylab = "Asimetría")
 abline(h = c(-1, 1), lty = 2)
 dev.off()
 
-# 4. Varianzas y covarianzas (matriz final)
+# 4. Varianzas y covarianzas de la matriz intermedia de 666 lotes
 S <- cov(datos666)
 png(out("04_varianzas_covarianzas.png"), width = as.integer(1500*1.6), height = as.integer(1000*1.6), res = 220)
 par(mfrow = c(1, 2), mar = c(8, 8, 3, 1))
@@ -149,7 +155,7 @@ barplot(diag(S), las = 2, col = "#8fb8a8", log = "y",
         ylab = "Varianza (log)")
 dev.off()
 
-# 5. Mahalanobis (PCA exploratorio sobre datos transformados, 1.070 lotes)
+# 5. Diagnóstico exploratorio de Mahalanobis sobre 1.070 filas
 datos_t <- datos8_pre
 for (v in names(obj$lambdas)) datos_t[[v]] <- car::yjPower(datos_t[[v]], obj$lambdas[v])
 pca_p <- prcomp(datos_t, center = TRUE, scale. = TRUE)
@@ -204,9 +210,9 @@ dev.off()
 
 ```
 
-# 3. Varianzas y correlaciones de la matriz de 627 lotes
+# 3. Matriz original: varianzas y correlaciones de los 627 lotes
 
-Figura de varianzas y correlaciones de la matriz final.
+Este bloque utiliza `datos_final_627.rds`, pero toma `datos_originales`: calcula covarianzas y correlaciones en la escala original de las ocho variables, no sobre la matriz Yeo-Johnson estandarizada que alimenta el PCA. Es una descripción de la muestra final en escala original; no debe confundirse con las cargas ni con la varianza explicada del PCA.
 
 ```{r fig3}
 obj <- readRDS("../datos/datos_final_627.rds")
@@ -227,9 +233,11 @@ dev.off()
 
 ```
 
-# 4. Humedad = 0 en las vecindades
+# 4. Humedad = 0 y vecindades: comprobación exploratoria
 
-Proporción de vecinos con Humedad = 0 frente a la base total.
+Este bloque compara la proporción de registros con `Moisture = 0` con la proporción observada entre sus 15 vecinos más cercanos en matrices transformadas. La correspondencia entre las filas de `z0` (construida desde la base inicial de 1.070) y las filas de `base_sin_atipicos.rds` depende de que se conserve exactamente el orden original de las observaciones. El código no reconstruye explícitamente los identificadores originales de esas filas; por eso, **no conviene defender la comparación de vecindades como evidencia concluyente hasta verificar esa correspondencia**.
+
+Además, observar humedad igual a cero no demuestra por sí solo que el valor sea faltante o inválido.
 
 ```{r fig4}
 d <- read.csv("../data/arabica_data_cleaned.csv")
