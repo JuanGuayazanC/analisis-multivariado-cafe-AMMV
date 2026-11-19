@@ -8,7 +8,7 @@ Este módulo documenta la preparación de los datos, el análisis de componentes
 |---|---|---|
 | 1 | [Depuración: 1.070 → 666 → 627 (HTML)](https://juanguayazanc.github.io/analisis-multivariado-cafe-AMMV/01-pca/depuracion.html) | Si preguntan cómo se construyó la matriz final y qué ocurrió en cada etapa. |
 | 2 | [PCA final: 627 lotes y 8 variables (HTML)](https://juanguayazanc.github.io/analisis-multivariado-cafe-AMMV/01-pca/pca_final.html) | Para explicar el modelo oficial, la selección de componentes, los scores, las cargas y el biplot. |
-| 3 | [Secuencia de figuras PCA (HTML)](https://juanguayazanc.github.io/analisis-multivariado-cafe-AMMV/01-pca/figuras_pca.html) | Para mostrar la secuencia visual de depuración y figuras de justificación. Hay secciones que corresponden a etapas distintas. |
+| 3 | [Secuencia de figuras PCA (HTML)](https://juanguayazanc.github.io/analisis-multivariado-cafe-AMMV/01-pca/figuras_pca.html) | Como apoyo visual secundario. La fuente distingue ahora diagnósticos de 1.070, 666 y 627; el HTML publicado debe regenerarse para reflejar esa explicación. |
 
 ## Fuentes reproducibles
 
