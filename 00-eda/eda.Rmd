@@ -18,14 +18,33 @@ knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE,
                       fig.align = "center", fig.width = 8, fig.height = 6)
 ```
 
-> **Semanas 2-3 del programa:** Matriz de datos, tipos de variables, preparación,
-> escalamiento, estandarización, visualización exploratoria. Medidas de localización
-> y dispersión multivariada: medias, matriz de varianzas y covarianzas, matriz de
-> correlaciones y varianza generalizada.
+> **Semanas 2–3 del programa:** matriz de datos, tipos de variables, preparación, escalamiento, estandarización y visualización exploratoria. Se estudian medidas de localización y dispersión multivariada mediante medias, covarianzas, correlaciones, varianza total y varianza generalizada.
+
+## Cómo leer este informe
+
+Este documento tiene dos niveles que deben distinguirse:
+
+- **Análisis principal:** trabaja con 11 variables continuas para calcular estadísticos, visualizaciones, distancias y diagnósticos multivariados.
+- **Anexo complementario:** presenta gráficos exploratorios de las 14 variables cuantitativas originales. Es una ampliación visual y no cambia la matriz de 11 variables usada en los cálculos principales.
+
+La base se filtra por altitud y por registros completos en las 14 variables seleccionadas. El tamaño de muestra resultante se imprime durante la ejecución del primer bloque.
+
+**Pregunta que responde:** ¿cómo se distribuyen las variables, qué relaciones presentan y qué aspectos conviene considerar antes de aplicar métodos multivariados?
+
+La preparación específica que lleva a la matriz del PCA se documenta por separado en [01-pca/depuracion.Rmd](../01-pca/depuracion.Rmd).
 
 ---
 
 # 1. Carga y preparación de datos
+
+Se leen los datos limpios de café Arábica y se seleccionan 14 variables cuantitativas. El código conserva los registros cuya altitud está entre 0 y 3.000 metros (sin incluir valores faltantes) y elimina filas incompletas en cualquiera de las 14 variables seleccionadas.
+
+Después de preparar la tabla, se definen dos conjuntos para el análisis:
+
+- 11 variables continuas para los cálculos multivariados principales.
+- 3 variables con inflación de ceros —humedad y defectos de categorías 1 y 2— que se describen por separado en el código.
+
+Este filtro pertenece al EDA y no debe confundirse con la secuencia de depuración posterior del PCA.
 
 ```{r datos}
 library(dplyr)
@@ -77,6 +96,8 @@ cat("\nVariables con inflación de ceros (3):\n"); cat(vars_infladas, sep=", ");
 
 # 2. Estadísticos de localización y dispersión multivariada
 
+Los estadísticos de esta sección se calculan sobre las 11 variables continuas definidas en el código. Permiten describir el centro, la variabilidad individual y la relación lineal entre variables. Como las variables están en escalas distintas, las covarianzas y la traza dependen de las unidades originales; la matriz de correlaciones facilita comparar la intensidad y dirección de las asociaciones lineales.
+
 ## 2.1. Vector de medias
 
 ```{r medias}
@@ -86,6 +107,8 @@ round(mu, 3)
 
 ## 2.2. Matriz de varianzas y covarianzas (S)
 
+La diagonal de S contiene las varianzas de cada variable y los elementos fuera de la diagonal contienen las covarianzas por pares. La traza suma las varianzas individuales; el determinante se presenta como medida de variación generalizada de la matriz.
+
 ```{r covarianza}
 S <- cov(datos[, vars_continuas])
 round(S, 3)
@@ -94,6 +117,8 @@ cat("Varianza generalizada (det S):", formatC(det(S), format="e", digits=3), "\n
 ```
 
 ## 2.3. Matriz de correlaciones (R)
+
+La correlación estandariza la asociación lineal entre cada par de variables, por lo que sus valores están entre −1 y 1. El mapa de calor ordena las variables jerárquicamente para facilitar la lectura de patrones; la correlación no implica causalidad.
 
 ```{r correlacion, fig.width=9, fig.height=8}
 R <- cor(datos[, vars_continuas])
@@ -108,6 +133,8 @@ corrplot(R, method="color", type="upper", order="hclust",
 
 ## 2.4. Varianza generalizada y varianza total
 
+Esta subsección vuelve a presentar la traza, el determinante y la varianza media para resumir la dispersión conjunta de las 11 variables.
+
 ```{r varianza-generalizada}
 cat("Varianza total       (traza S):", round(sum(diag(S)), 2), "\n")
 cat("Varianza generalizada (det S): ", formatC(det(S), format="e", digits=3), "\n")
@@ -117,6 +144,8 @@ cat("Varianza media                :", round(sum(diag(S))/ncol(S), 4), "\n")
 ---
 
 # 3. Visualización exploratoria
+
+Las gráficas permiten observar forma, dispersión, asimetrías y posibles valores extremos. Cada variable conserva su escala original en los boxplots principales, por lo que las magnitudes no son directamente comparables entre variables con unidades distintas.
 
 ## 3.1. Boxplots univariados
 
@@ -137,6 +166,8 @@ datos[, vars_continuas] %>%
 
 ## 3.2. Matriz de dispersión (pares)
 
+La matriz de pares se construye con las primeras seis variables del conjunto de 11. La diagonal muestra distribuciones, el triángulo inferior muestra nubes de puntos y el superior resume correlaciones. Es una vista parcial para facilitar la lectura, no una matriz gráfica de las 11 variables completas.
+
 ```{r pairs, fig.width=11, fig.height=10}
 ggpairs(datos[, vars_continuas[1:6]],
         lower=list(continuous=wrap("points", alpha=0.15, size=0.8, color="#2563a8")),
@@ -148,7 +179,9 @@ ggpairs(datos[, vars_continuas[1:6]],
 
 ---
 
-# 4. Distancias y similitudes
+# 4. Distancias multivariadas
+
+Esta sección ilustra dos formas de medir separación: la distancia euclídea sobre variables estandarizadas y la distancia de Mahalanobis, que incorpora la estructura de covarianza entre variables.
 
 ## 4.1. Distancia euclídea
 
@@ -164,7 +197,9 @@ round(as.matrix(D_euc), 2)
 
 ## 4.2. Distancia de Mahalanobis
 
-La distancia de Mahalanobis tiene en cuenta la covarianza entre variables.
+La distancia de Mahalanobis tiene en cuenta la covarianza entre las 11 variables. El código compara el cuadrado de la distancia con el cuantil 97,5 % de una distribución chi-cuadrado con 11 grados de libertad. Los registros que superan ese umbral se marcan como candidatos atípicos bajo este criterio.
+
+Este es un diagnóstico exploratorio aplicado a la matriz del EDA; no es por sí mismo la regla de selección utilizada para construir la matriz final del PCA.
 Un lote con $d^2_M > \chi^2_{p,0.975}$ se considera multivariadamente atípico.
 
 ```{r mahalanobis}
@@ -199,6 +234,10 @@ data.frame(id=seq_along(dm2), dm2=dm2) %>%
 
 ## 4.3. Comparación de distancias
 
+El código compara la norma euclídea de cada fila estandarizada respecto al origen con la raíz de la distancia de Mahalanobis. **No calcula aquí todas las distancias euclídeas entre pares de lotes**: la matriz de distancias por pares se ilustra con la muestra de 10 observaciones de la subsección 4.1.
+
+La correlación entre ambas medidas resume cuánto se parecen esos dos criterios radiales en esta base.
+
 ```{r comparacion-distancias}
 # Distancia estandarizada (euclídea sobre datos escalados) vs Mahalanobis
 d_std <- sqrt(rowSums(datos_std^2))   # euclídea en espacio estandarizado
@@ -209,9 +248,9 @@ cat("(Si correlación < 1: Mahalanobis detecta estructura de covarianza adiciona
 ```
 
 
-# Anexo: EDA complementario (eda_coffee.R)
+# Anexo: EDA complementario de las 14 variables cuantitativas
 
-Exploración visual complementaria de las 14 variables cuantitativas.
+Este anexo amplía la exploración visual a las 14 variables originales. No reemplaza ni modifica los cálculos principales, que se hicieron sobre 11 variables.
 
 ```{r eda-complementario}
 # EDA — Coffee Quality Institute
