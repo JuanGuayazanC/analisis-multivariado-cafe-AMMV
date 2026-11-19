@@ -25,7 +25,7 @@ Este módulo documenta la preparación de los datos, el análisis de componentes
 
 ## Cifras que no se deben mezclar
 
-La cadena documentada en el proceso de depuración es **1.070 → 666 → 627 lotes**. El PCA final oficial se presenta sobre **627 lotes y 8 variables**. Las figuras y documentos de métodos exploratorios pueden mostrar otras bases (por ejemplo, 1.070 o 666); siempre verifica el tamaño de muestra indicado en el título o sección antes de comparar resultados.
+La cadena documentada en el proceso de depuración es **1.070 → 666 → 627 lotes**. El PCA final oficial se presenta sobre **627 lotes y 8 variables**. Las figuras y documentos de métodos exploratorios pueden mostrar otras bases (por ejemplo, 1.070 o 666); siempre verifica el tamaño de muestra indicado en el título o sección antes de comparar resultados. En particular, `figuras_pca.Rmd` combina diagnósticos de distintas etapas y contiene un bloque exploratorio de Mahalanobis que aplica lambdas del objeto de 666 a filas de la base inicial de 1.070; no debe tratarse como resultado del PCA final.
 
 El PCA final reestima los parámetros de Yeo-Johnson sobre la matriz final de 627 lotes y después estandariza. No tomes cifras de varianza, cargas o porcentajes de informes históricos como si fueran resultados del PCA final.
 
