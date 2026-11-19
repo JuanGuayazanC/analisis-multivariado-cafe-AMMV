@@ -78,6 +78,8 @@ Esta sección **no corresponde a un único ajuste PCA ni a una única muestra**.
 
 Las salidas se guardan en `figuras/secuencia/` y no reemplazan las figuras de `imagenes_presentacion/`.
 
+En particular, las cajas ajustadas y la distribución de humedad parten de las 14 variables de la base inicial filtrada. El gráfico de asimetría compara esa base inicial con la matriz intermedia de 666; no es una comparación antes/después sobre las mismas filas. Las matrices de covarianzas, correlaciones y el biplot de esta sección se calculan sobre `datos_final_666.rds`.
+
 ```{r fig2}
 library(dplyr)
 library(car)
@@ -156,6 +158,8 @@ barplot(diag(S), las = 2, col = "#8fb8a8", log = "y",
 dev.off()
 
 # 5. Diagnóstico exploratorio de Mahalanobis sobre 1.070 filas
+
+**Advertencia de trazabilidad:** aunque `datos_t` contiene las 1.070 filas de `datos8_pre`, el bucle aplica `obj$lambdas`, recuperadas de `datos_final_666.rds`. Este gráfico es, por tanto, un diagnóstico exploratorio sobre 1.070 filas transformadas con parámetros procedentes del objeto intermedio de 666. No representa el PCA preliminar original ni el PCA final oficial de 627. Se conserva como antecedente, pero sus conteos no deben mezclarse con los 404 y 39 de la cadena de depuración.
 datos_t <- datos8_pre
 for (v in names(obj$lambdas)) datos_t[[v]] <- car::yjPower(datos_t[[v]], obj$lambdas[v])
 pca_p <- prcomp(datos_t, center = TRUE, scale. = TRUE)
