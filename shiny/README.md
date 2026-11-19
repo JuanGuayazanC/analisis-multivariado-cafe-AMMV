@@ -24,6 +24,12 @@ La aplicación carga la matriz de referencia desde ../datos/datos_final_627.rds,
 
 Las etiquetas de calidad alta, media o baja son una **interpretación relativa implementada por la aplicación** respecto a los lotes de referencia. No constituyen una certificación CQI ni una predicción oficial de calidad.
 
+## Interpretación de los componentes
+
+La aplicación presenta CP1 como dirección de calidad sensorial, CP2 como contraste entre atributos y CP3 como componente asociado a la altitud. El código muestra las cargas del PCA que ajusta sobre `datos_final_627.rds`, pero estas interpretaciones deben contrastarse con los valores numéricos de la matriz de cargas del PCA final antes de afirmarlas en la sustentación. En particular, el signo de un componente puede invertirse sin cambiar la solución matemática, por lo que la regla «CP1 negativo = mayor calidad» depende de la orientación concreta de las cargas.
+
+La proyección implementada aplica a las entradas las lambdas almacenadas, y luego utiliza el centro, la escala y la matriz de cargas del PCA de referencia. Esto describe la operación que realiza el código; no valida por sí solo la interpretación semántica de cada componente.
+
 ## Publicación
 
 GitHub Pages sirve archivos estáticos y no ejecuta por sí solo el servidor de una aplicación Shiny. Para ofrecer la interacción en línea se requiere desplegar la aplicación en un servicio que ejecute Shiny (por ejemplo, shinyapps.io o Posit Connect) y enlazar aquí la URL de esa instancia cuando exista.
