@@ -541,9 +541,11 @@ server <- function(input, output, session) {
 
     tagList(
       div(class = badge_class, badge_text),
-      div(style = "font-size:12px; color:#666; margin-bottom:10px;",
-          sprintf("Superior al %.0f%% de los lotes en calidad sensorial (CP1, percentil %d).",
-                  pct_calidad, round(pct_calidad))),
+      div(style = "font-size:12px; color:#666; margin-bottom:6px;",
+          sprintf("Posición relativa en el eje CP1: por encima del %.0f%% de los lotes de referencia.",
+                  pct_calidad)),
+      div(style = "font-size:11px; color:#888; margin-bottom:10px; line-height:1.4;",
+          "La etiqueta alta, media o baja es una regla orientativa de esta aplicación basada en percentiles; no es una certificación CQI ni una probabilidad de calidad."),
       div(class = "interp-item alt",
         div(class = "interp-pc", "CP2 · Altitud de cultivo"),
         div(class = "interp-val", pc2_txt)
@@ -554,8 +556,8 @@ server <- function(input, output, session) {
       ),
       div(style = "font-size:11px; color:#aaa; margin-top:10px; line-height:1.5;",
         paste0("CP1 captura el ", var_exp[1], "% de la varianza total. ",
-               "Score negativo en CP1 indica mayor calidad sensorial ",
-               "(los 7 atributos sensoriales cargan negativamente en CP1; CP2 está dominado por Altitud y CP3 contrapone principalmente Aroma/Acidez con Cuerpo/Balance).")
+               "La lectura de los ejes depende de la orientación de las cargas almacenadas: CP1 resume los atributos sensoriales; CP2 está dominado por Altitud y CP3 contrapone principalmente Aroma/Acidez con Cuerpo/Balance. ",
+               "Los umbrales de ±0,8 usados para describir CP2 y CP3 son reglas interpretativas de la interfaz.")
       )
     )
   })
