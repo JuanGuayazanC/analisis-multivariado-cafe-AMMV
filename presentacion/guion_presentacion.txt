@@ -133,7 +133,7 @@ Sigue en Alta porque CP1 es un promedio ponderado de los siete atributos: una so
 
 *Tiempo: 0:45 · Presenta: Juan*
 
-Respondemos el objetivo: la calidad sí se resume en dos dimensiones, pero no hay evidencia de grupos naturales. Primero, el PCA final resume el 80,9 por ciento de la variación en dos componentes, con 970 lotes, pero no demuestra grupos naturales. Segundo, la humedad igual a cero aparece en 174 registros y en la fuente original; detectarla no basta para conocer su causa. Tercero, K-means tiene separación débil y HDBSCAN deja el 58,5 por ciento como ruido.
+Respondemos el objetivo: la calidad sí se resume en dos dimensiones, pero no hay evidencia de grupos naturales. Primero, el PCA final resume el 80,9 por ciento de la variación en dos componentes, con 970 lotes. Segundo, la humedad igual a cero aparece en 174 registros y en la fuente original; detectarla no basta para conocer su causa. Tercero, K-means tiene separación débil y HDBSCAN deja el 58,5 por ciento como ruido.
 
 Estos métodos sirven para explorar, no para sustentar etiquetas comerciales: validarlas exigiría una fuente externa, como precios o certificaciones.
 
