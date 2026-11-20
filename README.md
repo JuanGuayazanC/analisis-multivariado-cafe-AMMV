@@ -14,6 +14,20 @@ Aplicación integral de los métodos de analítica multivariada vistos en el cur
 sobre un dataset real de calidad de café arábica. Cada módulo corresponde a un
 bloque temático del programa y reutiliza el mismo pipeline de preprocesamiento.
 
+## Ruta de consulta de los módulos
+
+Para revisar los análisis bajo nuestra responsabilidad, estos son los accesos principales:
+
+| Módulo | Guía de navegación | Informe publicado |
+|---|---|---|
+| **Análisis exploratorio (EDA)** | [00-eda/README.md](./00-eda/README.md) | [Abrir EDA](https://juanguayazanc.github.io/analisis-multivariado-cafe-AMMV/00-eda/eda.html) |
+| **Componentes principales (PCA)** | [01-pca/README.md](./01-pca/README.md) | [Abrir PCA final](https://juanguayazanc.github.io/analisis-multivariado-cafe-AMMV/01-pca/pca_final.html) |
+| **Explorador interactivo** | [shiny/README.md](./shiny/README.md) | [Consultar código de la aplicación](./shiny/app.R) |
+
+**Orden recomendado para la sustentación:** EDA → depuración de la matriz → PCA final → exploraciones complementarias → aplicación Shiny.
+
+> **Nota sobre la aplicación:** el repositorio contiene el código fuente Shiny y una representación HTML estática. GitHub Pages no ejecuta el servidor Shiny; por tanto, la aplicación interactiva debe ejecutarse localmente o desplegarse en un servicio compatible.
+
 ## Selección del dataset
 
 Antes de empezar, se descargaron y analizaron tres candidatos con Python/pandas
