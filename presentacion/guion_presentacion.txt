@@ -5,141 +5,170 @@ Analítica y Métodos Multivariados · AMMV-1
 Escuela Colombiana de Ingeniería Julio Garavito · 2026-2
 Juan Sebastián Guayazán · Esteban Valente Arenas · Diego Hernando Nocua González
 
-**Duración objetivo:** 10 minutos · **Alcance:** diapositivas 1 a 11 · **Texto a leer:** unas 1.150 palabras. Todo lo que está en "Apoyo para preguntas" (al final) **no se lee**: es para responder si preguntan.
+**Duración objetivo:** 10 minutos · **Alcance:** diapositivas 1 a 14 del deck en Canva (el resto es anexo; el anexo real son los HTML) · **Texto a leer:** unas 1.000 palabras. Todo lo que está en "Apoyo para preguntas" (al final) **no se lee**: es para responder si preguntan.
 
 ## Hilo de la exposición
 
-Partimos de una pregunta sobre los datos: ¿cómo resumir varias medidas de calidad y explorar patrones entre lotes sin confundir un resultado estadístico con una categoría comercial? Primero presentamos la base; luego qué aportan PCA y los métodos de agrupamiento; finalmente los límites del análisis y la herramienta interactiva.
+Partimos de una pregunta sobre los datos: ¿cómo resumir varias medidas de calidad y explorar patrones entre lotes sin confundir un resultado estadístico con una categoría comercial? Primero la base y su preparación; luego qué resume el PCA; después los métodos de agrupamiento; y al final la herramienta interactiva y las conclusiones.
 
 ## Diapositiva 1 - Portada
 
-*Tiempo: 0:30 · Presenta: Juan*
+*Tiempo: 0:20 · Presenta: Juan*
 
-Buenas tardes. Somos Juan Sebastián Guayazán, Esteban Valente y Diego Nocua, de Ingeniería Estadística. Analizamos 1.070 lotes de café arábica del Coffee Quality Institute para ver qué patrones aparecen cuando se estudian varias características a la vez, qué información se puede resumir y qué cuidado hay que tener al interpretar los grupos que producen los métodos de clustering.
+Buenas tardes. Somos Juan Sebastián Guayazán, Esteban Valente y Diego Nocua, de Ingeniería Estadística. Analizamos 1.070 lotes de café arábica del Coffee Quality Institute para ver qué patrones aparecen y qué cuidado hay que tener al interpretar los grupos que producen los métodos de clustering.
 
 **Transición:** Empecemos por el problema que encontramos en los datos.
 
 ## Diapositiva 2 - Diagnóstico del problema
 
-*Tiempo: 0:50 · Presenta: Juan*
+*Tiempo: 0:40 · Presenta: Juan*
 
-La base tiene catorce variables: puntajes sensoriales, altitud, humedad y conteos de defectos, en escalas distintas y con correlaciones entre los puntajes. Mirarlas una por una nos haría perder las relaciones entre ellas.
+La base tiene catorce variables cuantitativas: diez puntajes sensoriales, altitud, humedad y dos conteos de defectos, en escalas distintas y con correlaciones entre los puntajes. Además, 174 de los 1.070 registros tienen humedad igual a cero, y ese cero aparece explícito en la fuente original. El análisis muestra el patrón, pero no su causa: lo describimos como una anomalía observada, no como un faltante confirmado.
 
-Además, 174 de los 1.070 registros tienen humedad igual a cero, y ese cero aparece explícitamente en la fuente original. Los gráficos muestran que el patrón merece atención, pero no explican por qué ocurrió; por eso lo describimos como una anomalía observada, no como un faltante confirmado.
+Y a simple vista no se ven grupos. Por eso necesitamos reducir dimensionalidad.
 
 **Transición:** Con ese diagnóstico organizamos el análisis en etapas.
 
 ## Diapositiva 3 - Metodología
 
-*Tiempo: 1:15 · Presenta: Juan*
+*Tiempo: 0:45 · Presenta: Juan*
 
-Primero exploramos distribuciones, valores extremos y asimetría. Para los extremos usamos la caja robusta si la variable es simétrica y la caja ajustada si es asimétrica, y solo transformamos donde hubo evidencia.
+Son cuatro etapas. Diagnóstico: cajas robustas si la variable es simétrica y cajas ajustadas si es asimétrica, inflación de ceros y correlaciones. Transformación: excluimos seis variables, tres por inflación de ceros y tres por efecto techo en 10, y quedan ocho; el PCA final usa 970 lotes. Modelado: PCA, Kernel PCA, t-SNE y UMAP para reducir, y K-means, Ward y HDBSCAN para agrupar, estos con otra matriz de 1.070 lotes; LDA y QDA quedan en el anexo. Validación: Mahalanobis, silueta y matrices de confusión.
 
-El orden fue: transformar las variables problemáticas con Yeo-Johnson, estandarizar y después retirar atípicos. En un PCA preliminar con los 1.070 lotes calculamos la distancia de Mahalanobis y retiramos 100 lotes, el 9,3 por ciento, por encima del umbral chi-cuadrado al 97,5 por ciento. Quedan 970 lotes y ocho variables. Al volver a medir la asimetría ninguna variable queda por transformar, así que el PCA final solo estandariza.
+**Transición:** Veamos de dónde salen esos 970 lotes.
 
-Excluimos seis variables: tres por inflación de ceros y tres por efecto techo en 10. El clustering responde otra pregunta y usa otra matriz, con los 1.070 lotes.
+## Diapositiva 4 - De 1.311 a 970 lotes
 
-**Transición:** Veamos qué resume el PCA final.
+*Tiempo: 0:50 · Presenta: Juan*
 
-## Diapositiva 4 - Análisis de componentes principales
+Partimos de 1.311 lotes catados por el CQI. Quitamos 241, 227 sin altitud y 14 con altitud mayor a 3.000 metros, y quedan 1.070. Solo para el PCA retiramos además 100 atípicos multivariados.
 
-*Tiempo: 1:40 · Presenta: Diego*
+El orden fue: transformar con Yeo-Johnson las variables problemáticas, estandarizar y después retirar atípicos con la distancia de Mahalanobis, una sola vez, con el umbral chi-cuadrado al 97,5 por ciento. Son 100 lotes, el 9,3 por ciento, y quedan 970. Al volver a medir la asimetría, ninguna variable queda por transformar: el PCA final solo estandariza.
 
-Antes de interpretar los ejes, miramos la nube de los lotes en CP1 y CP2, coloreada por método de proceso: es una sola nube continua, sin grupos, y los métodos se mezclan. Por eso el PCA resume variación; no forma grupos.
+**Transición:** Con los datos listos, aplicamos el PCA.
 
-La primera componente explica el 69,3 por ciento y la segunda el 11,6; juntas, el 80,9 por ciento, con un intervalo bootstrap del 95 por ciento de 79,3 a 82,5. El codo cae hasta la segunda y se aplana.
+## Diapositiva 5 - PCA: varianza y cargas
 
-Sobre las cargas: CP1 reúne los siete puntajes sensoriales, entre menos 0,35 y menos 0,39: calidad general. CP2 es la altitud, con menos 0,98. CP3 es un contraste pequeño, de 5,3 por ciento, entre aroma y cuerpo. En el biplot, los vectores sensoriales apuntan juntos y la altitud sale casi perpendicular. Ningún eje es una certificación de calidad.
+*Tiempo: 1:05 · Presenta: Diego*
 
-**Acción:** Señalar la nube, luego el codo, las cargas y el biplot.
+A la izquierda, la primera componente explica el 69,3 por ciento de la variación y la segunda el 11,6; juntas, el 80,9 por ciento, con un intervalo bootstrap del 95 por ciento de 79,3 a 82,5. Después del codo en CP2, cada componente aporta menos de 6 por ciento.
 
-**Transición:** Resumir no es agrupar. Para eso probamos K-means.
+A la derecha, las cargas. CP1 reúne los siete atributos sensoriales, entre 0,35 y 0,39: calidad general. CP2 es casi solo la altitud, con 0,98. CP3 es un contraste pequeño, cuerpo frente a aroma, y CP4 es acidez.
 
-## Diapositiva 5 - K-means
+**Acción:** Señalar el codo y luego el mapa de cargas.
 
-*Tiempo: 1:10 · Presenta: Diego*
+**Transición:** Con esto podemos ubicar cada lote en un mapa de dos ejes.
 
-K-means asigna cada lote a un grupo en la matriz completa, con semilla 42. El codo se aplana después de tres grupos, así que usamos k igual a tres como candidato exploratorio; no es un óptimo demostrado, porque la silueta más alta se da con k igual a dos y el gap elige uno.
+## Diapositiva 6 - PCA: cómo leerlo
 
-La silueta promedio es 0,116 y 104 lotes tienen valor negativo: la separación es débil. Describimos los grupos: el 1, de 247 lotes, tiene 82,6 puntos y altitud mediana de 894 metros; el 2, de 382 lotes, tiene 80,1 puntos, es el más variable y está a 1.300 metros; el 3, de 441 lotes, tiene 83,6 puntos y está a 1.600 metros. Se traslapan: son diferencias de promedio, no categorías. Si los colores parecen mezclarse es porque proyectamos a dos dimensiones.
+*Tiempo: 0:45 · Presenta: Diego*
 
-**Transición:** Probamos también un método que puede dejar lotes sin asignar.
+Cada punto es un lote. Hacia la derecha mejora la calidad en taza y hacia arriba sube la altitud; el cero de cada eje es el lote promedio. Vemos una sola nube continua, sin grupos separados: el PCA resume la calidad, pero no separa grupos. Para buscarlos usamos otros métodos.
 
-## Diapositiva 6 - HDBSCAN
+**Transición:** Antes, una mirada a las variables categóricas.
 
-*Tiempo: 0:40 · Presenta: Diego*
+## Diapositiva 7 - Análisis de correspondencias múltiple
 
-HDBSCAN busca regiones densas y no obliga a asignar todos los lotes. Con tamaño mínimo de clúster 10 encontró seis grupos, de 30, 11, 57, 106, 135 y 105 lotes, y dejó 626, el 58,5 por ciento, como ruido. Aquí ruido significa que el método no los asignó a una zona densa, no que sean cafés de mala calidad. Esta matriz no incluye humedad y difiere de la de K-means, así que no comparamos sus etiquetas.
+*Tiempo: 0:30 · Presenta: Diego*
 
-**Transición:** Veamos un método jerárquico.
+Con las variables categóricas usamos el análisis de correspondencias múltiple. El eje principal separa el proceso natural, ligado a Brasil, del lavado, predominante en Colombia, Guatemala y México, y los granos de color verde se asocian con cafés lavados de altura. Es una asociación entre categorías, no una causa.
 
-## Diapositiva 7 - Ward.D2 — Clustering Jerárquico
+**Transición:** Volvamos a las variables numéricas y busquemos grupos; primero, cuántos.
+
+## Diapositiva 8 - Selección de clústeres (k)
+
+*Tiempo: 0:45 · Presenta: Diego*
+
+El codo baja de forma gradual, sin un quiebre claro. La silueta promedio es más alta con k igual a dos, 0,151, y cae a 0,115 con tres; y el estadístico gap elige uno. Con k igual a tres la silueta es 0,116 y el 9,7 por ciento de los lotes tiene valor negativo: no hay bloques separados sino un continuo con fronteras difusas. Por eso k igual a tres es una elección exploratoria, no un óptimo.
+
+**Transición:** Veamos qué produce K-means con k igual a tres.
+
+## Diapositiva 9 - K-means
 
 *Tiempo: 0:55 · Presenta: Esteban*
 
-Ward.D2 va uniendo lotes y no necesita fijar k al inicio. El dendrograma usa una muestra de 80 lotes. Cortando en tres obtenemos grupos de 15, 42 y 23. El árbol también admite cuatro: con cuatro, el grupo de 42 se parte en 27 y 15.
+K-means asigna cada lote a un solo grupo, con semilla 42. Los describimos con sus variables originales: el grupo 1, de 247 lotes, tiene 82,6 puntos y altitud de 894 metros; el grupo 2, de 382, 80,1 puntos y 1.300 metros; el grupo 3, de 441, 83,6 puntos y 1.600 metros.
 
-Mantuvimos tres porque la silueta de Ward es mayor, 0,128 frente a 0,113; pero la silueta global se maximiza con k igual a dos y el gap elige uno, así que es una elección exploratoria. El acuerdo con K-means es moderado, ARI de 0,471, y no basta para afirmar que existan grupos reales.
+Las distribuciones se traslapan: son diferencias de promedio, no categorías comerciales, y por eso no los llamamos Specialty, Premium ni Commodity. Si los colores parecen mezclarse es por la proyección a dos dimensiones.
 
-**Transición:** Veamos el perfil de cada grupo.
+**Transición:** Probamos también un método que puede dejar lotes sin asignar.
 
-## Diapositiva 8 - Perfiles de grupos — Ward.D2
+## Diapositiva 10 - HDBSCAN
 
-*Tiempo: 0:40 · Presenta: Esteban*
+*Tiempo: 0:35 · Presenta: Esteban*
 
-En la muestra de 80 lotes, el grupo 1, de 15 lotes, destaca solo en aroma, 7,71, con 82,86 puntos. El grupo 2, de 42, tiene 82,72 y supera al 1 en acidez, balance y puntaje del catador: son casi idénticos. El grupo 3, de 23, tiene los promedios más bajos en los siete atributos, con 79,90 puntos.
+HDBSCAN busca zonas densas y no obliga a asignar todos los lotes. Con tamaño mínimo 10 encontró seis grupos, que suman 444 lotes, y dejó 626, el 58,5 por ciento, como ruido. Ruido significa que no quedaron en una zona densa, no que sean cafés malos. Su matriz no incluye humedad y difiere de la de K-means, así que no comparamos sus etiquetas.
 
-Es una interpretación exploratoria: las distribuciones se traslapan y, sin un criterio externo, no podemos llamarlos Specialty, Premium ni Commodity.
+**Transición:** Veamos un método jerárquico.
 
-**Transición:** Con estas limitaciones claras, veamos una herramienta que usa el PCA.
+## Diapositiva 11 - Ward.D2
 
-## Diapositiva 9 - Demostración de Shiny
+*Tiempo: 0:55 · Presenta: Esteban*
 
-*Tiempo: 1:10 · Presenta: Esteban*
+Ward.D2 va uniendo lotes sin fijar k al inicio. El dendrograma usa una muestra de 80 lotes; cortando en tres obtenemos grupos de 15, 42 y 23. El árbol también admite cuatro: el grupo de 42 se partiría en 27 y 15. Mantuvimos tres porque la silueta de Ward es mayor, 0,128 frente a 0,113, pero es una elección exploratoria.
 
-Esta aplicación proyecta un lote hipotético en un PCA de referencia ajustado con los 970 lotes. Voy a ingresar un perfil sensorial alto; ojo, el máximo real en los datos es 8,5 en casi todos los atributos, no se puede escribir 9.
+Perfiles: el grupo 1 destaca solo en aroma, 7,71, con 82,86 puntos; el grupo 2 tiene 82,72 y casi no se distingue del 1; el grupo 3 tiene los más bajos, 79,90 puntos. El acuerdo con K-means es moderado, ARI de 0,471, y no basta para afirmar grupos reales.
 
-**Acción:** Ingresar Aroma 8,5 · Sabor 8,5 · Retrogusto 8,3 · Acidez 8,4 · Cuerpo 8,4 · Balance 8,4 · Puntaje Catador 8,5. La aplicación indica calidad Alta.
+**Transición:** Veamos una herramienta que usa el PCA.
 
-Sale calidad Alta, como era de esperar. Ahora le bajo el aroma de 8,5 a 7,5.
+## Diapositiva 12 - Demo en vivo: Shiny
+
+*Tiempo: 1:00 · Presenta: Esteban*
+
+Esta aplicación proyecta un lote hipotético en un PCA de referencia ajustado con los 970 lotes. Voy a ingresar un perfil alto; el máximo real en los datos es 8,5 en casi todos los atributos, no se puede escribir 9.
+
+**Acción:** Ingresar Aroma 8,5 · Sabor 8,5 · Retrogusto 8,3 · Acidez 8,4 · Cuerpo 8,4 · Balance 8,4 · Puntaje Catador 8,5 · Altitud 1.500. La aplicación indica calidad Alta.
+
+Ahora bajo el aroma de 8,5 a 7,5.
 
 **Acción:** Cambiar Aroma a 7,5; sigue en Alta.
 
-Sigue en Alta porque CP1 es un promedio ponderado de los siete atributos: una sola nota baja no saca el compuesto del rango alto. El percentil dice dónde queda el lote frente a la muestra, no si está certificado como Specialty, y la aplicación no asigna grupos de K-means ni de HDBSCAN.
+Sigue en Alta porque CP1 es un promedio ponderado de los siete atributos: una sola nota baja no saca el compuesto del rango alto. El percentil dice dónde queda el lote frente a la muestra, no si está certificado como Specialty, y la aplicación no asigna grupos.
 
 **Transición:** Con todo esto, nuestras conclusiones.
 
-## Diapositiva 10 - Conclusiones
+## Diapositiva 13 - Conclusiones
 
-*Tiempo: 0:50 · Presenta: Esteban*
+*Tiempo: 0:45 · Presenta: Juan*
 
-Primero, el PCA final resume el 80,9 por ciento de la variación en dos componentes, con 970 lotes. Segundo, la humedad igual a cero aparece en 174 registros y en la fuente original; detectarla no basta para conocer su causa.
+Primero, el PCA final resume el 80,9 por ciento de la variación en dos componentes, con 970 lotes, pero no demuestra grupos naturales. Segundo, la humedad igual a cero aparece en 174 registros y en la fuente original; detectarla no basta para conocer su causa. Tercero, K-means tiene separación débil y HDBSCAN deja el 58,5 por ciento como ruido.
 
-Tercero, K-means y Ward muestran separación débil y coincidencia moderada, y HDBSCAN deja más de la mitad de los lotes como ruido. Los métodos sirven para explorar la base, pero no sustentan por sí solos etiquetas comerciales. Como limitación, la interpretación es exploratoria y los perfiles de Ward se calcularon en una muestra de 80 lotes; validar categorías exigiría una fuente externa, como precios o certificaciones.
+Estos métodos sirven para explorar, no para sustentar etiquetas comerciales: validarlas exigiría una fuente externa, como precios o certificaciones.
 
-## Diapositiva 11 - Cierre
+## Diapositiva 14 - Gracias
 
-*Tiempo: 0:20 · Presenta: Juan*
+*Tiempo: 0:10 · Presenta: Juan*
 
-Muchas gracias. Los métodos nos permiten mirar los datos desde ángulos distintos, siempre cuidando qué pregunta responde cada resultado. Quedamos atentos a sus preguntas.
+Muchas gracias. Quedamos atentos a sus preguntas.
 
 ## Distribución del tiempo
 
 | Diapositiva | Presenta | Tiempo | Acumulado |
 |---|---|---:|---:|
-| 1 | Juan | 0:30 | 0:30 |
-| 2 | Juan | 0:50 | 1:20 |
-| 3 | Juan | 1:15 | 2:35 |
-| 4 | Diego | 1:40 | 4:15 |
-| 5 | Diego | 1:10 | 5:25 |
-| 6 | Diego | 0:40 | 6:05 |
-| 7 | Esteban | 0:55 | 7:00 |
-| 8 | Esteban | 0:40 | 7:40 |
-| 9 | Esteban | 1:10 | 8:50 |
-| 10 | Esteban | 0:50 | 9:40 |
-| 11 | Juan | 0:20 | 10:00 |
+| 1 | Juan | 0:20 | 0:20 |
+| 2 | Juan | 0:40 | 1:00 |
+| 3 | Juan | 0:45 | 1:45 |
+| 4 | Juan | 0:50 | 2:35 |
+| 5 | Diego | 1:05 | 3:40 |
+| 6 | Diego | 0:45 | 4:25 |
+| 7 | Diego | 0:30 | 4:55 |
+| 8 | Diego | 0:45 | 5:40 |
+| 9 | Esteban | 0:55 | 6:35 |
+| 10 | Esteban | 0:35 | 7:10 |
+| 11 | Esteban | 0:55 | 8:05 |
+| 12 | Esteban | 1:00 | 9:05 |
+| 13 | Juan | 0:45 | 9:50 |
+| 14 | Juan | 0:10 | 10:00 |
 
-*El texto a leer ronda las 1.150 palabras (unos 8 minutos y medio a ritmo normal), lo que deja margen para las acciones de la demostración y las transiciones. Por persona: Juan 2:55 (1, 2, 3 y 11) · Diego 3:30 (4, 5 y 6) · Esteban 3:35 (7, 8, 9 y 10). Los relevos son en bloque: Juan abre y presenta la metodología, Diego lleva PCA, K-means y HDBSCAN, y Esteban lleva Ward, la demostración de Shiny y las conclusiones; Juan cierra.*
+*Por persona: Juan 3:30 (1 a 4, 13 y 14) · Diego 3:05 (5 a 8) · Esteban 3:25 (9 a 12). Los relevos son en bloque: Juan abre y presenta los datos, Diego lleva PCA, ACM y selección de k, Esteban lleva K-means, HDBSCAN, Ward y la demostración, y Juan cierra con las conclusiones. El texto a leer ronda las 1.000 palabras (unos 8 minutos a ritmo normal), lo que deja margen para las acciones de la demostración y los cambios de diapositiva.*
+
+## Ajustes pendientes en el deck antes de ensayar
+
+- **Orden de PCA:** el profesor pidió mostrar la nube de dispersión antes que las cargas; en el deck las cargas están en la diapositiva 5 y la nube en la 6. Si no se reordena, al empezar la diapositiva 5 decir: "primero la varianza y las cargas; enseguida, la nube que lo respalda".
+- **Diapositiva 8:** el texto visible dice que la suma de cuadrados "desciende más hasta k = 3"; la curva baja sin quiebre. Conviene reemplazarlo y mencionar la silueta con k = 2 y el gap.
+- **Diapositiva 10:** "Concentran la mayor densidad de lotes de país y método de proceso" no tiene un cálculo que lo respalde; verificarlo o quitarlo.
+- **Diapositiva 11:** la justificación de k = 3 frente a los 4 grupos del dendrograma solo está en este guion y en las notas.
+- **Demo (diapositiva 12):** hay que correr la app de 970 lotes (`shiny::runApp("shiny")` desde la raíz del repositorio actualizado).
 
 ---
 
@@ -147,56 +176,64 @@ Muchas gracias. Los métodos nos permiten mirar los datos desde ángulos distint
 
 Respuestas breves y cifras verificadas, ordenadas por diapositiva.
 
-## Diapositiva 3 - Preprocesamiento
+## Diapositivas 3 y 4 - Preparación de los datos
 
-- **Qué diagrama de cajas:** se mide la simetría con el medcouple. Si |MC| menor o igual a 0,1 la variable se trata como simétrica y se usa la caja robusta (mediana y MAD); si no, la caja ajustada de Hubert y Vandervieren. Solo se transforma con evidencia de asimetría (|asimetría| > 1).
+- **Qué diagrama de cajas:** se mide la simetría con el medcouple. Si |MC| menor o igual a 0,1 la variable se trata como simétrica y se usa la caja robusta (mediana y MAD); si no, la caja ajustada de Hubert y Vandervieren. Solo se transforma con evidencia de asimetría (|asimetría| mayor que 1).
 - **Por qué el orden importa:** si se estandariza antes de transformar, los parámetros de Yeo-Johnson quedan calculados sobre datos ya centrados y la corrección de asimetría pierde sentido. Estandarizar es centrar en cero y dividir por la desviación estándar.
-- **Por qué los 100 atípicos van antes del PCA:** un supuesto del PCA es no tener atípicos fuertes. La asimetría de los 1.070 lotes la causaban sobre todo esos lotes extremos: tras retirarlos, ninguna de las ocho variables supera 1 (la mayor es altitud, −0,69).
-- **Cómo se calcula la distancia:** distancia de Mahalanobis (cada componente dividida entre su propia desviación), umbral chi-cuadrado al 97,5 % con 8 g.l. = 17,53. En la versión anterior un error de cálculo marcaba 404 lotes; la cifra correcta es 100.
-- **¿Y si preguntan por los que quedan?** Al repetir la regla sobre los 970 aparecen 63 lotes más (por azar se esperarían unos 24). No se retiran: al quitar los extremos la nube se encoge y otros pasan a parecer lejanos, así que repetir el filtro seguiría quitando lotes.
+- **Qué se transformó:** en los 1.070 lotes, los siete atributos sensoriales superaban |asimetría| 1 (de −3,8 a −8,2). Tras retirar los 100 atípicos, ninguna de las ocho variables la supera (la mayor es altitud, −0,69).
+- **Por qué los 100 atípicos van antes del PCA:** un supuesto del PCA es no tener atípicos fuertes. La asimetría de los 1.070 lotes la causaban sobre todo esos lotes extremos.
+- **Cómo se calcula la distancia:** distancia de Mahalanobis (cada componente dividida entre su propia desviación), umbral chi-cuadrado al 97,5 % con 8 g.l. = 17,53. En una versión anterior un error de cálculo marcaba 404 lotes; la cifra correcta es 100.
+- **Los que quedan:** al repetir la regla sobre los 970 aparecen 63 lotes más (por azar se esperarían unos 24). No se retiran: al quitar los extremos la nube se encoge y otros pasan a parecer lejanos, así que repetir el filtro seguiría quitando lotes.
 - **Variables excluidas:** Moisture, Category.One.Defects y Category.Two.Defects por inflación de ceros; Sweetness, Uniformity y Clean.Cup por efecto techo en 10.
+- **Humedad = 0:** 174 de 1.070 registros (253 en el archivo raw). La fuente no dice que sean faltantes; es una hipótesis sin confirmar. Un grano normalmente retiene entre 9 y 13 % de humedad.
+- **Altitudes mal digitadas:** quedan lotes con altitud de 1, 12 o 13 m (17 en los 1.070; 4 siguen en los 970). El filtro solo exige altitud mayor que 0.
 
-## Diapositiva 4 - PCA
+## Diapositivas 5 y 6 - PCA
 
 - **Criterio de Kaiser:** el valor propio de CP2 es 0,93, casi 1. Se conserva porque el codo la respalda y se interpreta con claridad.
 - **Intervalos bootstrap (B = 2000):** CP1 67,5–70,9 %; CP2 11,2–12,0 %; CP3 4,8–6,0 %.
-- **Cargas:** CP1 entre −0,35 y −0,39 en los siete puntajes (el signo es arbitrario); CP2 altitud −0,98; CP3 Aroma −0,64 frente a Cuerpo +0,68.
-- **t-SNE y UMAP** (coloreados por método de proceso) son exploratorios: sus ejes no se interpretan y la forma depende de los parámetros (t-SNE: perplejidad 30; UMAP: 15 vecinos).
-- **Por qué no se agrupa con PCA:** la nube es continua. El PCA resume varianza; los grupos los buscan K-means, Ward y HDBSCAN.
+- **Cargas:** CP1 entre −0,35 y −0,39 en los siete puntajes (el signo es arbitrario); CP2 altitud −0,98; CP3 Aroma −0,64 frente a Cuerpo +0,68; CP4 Acidez −0,89.
+- **Escala de los scores:** una desviación estándar equivale a 2,35 en CP1 y a 0,96 en CP2.
+- **Por qué no se agrupa con PCA:** la nube es continua; el PCA resume varianza y los grupos los buscan K-means, Ward y HDBSCAN. Con puntos coloreados por método de proceso tampoco se separan grupos.
+- **t-SNE y UMAP** (en el HTML) son exploratorios: sus ejes no se interpretan y la forma depende de los parámetros.
 
-## Diapositiva 5 - K-means
+## Diapositiva 7 - ACM
 
+- Usa solo variables categóricas (proceso, color, país); no usa los puntajes sensoriales. Los dos primeros ejes explican alrededor de 12 % de la inercia cada uno: el mapa resume una parte moderada de la información.
+- Es el equivalente del PCA para variables categóricas.
+
+## Diapositivas 8 y 9 - Selección de k y K-means
+
+- **Tendencia al agrupamiento (toda la matriz):** silueta promedio 0,151 con k = 2, 0,115 con k = 3, 0,114 con k = 4; el gap elige k = 1. La referencia del gap es uniforme, poco realista con columnas binarias.
 - **Semilla y corridas:** semilla 42, `nstart = 25`. Con 20 semillas distintas el ARI frente a la solución de referencia queda entre 0,958 y 1: estabilidad del procedimiento, no prueba de grupos naturales.
-- **Tendencia al agrupamiento (toda la matriz):** silueta promedio más alta con k = 2 (0,151); k = 3 da 0,115 y k = 4 da 0,114; el gap elige k = 1. La referencia del gap es uniforme, poco realista con columnas binarias.
-- **Silueta por grupo:** 0,088 · 0,168 · 0,086.
-- **Perfiles (puntaje total medio / altitud mediana):** G1 82,6 / 894 m · G2 80,1 / 1.300 m (incluye un lote con puntaje total 0) · G3 83,6 / 1.600 m.
-- **Prueba de proporciones (humedad = 0 por grupo):** 21,1 % (52 de 247), 6,0 % (23 de 382) y 22,4 % (99 de 441); chi-cuadrado = 45,98, 2 g.l., p aprox. 1e-10. Es una asociación descriptiva, no explica la causa.
-- **Matriz usada:** 1.070 lotes × 19 columnas (4 componentes exploratorias + 15 dummies de proceso, color y país).
+- **Silueta por grupo:** 0,088 · 0,168 · 0,086; 104 lotes (9,7 %) con silueta negativa.
+- **Perfiles (puntaje total medio / altitud mediana):** G1 82,6 / 894 m · G2 80,1 / 1.300 m (el más variable; incluye un lote con puntaje total 0) · G3 83,6 / 1.600 m.
+- **Prueba de proporciones (humedad = 0 por grupo):** 21,1 % (52 de 247), 6,0 % (23 de 382) y 22,4 % (99 de 441); chi-cuadrado = 45,98, 2 g.l., p cercano a 1e-10. Es una asociación descriptiva, no explica la causa.
+- **Matriz usada:** 1.070 lotes por 19 columnas (4 componentes exploratorias y 15 variables indicadoras de proceso, color y país).
 
-## Diapositiva 6 - HDBSCAN
+## Diapositiva 10 - HDBSCAN
 
-- Con tamaño mínimo 10, `min_samples` 10: grupos 0 a 5 de 30, 11, 57, 106, 135 y 105 lotes; ruido 626 (58,5 %).
+- Tamaño mínimo 10, `min_samples` 10: grupos 0 a 5 de 30, 11, 57, 106, 135 y 105 lotes (444 en total, 41,5 %); ruido 626 (58,5 %).
 - Es una implementación independiente (Python); no se calculó un ARI directo con K-means porque las matrices difieren.
-- En el anexo de `clustering.Rmd`, sobre otra matriz (8 variables numéricas, sin dummies) y con minPts = 15, HDBSCAN deja el 100 % como ruido: el resultado depende mucho de la matriz y de los parámetros.
+- En el anexo de `clustering.Rmd`, sobre otra matriz (8 variables numéricas, sin indicadoras) y con minPts = 15, HDBSCAN deja el 100 % como ruido: el resultado depende mucho de la matriz y de los parámetros.
 
-## Diapositivas 7 y 8 - Ward
+## Diapositiva 11 - Ward
 
-- **Alturas de las últimas fusiones (de 1 a 5 grupos):** 5,53 · 4,50 · 3,75 · 3,17 · 3,11. Los saltos mayores están entre 1 y 2 grupos, después entre 2 y 3.
+- **Alturas de las últimas fusiones (de 1 a 5 grupos):** 5,53 · 4,50 · 3,75 · 3,17 · 3,11. Los saltos mayores están entre 1 y 2 grupos y entre 2 y 3.
 - **Con k = 4** el grupo de 42 se parte en 27 lotes (83,5 puntos) y 15 lotes (81,3 puntos, aroma y sabor más bajos). Silueta de Ward: 0,128 con k = 3 y 0,113 con k = 4. Silueta por grupo con k = 3: 0,111 · 0,136 · 0,123.
 - **Perfiles de Ward (muestra de 80), aroma / puntaje total:** G1 (15) 7,71 / 82,86 · G2 (42) 7,58 / 82,72 · G3 (23) 7,38 / 79,90. G2 supera a G1 en acidez (7,58 frente a 7,51), balance (7,63 frente a 7,52) y puntaje del catador (7,60 frente a 7,53).
 - **ARI K-means/Ward:** 0,471, calculado solo en la muestra de 80.
-- En el anexo de `clustering.Rmd`, con otra matriz (8 variables numéricas, sin dummies) y Ward sobre todos los lotes, k = 3 da tamaños de 68, 648 y 354 y silueta 0,274: las cifras de la muestra de 80 no se generalizan.
+- En el anexo de `clustering.Rmd`, con otra matriz (8 variables numéricas, sin indicadoras) y Ward sobre todos los lotes, k = 3 da tamaños de 68, 648 y 354 y silueta 0,274: las cifras de la muestra de 80 no se generalizan.
 
-## Diapositiva 9 - Shiny
+## Diapositiva 12 - Shiny
 
 - Usa un PCA independiente, ajustado con los 970 lotes finales y sin Yeo-Johnson; el lote nuevo se estandariza con el centro y la escala de referencia.
 - Máximos reales por atributo: 8,5 (Aroma, Sabor, Acidez, Cuerpo, Balance), 8,3 (Retrogusto) y 8,6 (Puntaje Catador).
-- "Alta/Media/Baja" es una regla de percentiles de la propia aplicación (75 o más, mayor o igual a 25, resto): no es una certificación CQI.
+- "Alta/Media/Baja" es una regla de percentiles de la propia aplicación (75 o más, 25 o más, resto): no es una certificación CQI.
 - Con Aroma en 7,5 el percentil de calidad queda en 99,8 y sigue en Alta.
 
-## Diapositiva 10 - Limitaciones
+## Diapositiva 13 - Limitaciones
 
 - Sin una variable de clase externa, ningún método muestra agrupamientos naturales.
 - La clasificación (LDA/QDA) define las clases con los mismos puntajes que usa como predictores: reproduce cortes, no valida los grupos de K-means.
-- Humedad = 0: 174 de 1.070 registros (253 en el archivo raw). La fuente no dice que sean faltantes; es una hipótesis sin confirmar.
-- Quedan lotes con altitud de 1 m en los 970 (el filtro solo exige altitud mayor que 0).
+- Humedad = 0: la causa no está confirmada; es un patrón observado.
