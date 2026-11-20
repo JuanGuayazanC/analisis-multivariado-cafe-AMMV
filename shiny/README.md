@@ -18,7 +18,7 @@ Esta carpeta contiene la aplicación Shiny que permite modificar los valores de 
 shiny::runApp("shiny")
 ```
 
-La aplicación carga la matriz de referencia desde ../datos/datos_final_627.rds, por lo que debe conservarse esa estructura relativa de carpetas.
+La aplicación carga la matriz de referencia desde ../datos/datos_final_627.rds, por lo que debe conservarse esa estructura relativa de carpetas. El archivo `app.html` es una representación estática y debe actualizarse por separado cuando se regenere o publique una nueva versión de la aplicación.
 
 ## Qué representa la clasificación
 
@@ -26,9 +26,15 @@ Las etiquetas de calidad alta, media o baja son una **interpretación relativa i
 
 ## Interpretación de los componentes
 
-La aplicación presenta CP1 como dirección de calidad sensorial, CP2 como contraste entre atributos y CP3 como componente asociado a la altitud. El código muestra las cargas del PCA que ajusta sobre `datos_final_627.rds`, pero estas interpretaciones deben contrastarse con los valores numéricos de la matriz de cargas del PCA final antes de afirmarlas en la sustentación. En particular, el signo de un componente puede invertirse sin cambiar la solución matemática, por lo que la regla «CP1 negativo = mayor calidad» depende de la orientación concreta de las cargas.
+La matriz de cargas del PCA final (627 lotes) permite sustentar estas interpretaciones:
 
-La proyección implementada aplica a las entradas las lambdas almacenadas, y luego utiliza el centro, la escala y la matriz de cargas del PCA de referencia. Esto describe la operación que realiza el código; no valida por sí solo la interpretación semántica de cada componente.
+- **CP1 (55,1 %):** las siete variables sensoriales tienen cargas negativas (entre -0,33 y -0,41); por ello, en la orientación almacenada, scores más negativos se asocian con mayores valores sensoriales.
+- **CP2 (12,5 %):** está dominado por Altitud, cuya carga es -0,99. Scores más negativos se asocian con mayor altitud relativa.
+- **CP3 (8,9 %):** contrapone principalmente Aroma y Acidez (cargas positivas) frente a Cuerpo y Balance (cargas negativas).
+
+El signo de un componente puede invertirse sin cambiar la solución matemática. Por eso, las interpretaciones anteriores corresponden a la orientación concreta de las cargas almacenadas en este repositorio.
+
+La proyección implementada aplica a las entradas las lambdas almacenadas y luego utiliza el centro, la escala y la matriz de cargas del PCA de referencia. La aplicación clasifica la calidad de forma relativa a los 627 lotes; no constituye una certificación CQI ni una predicción oficial.
 
 ## Publicación
 
