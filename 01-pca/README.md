@@ -16,6 +16,20 @@ Este módulo documenta la preparación de los datos, el análisis de componentes
 - [pca_final.Rmd](./pca_final.Rmd)
 - [figuras_pca.Rmd](./figuras_pca.Rmd)
 
+## Organización de los recursos visuales
+
+La carpeta [`figuras/`](./figuras/) conserva los gráficos y tablas generados en las distintas etapas. Para ubicarlos rápidamente:
+
+| Carpeta | Contenido | Uso recomendado |
+|---|---|---|
+| [`secuencia/`](./figuras/secuencia/) | 12 imágenes de diagnóstico, transformación, varianzas, distancias, cargas y biplot. | Recorrido visual del proceso; comprobar siempre la etapa indicada en el nombre o título. |
+| [`proceso/`](./figuras/proceso/) | 3 imágenes asociadas a los diagnósticos de atípicos en 1.070 y 666 lotes. | Explicar la depuración y sus etapas. |
+| [`revision_profesor/`](./figuras/revision_profesor/) | Gráficos, tablas CSV y resultados de la revisión del PCA final. | Consultar cargas, varianza e intervalos bootstrap, biplot y representaciones exploratorias. |
+| [`exploratorios/`](./figuras/exploratorios/) | Resultados organizados por método y base: Kernel PCA, UMAP, t-SNE y MDS. | Comparar métodos complementarios sin confundirlos con el PCA oficial. |
+| [`taller_666/`](./figuras/taller_666/) y [`kpca_666/`](./figuras/kpca_666/) | Figuras del taller y Kernel PCA sobre 666 lotes. | Material histórico o de apoyo; no atribuirlo al PCA final de 627 lotes. |
+
+**Nota de trazabilidad:** que una figura esté guardada en el repositorio no significa que corresponda a la matriz final de 627 lotes. Antes de presentarla, verifica el tamaño de muestra, las variables y la etapa que indica su título o el documento que la genera.
+
 ## Informes complementarios
 
 - [Métodos exploratorios: Kernel PCA, UMAP, t-SNE y MDS (HTML)](https://juanguayazanc.github.io/analisis-multivariado-cafe-AMMV/01-pca/metodos_exploratorios.html) — comparaciones exploratorias; no reemplazan el PCA oficial ni definen por sí solas grupos.
