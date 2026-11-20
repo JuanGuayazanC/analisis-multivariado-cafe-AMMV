@@ -149,7 +149,7 @@ Respuestas breves y cifras verificadas, ordenadas por diapositiva.
 
 ## Diapositiva 3 - Preprocesamiento
 
-- **Qué diagrama de cajas:** se mide la simetría con el medcouple. Si |MC| ≤ 0,1 la variable se trata como simétrica y se usa la caja robusta (mediana y MAD); si no, la caja ajustada de Hubert y Vandervieren. Solo se transforma con evidencia de asimetría (|asimetría| > 1).
+- **Qué diagrama de cajas:** se mide la simetría con el medcouple. Si |MC| menor o igual a 0,1 la variable se trata como simétrica y se usa la caja robusta (mediana y MAD); si no, la caja ajustada de Hubert y Vandervieren. Solo se transforma con evidencia de asimetría (|asimetría| > 1).
 - **Por qué el orden importa:** si se estandariza antes de transformar, los parámetros de Yeo-Johnson quedan calculados sobre datos ya centrados y la corrección de asimetría pierde sentido. Estandarizar es centrar en cero y dividir por la desviación estándar.
 - **Por qué los 100 atípicos van antes del PCA:** un supuesto del PCA es no tener atípicos fuertes. La asimetría de los 1.070 lotes la causaban sobre todo esos lotes extremos: tras retirarlos, ninguna de las ocho variables supera 1 (la mayor es altitud, −0,69).
 - **Cómo se calcula la distancia:** distancia de Mahalanobis (cada componente dividida entre su propia desviación), umbral χ² al 97,5 % con 8 g.l. = 17,53. En la versión anterior un error de cálculo marcaba 404 lotes; la cifra correcta es 100.
@@ -170,7 +170,7 @@ Respuestas breves y cifras verificadas, ordenadas por diapositiva.
 - **Tendencia al agrupamiento (toda la matriz):** silueta promedio más alta con k = 2 (0,151); k = 3 da 0,115 y k = 4 da 0,114; el gap elige k = 1. La referencia del gap es uniforme, poco realista con columnas binarias.
 - **Silueta por grupo:** 0,088 · 0,168 · 0,086.
 - **Perfiles (puntaje total medio / altitud mediana):** G1 82,6 / 894 m · G2 80,1 / 1.300 m (incluye un lote con puntaje total 0) · G3 83,6 / 1.600 m.
-- **Prueba de proporciones (humedad = 0 por grupo):** 21,1 % (52 de 247), 6,0 % (23 de 382) y 22,4 % (99 de 441); χ² = 45,98, 2 g.l., p ≈ 1e-10. Es una asociación descriptiva, no explica la causa.
+- **Prueba de proporciones (humedad = 0 por grupo):** 21,1 % (52 de 247), 6,0 % (23 de 382) y 22,4 % (99 de 441); χ² = 45,98, 2 g.l., p aprox. 1e-10. Es una asociación descriptiva, no explica la causa.
 - **Matriz usada:** 1.070 lotes × 19 columnas (4 componentes exploratorias + 15 dummies de proceso, color y país).
 
 ## Diapositiva 6 - HDBSCAN
@@ -191,7 +191,7 @@ Respuestas breves y cifras verificadas, ordenadas por diapositiva.
 
 - Usa un PCA independiente, ajustado con los 970 lotes finales y sin Yeo-Johnson; el lote nuevo se estandariza con el centro y la escala de referencia.
 - Máximos reales por atributo: 8,5 (Aroma, Sabor, Acidez, Cuerpo, Balance), 8,3 (Retrogusto) y 8,6 (Puntaje Catador).
-- "Alta/Media/Baja" es una regla de percentiles de la propia aplicación (≥ 75, ≥ 25, resto): no es una certificación CQI.
+- "Alta/Media/Baja" es una regla de percentiles de la propia aplicación (75 o más, mayor o igual a 25, resto): no es una certificación CQI.
 - Con Aroma en 7,5 el percentil de calidad queda en 99,8 y sigue en Alta.
 
 ## Diapositiva 10 - Limitaciones
