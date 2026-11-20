@@ -2860,21 +2860,56 @@ border-radius: 0px;
 Semanas 2-3</h3>
 <h4 class="author">Juan Sebastián Guayazán · Esteban Valente · Diego
 Nocua</h4>
-<h4 class="date">17 de noviembre de 2026</h4>
+<h4 class="date">19 de noviembre de 2026</h4>
 
 </div>
 
 
 <blockquote>
-<p><strong>Semanas 2-3 del programa:</strong> Matriz de datos, tipos de
-variables, preparación, escalamiento, estandarización, visualización
-exploratoria. Medidas de localización y dispersión multivariada: medias,
-matriz de varianzas y covarianzas, matriz de correlaciones y varianza
-generalizada.</p>
+<p><strong>Semanas 2–3 del programa:</strong> matriz de datos, tipos de
+variables, preparación, escalamiento, estandarización y visualización
+exploratoria. Se estudian medidas de localización y dispersión
+multivariada mediante medias, covarianzas, correlaciones, varianza total
+y varianza generalizada.</p>
 </blockquote>
+<div id="cómo-leer-este-informe" class="section level2">
+<h2>Cómo leer este informe</h2>
+<p>Este documento tiene dos niveles que deben distinguirse:</p>
+<ul>
+<li><strong>Análisis principal:</strong> trabaja con 11 variables
+continuas para calcular estadísticos, visualizaciones, distancias y
+diagnósticos multivariados.</li>
+<li><strong>Anexo complementario:</strong> presenta gráficos
+exploratorios de las 14 variables cuantitativas originales. Es una
+ampliación visual y no cambia la matriz de 11 variables usada en los
+cálculos principales.</li>
+</ul>
+<p>La base se filtra por altitud y por registros completos en las 14
+variables seleccionadas. El tamaño de muestra resultante se imprime
+durante la ejecución del primer bloque.</p>
+<p><strong>Pregunta que responde:</strong> ¿cómo se distribuyen las
+variables, qué relaciones presentan y qué aspectos conviene considerar
+antes de aplicar métodos multivariados?</p>
+<p>La preparación específica que lleva a la matriz del PCA se documenta
+por separado en <a href="../01-pca/depuracion.Rmd">01-pca/depuracion.Rmd</a>.</p>
 <hr />
+</div>
 <div id="carga-y-preparación-de-datos" class="section level1">
 <h1>1. Carga y preparación de datos</h1>
+<p>Se leen los datos limpios de café Arábica y se seleccionan 14
+variables cuantitativas. El código conserva los registros cuya altitud
+está entre 0 y 3.000 metros (sin incluir valores faltantes) y elimina
+filas incompletas en cualquiera de las 14 variables seleccionadas.</p>
+<p>Después de preparar la tabla, se definen dos conjuntos para el
+análisis:</p>
+<ul>
+<li>11 variables continuas para los cálculos multivariados
+principales.</li>
+<li>3 variables con inflación de ceros —humedad y defectos de categorías
+1 y 2— que se describen por separado en el código.</li>
+</ul>
+<p>Este filtro pertenece al EDA y no debe confundirse con la secuencia
+de depuración posterior del PCA.</p>
 <pre class="r"><code>library(dplyr)
 library(ggplot2)
 library(GGally)      # ggpairs
@@ -2942,6 +2977,12 @@ cat(&quot;Variables continuas (11):\n&quot;); cat(vars_continuas, sep=&quot;, &q
 </div>
 <div id="estadísticos-de-localización-y-dispersión-multivariada" class="section level1">
 <h1>2. Estadísticos de localización y dispersión multivariada</h1>
+<p>Los estadísticos de esta sección se calculan sobre las 11 variables
+continuas definidas en el código. Permiten describir el centro, la
+variabilidad individual y la relación lineal entre variables. Como las
+variables están en escalas distintas, las covarianzas y la traza
+dependen de las unidades originales; la matriz de correlaciones facilita
+comparar la intensidad y dirección de las asociaciones lineales.</p>
 <div id="vector-de-medias" class="section level2">
 <h2>2.1. Vector de medias</h2>
 <pre class="r"><code>mu &lt;- colMeans(datos[, vars_continuas])
@@ -2955,6 +2996,10 @@ round(mu, 3)</code></pre>
 </div>
 <div id="matriz-de-varianzas-y-covarianzas-s" class="section level2">
 <h2>2.2. Matriz de varianzas y covarianzas (S)</h2>
+<p>La diagonal de S contiene las varianzas de cada variable y los
+elementos fuera de la diagonal contienen las covarianzas por pares. La
+traza suma las varianzas individuales; el determinante se presenta como
+medida de variación generalizada de la matriz.</p>
 <pre class="r"><code>S &lt;- cov(datos[, vars_continuas])
 round(S, 3)</code></pre>
 <pre><code>##                  Aroma  Sabor Retrogusto Acidez Cuerpo Balance Uniformidad
@@ -2989,6 +3034,10 @@ round(S, 3)</code></pre>
 </div>
 <div id="matriz-de-correlaciones-r" class="section level2">
 <h2>2.3. Matriz de correlaciones (R)</h2>
+<p>La correlación estandariza la asociación lineal entre cada par de
+variables, por lo que sus valores están entre −1 y 1. El mapa de calor
+ordena las variables jerárquicamente para facilitar la lectura de
+patrones; la correlación no implica causalidad.</p>
 <pre class="r"><code>R &lt;- cor(datos[, vars_continuas])
 round(R, 3)</code></pre>
 <pre><code>##                 Aroma Sabor Retrogusto Acidez Cuerpo Balance Uniformidad
@@ -3024,6 +3073,9 @@ round(R, 3)</code></pre>
 </div>
 <div id="varianza-generalizada-y-varianza-total" class="section level2">
 <h2>2.4. Varianza generalizada y varianza total</h2>
+<p>Esta subsección vuelve a presentar la traza, el determinante y la
+varianza media para resumir la dispersión conjunta de las 11
+variables.</p>
 <pre class="r"><code>cat(&quot;Varianza total       (traza S):&quot;, round(sum(diag(S)), 2), &quot;\n&quot;)</code></pre>
 <pre><code>## Varianza total       (traza S): 174658.4</code></pre>
 <pre class="r"><code>cat(&quot;Varianza generalizada (det S): &quot;, formatC(det(S), format=&quot;e&quot;, digits=3), &quot;\n&quot;)</code></pre>
@@ -3035,6 +3087,10 @@ round(R, 3)</code></pre>
 </div>
 <div id="visualización-exploratoria" class="section level1">
 <h1>3. Visualización exploratoria</h1>
+<p>Las gráficas permiten observar forma, dispersión, asimetrías y
+posibles valores extremos. Cada variable conserva su escala original en
+los boxplots principales, por lo que las magnitudes no son directamente
+comparables entre variables con unidades distintas.</p>
 <div id="boxplots-univariados" class="section level2">
 <h2>3.1. Boxplots univariados</h2>
 <pre class="r"><code>library(tidyr)
@@ -3053,6 +3109,11 @@ datos[, vars_continuas] %&gt;%
 </div>
 <div id="matriz-de-dispersión-pares" class="section level2">
 <h2>3.2. Matriz de dispersión (pares)</h2>
+<p>La matriz de pares se construye con las primeras seis variables del
+conjunto de 11. La diagonal muestra distribuciones, el triángulo
+inferior muestra nubes de puntos y el superior resume correlaciones. Es
+una vista parcial para facilitar la lectura, no una matriz gráfica de
+las 11 variables completas.</p>
 <pre class="r"><code>ggpairs(datos[, vars_continuas[1:6]],
         lower=list(continuous=wrap(&quot;points&quot;, alpha=0.15, size=0.8, color=&quot;#2563a8&quot;)),
         diag =list(continuous=wrap(&quot;densityDiag&quot;, fill=&quot;#2563a8&quot;, alpha=0.4)),
@@ -3063,8 +3124,11 @@ datos[, vars_continuas] %&gt;%
 <hr />
 </div>
 </div>
-<div id="distancias-y-similitudes" class="section level1">
-<h1>4. Distancias y similitudes</h1>
+<div id="distancias-multivariadas" class="section level1">
+<h1>4. Distancias multivariadas</h1>
+<p>Esta sección ilustra dos formas de medir separación: la distancia
+euclídea sobre variables estandarizadas y la distancia de Mahalanobis,
+que incorpora la estructura de covarianza entre variables.</p>
 <div id="distancia-euclídea" class="section level2">
 <h2>4.1. Distancia euclídea</h2>
 <pre class="r"><code>datos_std &lt;- scale(datos[, vars_continuas])
@@ -3088,8 +3152,14 @@ round(as.matrix(D_euc), 2)</code></pre>
 </div>
 <div id="distancia-de-mahalanobis" class="section level2">
 <h2>4.2. Distancia de Mahalanobis</h2>
-<p>La distancia de Mahalanobis tiene en cuenta la covarianza entre
-variables. Un lote con <span class="math inline">\(d^2_M &gt;
+<p>La distancia de Mahalanobis tiene en cuenta la covarianza entre las
+11 variables. El código compara el cuadrado de la distancia con el
+cuantil 97,5 % de una distribución chi-cuadrado con 11 grados de
+libertad. Los registros que superan ese umbral se marcan como candidatos
+atípicos bajo este criterio.</p>
+<p>Este es un diagnóstico exploratorio aplicado a la matriz del EDA; no
+es por sí mismo la regla de selección utilizada para construir la matriz
+final del PCA. Un lote con <span class="math inline">\(d^2_M &gt;
 \chi^2_{p,0.975}\)</span> se considera multivariadamente atípico.</p>
 <pre class="r"><code>dm2 &lt;- mahalanobis(datos[, vars_continuas],
                    colMeans(datos[, vars_continuas]),
@@ -3124,6 +3194,13 @@ cat(&quot;Umbral chi² al 97.5% (p=11):&quot;, round(umbral, 2), &quot;\n&quot;)
 </div>
 <div id="comparación-de-distancias" class="section level2">
 <h2>4.3. Comparación de distancias</h2>
+<p>El código compara la norma euclídea de cada fila estandarizada
+respecto al origen con la raíz de la distancia de Mahalanobis.
+<strong>No calcula aquí todas las distancias euclídeas entre pares de
+lotes</strong>: la matriz de distancias por pares se ilustra con la
+muestra de 10 observaciones de la subsección 4.1.</p>
+<p>La correlación entre ambas medidas resume cuánto se parecen esos dos
+criterios radiales en esta base.</p>
 <pre class="r"><code># Distancia estandarizada (euclídea sobre datos escalados) vs Mahalanobis
 d_std &lt;- sqrt(rowSums(datos_std^2))   # euclídea en espacio estandarizado
 
@@ -3134,10 +3211,11 @@ cat(&quot;Correlación euclídea-estandarizada vs Mahalanobis:&quot;,
 <pre><code>## (Si correlación &lt; 1: Mahalanobis detecta estructura de covarianza adicional)</code></pre>
 </div>
 </div>
-<div id="anexo-eda-complementario-eda_coffee.r" class="section level1">
-<h1>Anexo: EDA complementario (eda_coffee.R)</h1>
-<p>Exploración visual complementaria de las 14 variables
-cuantitativas.</p>
+<div id="anexo-eda-complementario-de-las-14-variables-cuantitativas" class="section level1">
+<h1>Anexo: EDA complementario de las 14 variables cuantitativas</h1>
+<p>Este anexo amplía la exploración visual a las 14 variables
+originales. No reemplaza ni modifica los cálculos principales, que se
+hicieron sobre 11 variables.</p>
 <pre class="r"><code># EDA — Coffee Quality Institute
 # Exploración inicial de las 14 variables cuantitativas
 # Complemento visual al informe del taller (informe_taller_pca.Rmd)

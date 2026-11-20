@@ -157,9 +157,13 @@ barplot(diag(S), las = 2, col = "#8fb8a8", log = "y",
         ylab = "Varianza (log)")
 dev.off()
 
+```
+
 # 5. Diagnóstico exploratorio de Mahalanobis sobre 1.070 filas
 
 **Advertencia de trazabilidad:** aunque `datos_t` contiene las 1.070 filas de `datos8_pre`, el bucle aplica `obj$lambdas`, recuperadas de `datos_final_666.rds`. Este gráfico es, por tanto, un diagnóstico exploratorio sobre 1.070 filas transformadas con parámetros procedentes del objeto intermedio de 666. No representa el PCA preliminar original ni el PCA final oficial de 627. Se conserva como antecedente, pero sus conteos no deben mezclarse con los 404 y 39 de la cadena de depuración.
+
+```{r fig2b}
 datos_t <- datos8_pre
 for (v in names(obj$lambdas)) datos_t[[v]] <- car::yjPower(datos_t[[v]], obj$lambdas[v])
 pca_p <- prcomp(datos_t, center = TRUE, scale. = TRUE)

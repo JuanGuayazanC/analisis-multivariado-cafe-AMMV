@@ -1501,20 +1501,32 @@ border-radius: 0px;
 Quality Institute</h3>
 <h4 class="author">Juan Sebastián Guayazán · Esteban Valente · Diego
 Nocua</h4>
-<h4 class="date">17 de noviembre de 2026</h4>
+<h4 class="date">19 de noviembre de 2026</h4>
 
 </div>
 
 
-<div id="pca-de-1.070-lotes-666-y-627-secuencia-de-atípicos" class="section level1">
-<h1>1. PCA de 1.070 lotes, 666 y 627: secuencia de atípicos</h1>
-<p>Muestra en qué paso sale cada grupo de atípicos. Las figuras se
-guardan en <code>figuras/secuencia/</code>.</p>
+<div id="secuencia-de-depuración-1.070-666-627-lotes" class="section level1">
+<h1>1. Secuencia de depuración: 1.070 → 666 → 627 lotes</h1>
+<p>Esta sección reconstruye las dos etapas de identificación
+multivariada de observaciones extremas. La primera dispersión
+corresponde al PCA preliminar de 1.070 lotes y marca los 404 registros
+identificados en esa etapa. La segunda corresponde al PCA ajustado sobre
+los 666 registros restantes y marca los 39 identificados en la segunda
+etapa.</p>
+<p><strong>Alcance de la figura final:</strong> el código también ajusta
+un PCA sobre <code>datos_final_627.rds</code>, pero en este bloque no
+dibuja la dispersión de sus scores. La salida correspondiente a 627 es
+un mapa de calor de las cargas de CP1–CP3. Para la varianza explicada,
+los scores, el biplot y la interpretación del modelo definitivo, utiliza
+<a href="pca_final.Rmd">PCA final</a>.</p>
+<p>Las figuras de esta sección se guardan en
+<code>figuras/secuencia/</code>.</p>
 <pre class="r"><code># Figuras de la secuencia de depuración, en el orden en que se presentan:
 # 1) PCA de 1.070 lotes con atípicos marcados (404)
 # 2) PCA de 666 lotes con atípicos marcados (39)
-# 3) PCA final de 627 lotes
-# 4) Cargas CP1-CP3 como mapa de calor
+# 3) Ajuste del PCA final sobre 627 lotes (sin dispersión de scores en este bloque)
+# 4) Cargas CP1-CP3 del PCA final como mapa de calor
 suppressMessages(library(ggplot2))
 
 th &lt;- theme_minimal(base_size = 14) + theme(legend.position = &quot;bottom&quot;)
@@ -1540,7 +1552,7 @@ g2 &lt;- ggplot(p2, aes(CP1, CP2, color = Lote)) + geom_point(alpha = 0.7, size 
   labs(title = sprintf(&quot;PCA de 666 lotes: %d atípicos más&quot;, sum(out2)), x = sprintf(&quot;CP1 (%.1f %%)&quot;, 100 * summary(p666)$importance[2, 1]), y = sprintf(&quot;CP2 (%.1f %%)&quot;, 100 * summary(p666)$importance[2, 2]), color = NULL) + th
 ggsave(&quot;figuras/secuencia/seq2_pca666_atipicos.png&quot;, g2, width = 8, height = 6, dpi = 200)
 
-# PCA final oficial: 627 lotes con λ re-estimados (datos_final_627.rds)
+# PCA final oficial: 627 lotes con λ reestimados (`datos_final_627.rds`). En este bloque se obtienen las cargas; no se genera una gráfica de scores para esta muestra.
 fin &lt;- readRDS(&quot;../datos/datos_final_627.rds&quot;)
 F627 &lt;- fin$datos_limpio
 names(F627) &lt;- names(T1070)
@@ -1558,12 +1570,23 @@ ggsave(&quot;figuras/secuencia/seq4_cargas_mapa.png&quot;, g4, width = 6.5, heig
 cat(&quot;n1070&quot;, length(out1), &quot;out1&quot;, sum(out1), &quot;out2&quot;, sum(out2), &quot;final&quot;, nrow(F627), &quot;\n&quot;)</code></pre>
 <pre><code>## n1070 1070 out1 404 out2 39 final 627</code></pre>
 </div>
-<div id="justificación-cajas-ajustadas-correlaciones-varianzas-y-biplot" class="section level1">
-<h1>2. Justificación: cajas ajustadas, correlaciones, varianzas y
-biplot</h1>
-<p>Figuras de la justificación del preprocesamiento y del biplot limpio.
-Escriben en <code>figuras/secuencia/</code> y no reemplazan las figuras
-de <code>imagenes_presentacion/</code>.</p>
+<div id="diagnósticos-y-figuras-de-etapas-exploratorias" class="section level1">
+<h1>2. Diagnósticos y figuras de etapas exploratorias</h1>
+<p>Esta sección <strong>no corresponde a un único ajuste PCA ni a una
+única muestra</strong>. Combina diagnósticos descriptivos de la base
+inicial filtrada (1.070 lotes), resúmenes calculados sobre la matriz
+intermedia de 666 lotes y un diagnóstico exploratorio adicional que
+mezcla datos de 1.070 con lambdas almacenadas en el objeto de 666. Por
+tanto, sus gráficas no deben leerse como resultados homogéneos del PCA
+final de 627.</p>
+<p>Las salidas se guardan en <code>figuras/secuencia/</code> y no
+reemplazan las figuras de <code>imagenes_presentacion/</code>.</p>
+<p>En particular, las cajas ajustadas y la distribución de humedad
+parten de las 14 variables de la base inicial filtrada. El gráfico de
+asimetría compara esa base inicial con la matriz intermedia de 666; no
+es una comparación antes/después sobre las mismas filas. Las matrices de
+covarianzas, correlaciones y el biplot de esta sección se calculan sobre
+<code>datos_final_666.rds</code>.</p>
 <pre class="r"><code>library(dplyr)
 library(car)
 library(robustbase)
@@ -1607,7 +1630,7 @@ barplot(c(Sweetness = mean(datos14$Sweetness == 10), Uniformity = mean(datos14$U
 dev.off()</code></pre>
 <pre><code>## png 
 ##   2</code></pre>
-<pre class="r"><code># 3. Asimetría antes y después de Yeo-Johnson (8 variables)
+<pre class="r"><code># 3. Asimetría: base inicial frente a matriz intermedia de 666 lotes (8 variables)
 skew &lt;- function(x) mean((x - mean(x))^3) / sd(x)^3
 datos8_pre &lt;- datos14[, vars8]
 sk_pre &lt;- sapply(datos8_pre, skew)
@@ -1617,13 +1640,13 @@ barplot(sk_pre, las = 2, col = ifelse(abs(sk_pre) &gt; 1, &quot;firebrick&quot;,
         main = &quot;Asimetría antes de Yeo-Johnson&quot;, ylab = &quot;Asimetría&quot;)
 abline(h = c(-1, 1), lty = 2)
 sk_post &lt;- sapply(datos666, skew)
-barplot(sk_post, las = 2, col = &quot;steelblue&quot;, main = &quot;Asimetría en la matriz final (666 lotes)&quot;,
+barplot(sk_post, las = 2, col = &quot;steelblue&quot;, main = &quot;Asimetría en la matriz intermedia (666 lotes)&quot;,
         ylab = &quot;Asimetría&quot;)
 abline(h = c(-1, 1), lty = 2)
 dev.off()</code></pre>
 <pre><code>## png 
 ##   2</code></pre>
-<pre class="r"><code># 4. Varianzas y covarianzas (matriz final)
+<pre class="r"><code># 4. Varianzas y covarianzas de la matriz intermedia de 666 lotes
 S &lt;- cov(datos666)
 png(out(&quot;04_varianzas_covarianzas.png&quot;), width = as.integer(1500*1.6), height = as.integer(1000*1.6), res = 220)
 par(mfrow = c(1, 2), mar = c(8, 8, 3, 1))
@@ -1645,8 +1668,19 @@ barplot(diag(S), las = 2, col = &quot;#8fb8a8&quot;, log = &quot;y&quot;,
 dev.off()</code></pre>
 <pre><code>## png 
 ##   2</code></pre>
-<pre class="r"><code># 5. Mahalanobis (PCA exploratorio sobre datos transformados, 1.070 lotes)
-datos_t &lt;- datos8_pre
+</div>
+<div id="diagnóstico-exploratorio-de-mahalanobis-sobre-1.070-filas" class="section level1">
+<h1>5. Diagnóstico exploratorio de Mahalanobis sobre 1.070 filas</h1>
+<p><strong>Advertencia de trazabilidad:</strong> aunque
+<code>datos_t</code> contiene las 1.070 filas de
+<code>datos8_pre</code>, el bucle aplica <code>obj$lambdas</code>,
+recuperadas de <code>datos_final_666.rds</code>. Este gráfico es, por
+tanto, un diagnóstico exploratorio sobre 1.070 filas transformadas con
+parámetros procedentes del objeto intermedio de 666. No representa el
+PCA preliminar original ni el PCA final oficial de 627. Se conserva como
+antecedente, pero sus conteos no deben mezclarse con los 404 y 39 de la
+cadena de depuración.</p>
+<pre class="r"><code>datos_t &lt;- datos8_pre
 for (v in names(obj$lambdas)) datos_t[[v]] &lt;- car::yjPower(datos_t[[v]], obj$lambdas[v])
 pca_p &lt;- prcomp(datos_t, center = TRUE, scale. = TRUE)
 dm2 &lt;- rowSums((pca_p$x / pca_p$sdev)^2)
@@ -1703,9 +1737,14 @@ dev.off()</code></pre>
 <pre><code>## png 
 ##   2</code></pre>
 </div>
-<div id="varianzas-y-correlaciones-de-la-matriz-de-627-lotes" class="section level1">
-<h1>3. Varianzas y correlaciones de la matriz de 627 lotes</h1>
-<p>Figura de varianzas y correlaciones de la matriz final.</p>
+<div id="matriz-original-varianzas-y-correlaciones-de-los-627-lotes" class="section level1">
+<h1>3. Matriz original: varianzas y correlaciones de los 627 lotes</h1>
+<p>Este bloque utiliza <code>datos_final_627.rds</code>, pero toma
+<code>datos_originales</code>: calcula covarianzas y correlaciones en la
+escala original de las ocho variables, no sobre la matriz Yeo-Johnson
+estandarizada que alimenta el PCA. Es una descripción de la muestra
+final en escala original; no debe confundirse con las cargas ni con la
+varianza explicada del PCA.</p>
 <pre class="r"><code>obj &lt;- readRDS(&quot;../datos/datos_final_627.rds&quot;)
 R &lt;- obj$datos_originales[, c(&quot;Aroma&quot;,&quot;Flavor&quot;,&quot;Aftertaste&quot;,&quot;Acidity&quot;,&quot;Body&quot;,&quot;Balance&quot;,&quot;Cupper.Points&quot;,&quot;altitude_mean_meters&quot;)]
 names(R) &lt;- c(&quot;Aroma&quot;,&quot;Flavor&quot;,&quot;Aftertaste&quot;,&quot;Acidity&quot;,&quot;Body&quot;,&quot;Balance&quot;,&quot;Cupper.Points&quot;,&quot;Altitud&quot;)
@@ -1727,9 +1766,20 @@ dev.off()</code></pre>
 <pre><code>## png 
 ##   2</code></pre>
 </div>
-<div id="humedad-0-en-las-vecindades" class="section level1">
-<h1>4. Humedad = 0 en las vecindades</h1>
-<p>Proporción de vecinos con Humedad = 0 frente a la base total.</p>
+<div id="humedad-0-y-vecindades-comprobación-exploratoria" class="section level1">
+<h1>4. Humedad = 0 y vecindades: comprobación exploratoria</h1>
+<p>Este bloque compara la proporción de registros con
+<code>Moisture = 0</code> con la proporción observada entre sus 15
+vecinos más cercanos en matrices transformadas. La correspondencia entre
+las filas de <code>z0</code> (construida desde la base inicial de 1.070)
+y las filas de <code>base_sin_atipicos.rds</code> depende de que se
+conserve exactamente el orden original de las observaciones. El código
+no reconstruye explícitamente los identificadores originales de esas
+filas; por eso, <strong>no conviene defender la comparación de
+vecindades como evidencia concluyente hasta verificar esa
+correspondencia</strong>.</p>
+<p>Además, observar humedad igual a cero no demuestra por sí solo que el
+valor sea faltante o inválido.</p>
 <pre class="r"><code>d &lt;- read.csv(&quot;../data/arabica_data_cleaned.csv&quot;)
 vars14 &lt;- c(&quot;Aroma&quot;,&quot;Flavor&quot;,&quot;Aftertaste&quot;,&quot;Acidity&quot;,&quot;Body&quot;,&quot;Balance&quot;,&quot;Uniformity&quot;,&quot;Clean.Cup&quot;,&quot;Sweetness&quot;,&quot;Cupper.Points&quot;,&quot;Moisture&quot;,&quot;Category.One.Defects&quot;,&quot;Category.Two.Defects&quot;,&quot;altitude_mean_meters&quot;)
 b &lt;- d[!is.na(d$altitude_mean_meters) &amp; d$altitude_mean_meters &gt; 0 &amp; d$altitude_mean_meters &lt;= 3000, ]

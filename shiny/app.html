@@ -612,17 +612,17 @@ ui &lt;- fluidPage(
       div(class = &quot;pc-badge&quot;,
         div(class = &quot;pc-name&quot;, &quot;CP2&quot;),
         div(class = &quot;pc-var&quot;,  paste0(var_exp[2], &quot;%&quot;)),
-        div(class = &quot;pc-desc&quot;, &quot;Contraste entre atributos&quot;)
+        div(class = &quot;pc-desc&quot;, &quot;Altitud de cultivo&quot;)
       ),
       div(class = &quot;pc-badge&quot;,
         div(class = &quot;pc-name&quot;, &quot;CP3&quot;),
         div(class = &quot;pc-var&quot;,  paste0(var_exp[3], &quot;%&quot;)),
-        div(class = &quot;pc-desc&quot;, &quot;Componente de altitud&quot;)
+        div(class = &quot;pc-desc&quot;, &quot;Contraste sensorial fino&quot;)
       ),
       div(class = &quot;pc-badge&quot;,
         div(class = &quot;pc-name&quot;, &quot;CP4&quot;),
         div(class = &quot;pc-var&quot;,  paste0(var_exp[4], &quot;%&quot;)),
-        div(class = &quot;pc-desc&quot;, &quot;Contraste sensorial fino&quot;)
+        div(class = &quot;pc-desc&quot;, &quot;Componente adicional&quot;)
       )
     )
   ),
@@ -661,8 +661,8 @@ ui &lt;- fluidPage(
               radioButtons(&quot;ejes&quot;, NULL,
                 choices = setNames(
                   c(&quot;12&quot;, &quot;13&quot;),
-                  c(paste0(&quot;CP1 vs CP2 — Calidad sensorial  ↔  Contraste atributos (&quot;, var_exp[1], &quot;% + &quot;, var_exp[2], &quot;%)&quot;),
-                    paste0(&quot;CP1 vs CP3 — Calidad sensorial  ↔  Altitud              (&quot;, var_exp[1], &quot;% + &quot;, var_exp[3], &quot;%)&quot;))
+                  c(paste0(&quot;CP1 vs CP2 — Calidad sensorial  ↔  Altitud (&quot;, var_exp[1], &quot;% + &quot;, var_exp[2], &quot;%)&quot;),
+                    paste0(&quot;CP1 vs CP3 — Calidad sensorial  ↔  Contraste sensorial              (&quot;, var_exp[1], &quot;% + &quot;, var_exp[3], &quot;%)&quot;))
                 ),
                 selected = &quot;12&quot;, inline = FALSE)
             )
@@ -685,7 +685,7 @@ ui &lt;- fluidPage(
             div(class = &quot;card-title&quot;, &quot;Varianza por componente&quot;),
             plotOutput(&quot;scree&quot;, height = &quot;320px&quot;),
             div(style = &quot;font-size:12px; color:#666;&quot;,
-              &quot;Cada barra es el porcentaje de varianza que explica el componente. CP1 y CP2 suman 66,8 %.&quot;)
+              paste0(&quot;Cada barra es el porcentaje de varianza que explica el componente. CP1 y CP2 suman &quot;, round(var_exp[1] + var_exp[2], 1), &quot; %.&quot;))
           )
         ),
         column(4,
@@ -863,7 +863,8 @@ server &lt;- function(input, output, session) {
     if (is.null(ns)) return(NULL)
 
     pct_pc1     &lt;- mean(scores_df$PC1 &lt;= ns[1]) * 100
-    pct_pc3     &lt;- mean(scores_df$PC3 &lt;= ns[3]) * 100
+    pct_pc2     &lt;- mean(scores_df$PC2 &lt;= ns[2]) * 100
+    pct_altitud &lt;- 100 - pct_pc2   # CP2 tiene carga negativa dominante en Altitud
     pct_calidad &lt;- 100 - pct_pc1   # PC1 negativo = mayor calidad sensorial
 
     if (pct_calidad &gt;= 75) {
@@ -877,39 +878,41 @@ server &lt;- function(input, output, session) {
       badge_text  &lt;- &quot;Calidad sensorial baja&quot;
     }
 
-    pc2_txt &lt;- if (ns[2] &gt; 0.8) {
-      &quot;Perfil con mayor peso en atributos secundarios (Retrogusto, Balance, Cuerpo)&quot;
-    } else if (ns[2] &lt; -0.8) {
-      &quot;Perfil con mayor peso en atributos primarios (Aroma, Sabor, Acidez, Puntaje Catador)&quot;
+    pc2_txt &lt;- if (ns[2] &lt; -0.8) {
+      paste0(&quot;Altitud relativamente alta — percentil &quot;, round(pct_altitud), &quot; en el dataset&quot;)
+    } else if (ns[2] &gt; 0.8) {
+      paste0(&quot;Altitud relativamente baja — percentil &quot;, round(pct_altitud), &quot; en el dataset&quot;)
     } else {
-      &quot;Perfil equilibrado entre atributos primarios y secundarios&quot;
+      paste0(&quot;Altitud cercana al centro de la distribución — percentil &quot;, round(pct_altitud), &quot; en el dataset&quot;)
     }
 
     pc3_txt &lt;- if (ns[3] &gt; 0.8) {
-      paste0(&quot;Altitud de cultivo alta — percentil &quot;, round(pct_pc3), &quot; en el dataset&quot;)
+      &quot;Mayor peso relativo de Aroma y Acidez frente a Cuerpo y Balance&quot;
     } else if (ns[3] &lt; -0.8) {
-      paste0(&quot;Altitud de cultivo baja — percentil &quot;, round(pct_pc3), &quot; en el dataset&quot;)
+      &quot;Mayor peso relativo de Cuerpo y Balance frente a Aroma y Acidez&quot;
     } else {
-      paste0(&quot;Altitud de cultivo típica — percentil &quot;, round(pct_pc3), &quot; en el dataset&quot;)
+      &quot;Perfil intermedio en el contraste sensorial de CP3&quot;
     }
 
     tagList(
       div(class = badge_class, badge_text),
-      div(style = &quot;font-size:12px; color:#666; margin-bottom:10px;&quot;,
-          sprintf(&quot;Superior al %.0f%% de los lotes en calidad sensorial (CP1, percentil %d).&quot;,
-                  pct_calidad, round(pct_calidad))),
-      div(class = &quot;interp-item con&quot;,
-        div(class = &quot;interp-pc&quot;, &quot;CP2 · Contraste entre atributos sensoriales&quot;),
+      div(style = &quot;font-size:12px; color:#666; margin-bottom:6px;&quot;,
+          sprintf(&quot;Posición relativa en el eje CP1: por encima del %.0f%% de los lotes de referencia.&quot;,
+                  pct_calidad)),
+      div(style = &quot;font-size:11px; color:#888; margin-bottom:10px; line-height:1.4;&quot;,
+          &quot;La etiqueta alta, media o baja es una regla orientativa de esta aplicación basada en percentiles; no es una certificación CQI ni una probabilidad de calidad.&quot;),
+      div(class = &quot;interp-item alt&quot;,
+        div(class = &quot;interp-pc&quot;, &quot;CP2 · Altitud de cultivo&quot;),
         div(class = &quot;interp-val&quot;, pc2_txt)
       ),
-      div(class = &quot;interp-item alt&quot;,
-        div(class = &quot;interp-pc&quot;, &quot;CP3 · Altitud de cultivo&quot;),
+      div(class = &quot;interp-item con&quot;,
+        div(class = &quot;interp-pc&quot;, &quot;CP3 · Contraste entre atributos sensoriales&quot;),
         div(class = &quot;interp-val&quot;, pc3_txt)
       ),
       div(style = &quot;font-size:11px; color:#aaa; margin-top:10px; line-height:1.5;&quot;,
         paste0(&quot;CP1 captura el &quot;, var_exp[1], &quot;% de la varianza total. &quot;,
-               &quot;Score negativo en CP1 indica mayor calidad sensorial &quot;,
-               &quot;(los 7 atributos sensoriales cargan negativamente en CP1).&quot;)
+               &quot;La lectura de los ejes depende de la orientación de las cargas almacenadas: CP1 resume los atributos sensoriales; CP2 está dominado por Altitud y CP3 contrapone principalmente Aroma/Acidez con Cuerpo/Balance. &quot;,
+               &quot;Los umbrales de ±0,8 usados para describir CP2 y CP3 son reglas interpretativas de la interfaz.&quot;)
       )
     )
   })
