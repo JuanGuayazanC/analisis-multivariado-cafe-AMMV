@@ -8,11 +8,16 @@
 #  - prueba de proporciones entre grupos con una variable que NO entra al agrupamiento
 # Salida: figuras/revision_profesor/ (dentro de 04-clustering) y resultados_clustering_profesor.txt
 
+# Ejecutar con 04-clustering/ como directorio de trabajo (las rutas son relativas a esa carpeta).
+if (!file.exists("../data/arabica_data_cleaned.csv"))
+  stop("Ejecute el script desde la carpeta 04-clustering/ (no se encuentra ../data/arabica_data_cleaned.csv).")
+dir.create("figuras/revision_profesor", recursive = TRUE, showWarnings = FALSE)
+
 suppressMessages({ library(dplyr); library(car); library(cluster) })
 out_txt <- character()
 add <- function(...) out_txt <<- c(out_txt, paste0(...))
 
-# ---- 1. Matriz de 04-clustering/clustering.Rmd (réplica exacta) ----
+# == 1. Matriz de 04-clustering/clustering.Rmd (réplica exacta) ==
 data_raw <- read.csv("../data/arabica_data_cleaned.csv")
 datos_filtrados <- data_raw %>% filter(!is.na(altitude_mean_meters), altitude_mean_meters > 0, altitude_mean_meters <= 3000)
 vars_activas <- c("Aroma", "Flavor", "Aftertaste", "Acidity", "Body", "Balance", "Cupper.Points", "altitude_mean_meters")
@@ -40,7 +45,7 @@ add("K-means k = 3 (semilla 42): tamaños ", paste(km$size, collapse = ", "),
     "; silueta negativa ", sum(sil_km[, 3] < 0), " (", round(100 * mean(sil_km[, 3] < 0), 1), " %)")
 add("Silueta por grupo K-means: ", paste(sprintf("G%d=%.3f", 1:3, tapply(sil_km[, 3], sil_km[, 1], mean)), collapse = ", "))
 
-# ---- 2. Tendencia al agrupamiento ----
+# == 2. Tendencia al agrupamiento ==
 set.seed(42)
 wss <- sapply(1:8, function(k) kmeans(X, centers = k, nstart = 25, iter.max = 100)$tot.withinss)
 set.seed(42)
@@ -56,6 +61,11 @@ k_gap1 <- maxSE(gap$Tab[, "gap"], gap$Tab[, "SE.sim"], method = "firstSEmax")
 k_gapG <- maxSE(gap$Tab[, "gap"], gap$Tab[, "SE.sim"], method = "globalmax")
 add("k por gap: primer máximo (firstSEmax) = ", k_gap1, "; máximo global = ", k_gapG)
 add("k con mayor silueta promedio: ", which.max(sil_k) + 1)
+if (k_gap1 == 1)
+  add("Interpretación: el gap elige k = 1, es decir, no hay evidencia de que la matriz esté más agrupada ",
+      "que una referencia uniforme. La elección k = 3 es exploratoria y no la respaldan ni el gap ni la silueta.")
+add("Nota: la referencia del gap es uniforme en la caja de cada columna; con 15 columnas binarias (dummies) ",
+    "esa referencia es poco realista, así que el gap debe leerse junto con la silueta y no como prueba formal.")
 
 png("figuras/revision_profesor/tendencia_codo_silueta_gap.png", width = 2400, height = 800, res = 170, bg = "transparent")
 par(mfrow = c(1, 3), mar = c(4.2, 4.2, 3, 1))
@@ -66,7 +76,7 @@ abline(v = 3, lty = 3, col = "#c0392b")
 plot(gap, main = "Estadístico gap", xlab = "k")
 dev.off()
 
-# ---- 3. Dendrograma Ward.D2 (misma muestra de 80) y silueta por grupo ----
+# == 3. Dendrograma Ward.D2 (misma muestra de 80) y silueta por grupo ==
 set.seed(42)
 idx <- sample(seq_len(nrow(X)), 80)
 Xw <- X[idx, ]
@@ -84,7 +94,7 @@ add("Tamaños: ", paste(table(gw), collapse = ", "), "; silueta promedio ", roun
 add("Silueta por grupo Ward: ", paste(sprintf("G%d=%.3f", 1:3, tapply(sil_w[, 3], sil_w[, 1], mean)), collapse = ", "))
 add("Alturas de las últimas fusiones (de 1 a 4 grupos): ", paste(round(alturas, 2), collapse = ", "),
     "; el corte en k = 3 queda entre ", round(alturas[3], 2), " y ", round(alturas[2], 2),
-    ". El mayor salto es entre 1 y 2 grupos, coherente con la silueta máxima en k = 2.")
+    ". El mayor salto es entre ", which.max(-diff(alturas)), " y ", which.max(-diff(alturas)) + 1, " grupos.")
 add("ARI K-means / Ward en la muestra: ", round(ari(km$cluster[idx], gw), 3))
 
 png("figuras/revision_profesor/dendrograma_ward_k3.png", width = 2200, height = 1100, res = 170, bg = "transparent")
@@ -96,7 +106,7 @@ plot(sil_w, border = NA, col = c("#c0392b", "#1f4e79", "#117a65")[sort(gw)],
      main = sprintf("Silueta por grupo, Ward.D2 k = 3 (promedio %.3f)", mean(sil_w[, 3])))
 dev.off()
 
-# ---- 4. Prueba de proporciones: Humedad = 0 por grupo de K-means ----
+# == 4. Prueba de proporciones: Humedad = 0 por grupo de K-means ==
 # Humedad no entra en la matriz de agrupamiento, así que la comparación es informativa.
 h0 <- datos_filtrados$Moisture == 0
 tab <- table(Grupo = km$cluster, Humedad0 = h0)

@@ -26,7 +26,7 @@ estandarizar la matriz X, examinar WSS con factoextra, fijar k a partir del grá
 ajustar con 25 inicializaciones y visualizar con fviz_cluster.
 
 El espacio de clustering combina cuatro scores PCA con tres variables categóricas
-codificadas como indicadores. La matriz se pondera por bloques para que las 14
+codificadas como indicadores. La matriz se pondera por bloques para que las 15
 columnas dummy no dominen solo por ser más numerosas. No se quitan las filas que
 el informe PCA posterior marca como atípicas. Por eso este análisis usa el PCA
 exploratorio sobre los 1.070 lotes; sus componentes no son los del PCA final
@@ -34,7 +34,7 @@ ajustado después de retirar atípicos.
 
 La elección k = 3 se usa como solución exploratoria, elegida visualmente en la curva
 WSS. Silhouette se reporta como validación y muestra que la separación es débil.
-Los números 3 o 8 no se traducen automáticamente en Specialty, Premium o Commodity.
+El número de grupos no se traduce automáticamente en categorías Specialty, Premium o Commodity.
 
 # 1. Preparar datos y PCA exploratorio
 
@@ -347,7 +347,7 @@ for (i in seq_len(20)) {
 cat("ARI frente a la solución de referencia — rango:",
     paste(round(range(ari_repeticiones), 3), collapse = " a "), "\n")
 cat("WSS entre las 20 repeticiones — rango:",
-    paste(round(wss_repeticiones, 1), collapse = " a "), "\n")
+    paste(round(range(wss_repeticiones), 1), collapse = " a "), "\n")
 cat("Repeticiones idénticas a la referencia:",
     sum(ari_repeticiones == 1), "de 20\n")
 ```
@@ -418,6 +418,27 @@ Ward se ajustó sobre 80 lotes, mientras K-means usa los 1.070.
 Por tanto, el dendrograma ilustra el método y sus grupos no se comparan como si
 fueran etiquetas de toda la base.
 
+## 6.1 Perfil de los grupos Ward en las variables originales
+
+Promedios de los atributos sensoriales y del puntaje total para los 80 lotes de la
+muestra, en su escala original. Estas son las cifras que se citan en la presentación;
+describen solo la muestra y las distribuciones de los grupos se traslapan.
+
+```{r perfil-ward}
+perfil_ward <- datos_filtrados[idx_ward, ] %>%
+  mutate(grupo_ward = factor(grupos_ward)) %>%
+  group_by(grupo_ward) %>%
+  summarise(
+    lotes = n(),
+    Aroma = mean(Aroma), Flavor = mean(Flavor), Aftertaste = mean(Aftertaste),
+    Acidity = mean(Acidity), Body = mean(Body), Balance = mean(Balance),
+    Cupper.Points = mean(Cupper.Points), Total.Cup.Points = mean(Total.Cup.Points),
+    .groups = "drop"
+  ) %>%
+  mutate(across(where(is.numeric) & !lotes, ~ round(., 2)))
+perfil_ward
+```
+
 # 7. Comparación K-means y Ward.D2
 
 Adjusted Rand Index compara las particiones de los mismos 80 lotes; no es una
@@ -451,18 +472,30 @@ comparables con las de K-means sobre los 1.070 lotes. Ambos métodos usan distan
 euclídea y buscan grupos compactos; sus resultados dependen de la representación
 y ponderación de las variables.
 
-# 9. Conclusión
+# 8. Conclusión
 
 El flujo de código sigue el procedimiento visto en clase. La solución k = 3 es
 una elección visual exploratoria del codo, no una certificación de que existan
-tres segmentos naturales. Silhouette, tamaños, estabilidad y perfiles en
+tres segmentos naturales. De hecho, en `revision_clustering_profesor.R` la silueta
+promedio es máxima en k = 2 y el estadístico gap elige k = 1, es decir, no encuentra
+evidencia de que los datos estén más agrupados que una referencia sin estructura.
+Silhouette, tamaños, estabilidad y perfiles en
 variables originales deben leerse conjuntamente. Los nombres comerciales solo
 se justifican si criterios de calidad externos, definidos antes de ver los
 clusters, muestran una correspondencia clara.
 
 # Anexo: robustez del agrupamiento (1.070 lotes vs. sin atípicos)
 
-Compara K-means (k = 2 a 6), Ward.D2 y HDBSCAN (minPts = 15) sobre las dos bases de 1.070 lotes. Sirve para ver si la estructura cambia al quitar los atípicos.
+Compara K-means (k = 2 a 6), Ward.D2 y HDBSCAN (minPts = 15) sobre la base de 1.070 lotes
+y sobre la base de 970 lotes sin atípicos (`base_sin_atipicos.rds`). Sirve para ver si la
+estructura cambia al quitar los atípicos.
+
+**Importante:** este anexo usa **otra matriz**: las 8 variables numéricas transformadas y
+estandarizadas, sin las variables categóricas ni la ponderación por bloques. Por eso sus
+siluetas (≈ 0,26) no son comparables con la del análisis principal (0,116), y aquí Ward se
+ajusta con todos los lotes, no con la muestra de 80. Con minPts = 15, HDBSCAN en R deja todos los
+lotes como ruido en esta matriz; los cinco grupos que se presentan vienen del script de Python
+(`hdbscan_python.py`), que usa otra matriz y otro tamaño mínimo de grupo (20).
 
 ```{r robustez-agrupamiento}
 suppressMessages(library(cluster))

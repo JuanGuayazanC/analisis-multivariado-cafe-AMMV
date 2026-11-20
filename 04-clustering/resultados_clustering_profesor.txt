@@ -14,11 +14,13 @@ Silueta por grupo K-means: G1=0.088, G2=0.168, G3=0.086
  8 1006.3   0.136 0.869  0.004
 k por gap: primer máximo (firstSEmax) = 1; máximo global = 1
 k con mayor silueta promedio: 2
+Interpretación: el gap elige k = 1, es decir, no hay evidencia de que la matriz esté más agrupada que una referencia uniforme. La elección k = 3 es exploratoria y no la respaldan ni el gap ni la silueta.
+Nota: la referencia del gap es uniforme en la caja de cada columna; con 15 columnas binarias (dummies) esa referencia es poco realista, así que el gap debe leerse junto con la silueta y no como prueba formal.
 
 == Ward.D2 (muestra de 80, misma semilla) ==
 Tamaños: 15, 42, 23; silueta promedio 0.128
 Silueta por grupo Ward: G1=0.111, G2=0.136, G3=0.123
-Alturas de las últimas fusiones (de 1 a 4 grupos): 5.53, 4.5, 3.75, 3.17; el corte en k = 3 queda entre 3.75 y 4.5. El mayor salto es entre 1 y 2 grupos, coherente con la silueta máxima en k = 2.
+Alturas de las últimas fusiones (de 1 a 4 grupos): 5.53, 4.5, 3.75, 3.17; el corte en k = 3 queda entre 3.75 y 4.5. El mayor salto es entre 1 y 2 grupos.
 ARI K-means / Ward en la muestra: 0.471
 
 == Prueba de proporciones: lotes con Humedad = 0 por grupo de K-means ==
