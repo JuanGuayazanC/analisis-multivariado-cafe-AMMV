@@ -11,12 +11,19 @@ Esta carpeta contiene la aplicación Shiny que permite modificar los valores de 
 
 1. Abre el proyecto de R desde la raíz del repositorio.
 2. Verifica que exista el archivo datos/datos_final_627.rds.
-3. Instala las dependencias de R utilizadas por la aplicación (shiny, dplyr, ggplot2 y car).
-4. Desde la consola de R, en la raíz del proyecto, ejecuta:
+3. Instala las dependencias de R utilizadas por la aplicación:
+
+```r
+install.packages(c("shiny", "dplyr", "ggplot2", "car"))
+```
+
+4. Desde la consola de R, situado en la raíz del proyecto, ejecuta:
 
 ```r
 shiny::runApp("shiny")
 ```
+
+Si la aplicación no encuentra el archivo RDS, verifica que el directorio de trabajo sea la raíz del repositorio y que exista `datos/datos_final_627.rds`. No cambies la ruta relativa del código sin ajustar también la estructura de ejecución.
 
 La aplicación carga la matriz de referencia desde ../datos/datos_final_627.rds, por lo que debe conservarse esa estructura relativa de carpetas. El archivo `app.html` es una representación estática y debe actualizarse por separado cuando se regenere o publique una nueva versión de la aplicación.
 
