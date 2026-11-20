@@ -11,7 +11,7 @@ Esta carpeta contiene la aplicación Shiny que permite modificar los valores de 
 ## Ejecutar localmente
 
 1. Abre el proyecto de R desde la raíz del repositorio.
-2. Verifica que exista el archivo datos/datos_final_970.rds.
+2. Verifica que existan los archivos datos/datos_final_970.rds y data/arabica_data_cleaned.csv (este último se usa para el panel de regresión).
 3. Instala las dependencias de R utilizadas por la aplicación:
 
 ```r
@@ -31,6 +31,12 @@ La aplicación carga la matriz de referencia desde ../datos/datos_final_970.rds,
 ## Qué representa la clasificación
 
 Las etiquetas de calidad alta, media o baja son una **interpretación relativa implementada por la aplicación** respecto a los lotes de referencia. No constituyen una certificación CQI ni una predicción oficial de calidad.
+
+## Regresión simple: puntaje total ~ CP1
+
+La aplicación incluye un panel de **regresión lineal simple** entre el puntaje total de catación (`Total.Cup.Points`) y el score de CP1, ajustada con los 970 lotes de referencia: `puntaje total = 82,16 − 0,89 · CP1`, R² = 0,83. Al proyectar un lote, el panel marca su punto sobre la recta y da el puntaje total estimado con un intervalo de predicción del 95 %. Si el CP1 del lote queda fuera del rango de los lotes de referencia, la aplicación lo avisa como extrapolación.
+
+Es una regresión **descriptiva**: el puntaje total se construye sumando los atributos sensoriales, así que CP1 (que los resume) lo explica casi por construcción. No es una predicción independiente ni una certificación del CQI. El análisis de regresión múltiple con variables que no forman parte del puntaje está en `06-regresion/`.
 
 ## Interpretación de los componentes
 

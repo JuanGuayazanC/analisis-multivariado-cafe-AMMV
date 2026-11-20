@@ -232,6 +232,7 @@ Respuestas breves y cifras verificadas, ordenadas por diapositiva.
 - Máximos reales por atributo: 8,5 (Aroma, Sabor, Acidez, Cuerpo, Balance), 8,3 (Retrogusto) y 8,6 (Puntaje Catador).
 - "Alta/Media/Baja" es una regla de percentiles de la propia aplicación (75 o más, 25 o más, resto): no es una certificación CQI.
 - Con Aroma en 7,5 el percentil de calidad queda en 99,8 y sigue en Alta.
+- **Panel de regresión simple (puntaje total ~ CP1):** recta `puntaje total = 82,16 − 0,89 · CP1`, R² = 0,83, error típico 0,9 puntos; intervalo de predicción del 95 % de unos ±1,8 puntos. Es descriptiva: el puntaje total se construye sumando los atributos, así que CP1 (que los resume) lo explica casi por construcción; no es una predicción independiente ni una certificación. Con el perfil alto de la demostración estima 89,6 puntos y la app avisa que es una extrapolación (CP1 fuera del rango de los lotes reales; el máximo observado es 88,8). Con Aroma 7,5 estima 88,5. La regresión múltiple con variables independientes del puntaje (origen, altitud, proceso) está en `06-regresion`.
 
 ## Diapositiva 13 - Limitaciones
 

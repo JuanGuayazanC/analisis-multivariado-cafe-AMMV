@@ -1547,15 +1547,17 @@ Nocua</h4>
 lote hipotético (siete atributos sensoriales y la altitud), lo
 estandariza con el mismo preprocesamiento del PCA final y lo ubica en el
 plano de componentes de los <strong>970 lotes de referencia</strong>.
-Devuelve su posición (percentil) en cada componente y una etiqueta
-orientativa de calidad sensorial. <strong>No clasifica, no asigna grupos
-y no certifica nada.</strong></p>
+Devuelve su posición (percentil) en cada componente, una etiqueta
+orientativa de calidad sensorial y un puntaje total estimado con una
+regresión simple sobre CP1 (R² = 0,83). <strong>No clasifica, no asigna
+grupos y no certifica nada.</strong></p>
 </div>
 <div id="qué-es-y-para-qué-sirve" class="section level1">
 <h1>Qué es y para qué sirve</h1>
-<p><strong>Pregunta que responde:</strong> si un lote tuviera ciertos
+<p><strong>Preguntas que responde:</strong> si un lote tuviera ciertos
 puntajes y altitud, ¿dónde caería respecto a los 970 lotes con los que
-se ajustó el PCA?</p>
+se ajustó el PCA?, y ¿qué puntaje total de catación le correspondería
+según una <strong>regresión lineal simple</strong> sobre CP1?</p>
 <p>Es una <strong>demostración interactiva del PCA final</strong>:
 permite ver, moviendo los controles, que CP1 sube y baja con los siete
 atributos sensoriales a la vez y que CP2 responde casi solo a la
@@ -1576,7 +1578,8 @@ rojo en el plano CP1–CP2 (o CP1–CP3 si se cambia el eje).</li>
 <li><strong>Leer los paneles de la derecha:</strong> <em>Scores del
 nuevo lote</em> (valor en cada componente y su percentil) e
 <em>Interpretación</em> (etiqueta de calidad, altitud relativa y
-contraste CP3).</li>
+contraste CP3). Más abajo, el panel <em>Regresión simple</em> muestra la
+recta y el puntaje total estimado.</li>
 <li><strong>Restablecer medianas</strong> vuelve todos los controles a
 su valor inicial.</li>
 </ol>
@@ -1620,6 +1623,12 @@ los 970 lotes</strong>; el resultado se multiplica por las cargas.</td>
 <tr class="odd">
 <td>5. Percentil</td>
 <td>Se compara el score del lote con los scores de los 970 lotes.</td>
+</tr>
+<tr class="even">
+<td>6. Regresión</td>
+<td>Se ajusta <code>lm(Total.Cup.Points ~ CP1)</code> con los 970 lotes
+y se predice el puntaje total del lote con su intervalo de predicción
+del 95 %.</td>
 </tr>
 </tbody>
 </table>
@@ -1875,9 +1884,117 @@ para esa variable, y la etiqueta es <em>Alta</em>. Esto ocurre porque
 una sola nota baja no saca al lote del rango alto mientras las demás
 siguen altas.</p>
 </div>
+<div id="regresión-simple-puntaje-total-cp1" class="section level1">
+<h1>Regresión simple: puntaje total ~ CP1</h1>
+<p><strong>Qué hacemos y por qué.</strong> Además de ubicar el lote, la
+aplicación ajusta una <strong>regresión lineal simple</strong> entre la
+variable que queremos estimar (el puntaje total de catación,
+<code>Total.Cup.Points</code>) y una sola variable explicativa: el score
+de CP1, que resume los siete atributos sensoriales. Es el modelo más
+sencillo posible: una recta.</p>
+<table>
+<caption>Coeficientes de la recta</caption>
+<thead>
+<tr class="header">
+<th align="left">Término</th>
+<th align="right">Estimación</th>
+<th align="right">Error estándar</th>
+<th align="right">Valor p</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left">Intercepto</td>
+<td align="right">82,159</td>
+<td align="right">0,030</td>
+<td align="right">&lt; 0,0001</td>
+</tr>
+<tr class="even">
+<td align="left">Pendiente (por unidad de CP1)</td>
+<td align="right">-0,893</td>
+<td align="right">0,013</td>
+<td align="right">&lt; 0,0001</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Cómo se lee.</strong></p>
+<ul>
+<li><strong>Ecuación:</strong> puntaje total = 82,16 − 0,89 · CP1. La
+pendiente es negativa porque en esta orientación del PCA un CP1 más bajo
+significa mejor calidad: cada unidad menos de CP1 equivale a unos 0,89
+puntos más.</li>
+<li><strong>R² = 0,83:</strong> CP1 explica el 83 % de la variación del
+puntaje total.</li>
+<li><strong>Error típico de la recta:</strong> 0,9 puntos; el intervalo
+de predicción del 95 % para un lote nuevo mide unos ±1,8 puntos.</li>
+<li><strong>Intervalo de confianza frente a intervalo de
+predicción.</strong> La franja del gráfico es el intervalo de confianza
+de la recta (dónde está la relación media). El intervalo de predicción
+de un lote individual es mucho más ancho porque incluye la variación
+propia de cada lote.</li>
+</ul>
+<table>
+<caption>Estimación para el ejemplo de demostración</caption>
+<colgroup>
+<col width="22%" />
+<col width="4%" />
+<col width="19%" />
+<col width="23%" />
+<col width="29%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th align="left">Caso</th>
+<th align="right">CP1</th>
+<th align="right">Puntaje total estimado</th>
+<th align="right">Intervalo de predicción 95 %</th>
+<th align="left">¿Dentro del rango de CP1 observado?</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left">Perfil alto (Aroma 8,5)</td>
+<td align="right">-8,38</td>
+<td align="right">89,6</td>
+<td align="right">87,8 a 91,5</td>
+<td align="left">No (extrapolación)</td>
+</tr>
+<tr class="even">
+<td align="left">Mismo perfil con Aroma 7,5</td>
+<td align="right">-7,09</td>
+<td align="right">88,5</td>
+<td align="right">86,6 a 90,3</td>
+<td align="left">Sí</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Cómo se lee el ejemplo.</strong> El perfil alto de la
+demostración da un puntaje estimado de 89,6. Como el máximo observado en
+los lotes reales es 88,8, y el CP1 de este perfil queda por debajo del
+mínimo observado (-8,35), la aplicación lo avisa como
+<strong>extrapolación</strong>: ningún lote de referencia llega a un CP1
+tan bajo (una combinación tan alta de todos los atributos a la vez), y
+la recta no debe usarse fuera del rango de los datos.</p>
+<blockquote>
+<p><strong>Advertencia importante.</strong> Es una regresión
+<strong>descriptiva</strong>, no una predicción independiente. El
+puntaje total se construye <strong>sumando</strong> los atributos
+sensoriales, así que CP1, que los resume, lo explica casi por
+construcción. Por eso el R² es alto. Tampoco es una certificación del
+CQI. Un análisis con variables que <strong>no</strong> forman parte del
+puntaje (origen, altitud, proceso) está en el módulo <a href="../06-regresion/regresion.html">regresión</a>.</p>
+</blockquote>
+<p><strong>Una observación sobre los residuos.</strong> En el gráfico
+los puntos se alejan más de la recta en la zona de baja calidad
+(izquierda); allí el ajuste lineal es peor. Es un caso típico en el que
+conviene revisar los residuos antes de confiar en el modelo.</p>
+</div>
 <div id="limitaciones" class="section level1">
 <h1>Limitaciones</h1>
 <ul>
+<li>La regresión es simple (una sola variable, CP1) y descriptiva; no
+sustituye al análisis de regresión múltiple del módulo de
+regresión.</li>
 <li>La proyección <strong>no valida grupos</strong>: no asigna el lote a
 un grupo de K-means ni de HDBSCAN.</li>
 <li>El percentil dice dónde queda el lote frente a la muestra de
@@ -1929,6 +2046,30 @@ var_exp   &lt;- round(pca$sdev^2 / sum(pca$sdev^2) * 100, 1)
 
 # valores crudos de los 970 lotes, para rangos y percentiles
 datos_full &lt;- obj_final$datos_originales[, vars_8]
+
+# ── Regresión lineal simple: puntaje total ~ CP1 ──────────────────────────────
+# Se recupera Total.Cup.Points de los mismos 970 lotes (mismo filtro de la
+# depuración y sin los lotes atípicos, por idx_atipicos) y se ajusta una recta
+# sobre el score de CP1. Es descriptiva: el puntaje total se construye sumando
+# los atributos sensoriales, así que no es una predicción independiente.
+raw_csv &lt;- read.csv(&quot;../data/arabica_data_cleaned.csv&quot;)
+vars14_csv &lt;- c(&quot;Aroma&quot;, &quot;Flavor&quot;, &quot;Aftertaste&quot;, &quot;Acidity&quot;, &quot;Body&quot;, &quot;Balance&quot;,
+                &quot;Uniformity&quot;, &quot;Clean.Cup&quot;, &quot;Sweetness&quot;, &quot;Cupper.Points&quot;,
+                &quot;Moisture&quot;, &quot;Category.One.Defects&quot;, &quot;Category.Two.Defects&quot;,
+                &quot;altitude_mean_meters&quot;)
+base_csv &lt;- raw_csv[!is.na(raw_csv$altitude_mean_meters) &amp;
+                    raw_csv$altitude_mean_meters &gt; 0 &amp;
+                    raw_csv$altitude_mean_meters &lt;= 3000, ]
+base_csv &lt;- base_csv[complete.cases(base_csv[, vars14_csv]), ]
+base970  &lt;- base_csv[-obj_final$idx_atipicos, ]
+# comprobación: las filas coinciden con la matriz de referencia
+stopifnot(nrow(base970) == nrow(datos_t),
+          isTRUE(all.equal(as.numeric(base970$altitude_mean_meters),
+                           as.numeric(datos_t$Altitud))))
+
+reg_df     &lt;- data.frame(PC1 = scores_df$PC1, Total = base970$Total.Cup.Points)
+modelo_reg &lt;- lm(Total ~ PC1, data = reg_df)
+r2_reg     &lt;- summary(modelo_reg)$r.squared
 
 rangos &lt;- lapply(vars_8, function(v) {
   x &lt;- datos_full[[v]]
@@ -2242,6 +2383,22 @@ ui &lt;- fluidPage(
               &quot;La línea roja marca la posición de tu lote dentro de los 970 de referencia.&quot;)
           )
         )
+      ),
+      fluidRow(
+        column(8,
+          div(class = &quot;card&quot;,
+            div(class = &quot;card-title&quot;, &quot;Regresión simple: puntaje total ~ CP1&quot;),
+            plotOutput(&quot;reg&quot;, height = &quot;420px&quot;),
+            div(style = &quot;font-size:15px; color:#444;&quot;,
+              &quot;Cada punto es un lote de referencia; la recta es el ajuste por mínimos cuadrados y la franja, su intervalo de confianza del 95 %. Hacia la derecha, mejor calidad sensorial (CP1 más negativo).&quot;)
+          )
+        ),
+        column(4,
+          div(class = &quot;card&quot;,
+            div(class = &quot;card-title&quot;, &quot;Modelo y predicción&quot;),
+            uiOutput(&quot;reg_ui&quot;)
+          )
+        )
       )
     )
   )
@@ -2452,6 +2609,69 @@ server &lt;- function(input, output, session) {
                &quot;La lectura de los ejes depende de la orientación de las cargas almacenadas: CP1 resume los atributos sensoriales; CP2 está dominado por Altitud y CP3 contrapone principalmente Aroma/Acidez con Cuerpo/Balance. &quot;,
                &quot;Los umbrales de ±0,8 usados para describir CP2 y CP3 son reglas interpretativas de la interfaz.&quot;)
       )
+    )
+  })
+
+  # Predicción del puntaje total para el lote proyectado (intervalo de predicción 95 %)
+  pred_reg &lt;- reactive({
+    ns &lt;- nuevo_score()
+    if (is.null(ns)) return(NULL)
+    p &lt;- predict(modelo_reg, newdata = data.frame(PC1 = ns[1]),
+                 interval = &quot;prediction&quot;, level = 0.95)
+    list(x = ns[1], fit = p[1, &quot;fit&quot;], lwr = p[1, &quot;lwr&quot;], upr = p[1, &quot;upr&quot;],
+         fuera = ns[1] &lt; min(reg_df$PC1) || ns[1] &gt; max(reg_df$PC1))
+  })
+
+  output$reg &lt;- renderPlot({
+    p &lt;- ggplot(reg_df, aes(x = PC1, y = Total)) +
+      geom_point(alpha = 0.25, color = &quot;#2563a8&quot;, size = 1.4) +
+      geom_smooth(method = &quot;lm&quot;, formula = y ~ x, color = &quot;#1a4a7a&quot;,
+                  fill = &quot;#9fc3e6&quot;, linewidth = 1.1) +
+      scale_x_reverse() +
+      labs(x = paste0(&quot;CP1 (&quot;, var_exp[1], &quot; %)  ·  más bajo = mayor calidad sensorial&quot;),
+           y = &quot;Puntaje total de catación (Total.Cup.Points)&quot;) +
+      theme_minimal(base_size = 15) +
+      theme(panel.grid.minor = element_blank(),
+            plot.background = element_rect(fill = &quot;white&quot;, color = NA))
+    pr &lt;- pred_reg()
+    if (!is.null(pr)) {
+      nd &lt;- data.frame(PC1 = pr$x, Total = pr$fit, lwr = pr$lwr, upr = pr$upr)
+      p &lt;- p +
+        geom_errorbar(data = nd, aes(x = PC1, ymin = lwr, ymax = upr),
+                      inherit.aes = FALSE, color = &quot;#c0392b&quot;, width = 0.3, linewidth = 0.9) +
+        geom_point(data = nd, aes(x = PC1, y = Total), inherit.aes = FALSE,
+                   color = &quot;#c0392b&quot;, size = 5, shape = 17)
+    }
+    p
+  }, bg = &quot;white&quot;)
+
+  output$reg_ui &lt;- renderUI({
+    b0 &lt;- coef(modelo_reg)[1]; b1 &lt;- coef(modelo_reg)[2]
+    sig &lt;- summary(modelo_reg)$sigma
+    pr  &lt;- pred_reg()
+    tagList(
+      div(class = &quot;interp-item&quot;,
+        div(class = &quot;interp-pc&quot;, &quot;Ecuación de la recta&quot;),
+        div(class = &quot;interp-val&quot;,
+            sprintf(&quot;Puntaje total = %.2f %s %.2f · CP1&quot;, b0, if (b1 &lt; 0) &quot;−&quot; else &quot;+&quot;, abs(b1)))
+      ),
+      div(class = &quot;interp-item alt&quot;,
+        div(class = &quot;interp-pc&quot;, &quot;Qué tan bien ajusta&quot;),
+        div(class = &quot;interp-val&quot;,
+            sprintf(&quot;R² = %.2f: CP1 explica el %.0f %% de la variación del puntaje total. Error típico de la recta: %.1f puntos.&quot;,
+                    r2_reg, 100 * r2_reg, sig))
+      ),
+      div(class = &quot;interp-item con&quot;,
+        div(class = &quot;interp-pc&quot;, &quot;Puntaje total estimado para tu lote&quot;),
+        div(class = &quot;interp-val&quot;,
+            if (is.null(pr)) &quot;Presiona «Proyectar este lote» para estimarlo.&quot;
+            else sprintf(&quot;%.1f puntos (intervalo de predicción del 95 %%: %.1f a %.1f)&quot;, pr$fit, pr$lwr, pr$upr))
+      ),
+      if (!is.null(pr) &amp;&amp; pr$fuera)
+        div(style = &quot;font-size:15px; color:#9a6700; margin-top:8px; line-height:1.4;&quot;,
+            &quot;Tu lote queda fuera del rango de CP1 de los 970 lotes de referencia: la estimación es una extrapolación.&quot;),
+      div(style = &quot;font-size:14px; color:#666; margin-top:10px; line-height:1.5;&quot;,
+          &quot;Es una regresión descriptiva: el puntaje total se construye sumando los atributos sensoriales, así que CP1 (que los resume) lo explica casi por construcción. No es una predicción independiente ni una certificación del CQI.&quot;)
     )
   })
 }

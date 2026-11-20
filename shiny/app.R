@@ -31,6 +31,30 @@ var_exp   <- round(pca$sdev^2 / sum(pca$sdev^2) * 100, 1)
 # valores crudos de los 970 lotes, para rangos y percentiles
 datos_full <- obj_final$datos_originales[, vars_8]
 
+# ── Regresión lineal simple: puntaje total ~ CP1 ──────────────────────────────
+# Se recupera Total.Cup.Points de los mismos 970 lotes (mismo filtro de la
+# depuración y sin los lotes atípicos, por idx_atipicos) y se ajusta una recta
+# sobre el score de CP1. Es descriptiva: el puntaje total se construye sumando
+# los atributos sensoriales, así que no es una predicción independiente.
+raw_csv <- read.csv("../data/arabica_data_cleaned.csv")
+vars14_csv <- c("Aroma", "Flavor", "Aftertaste", "Acidity", "Body", "Balance",
+                "Uniformity", "Clean.Cup", "Sweetness", "Cupper.Points",
+                "Moisture", "Category.One.Defects", "Category.Two.Defects",
+                "altitude_mean_meters")
+base_csv <- raw_csv[!is.na(raw_csv$altitude_mean_meters) &
+                    raw_csv$altitude_mean_meters > 0 &
+                    raw_csv$altitude_mean_meters <= 3000, ]
+base_csv <- base_csv[complete.cases(base_csv[, vars14_csv]), ]
+base970  <- base_csv[-obj_final$idx_atipicos, ]
+# comprobación: las filas coinciden con la matriz de referencia
+stopifnot(nrow(base970) == nrow(datos_t),
+          isTRUE(all.equal(as.numeric(base970$altitude_mean_meters),
+                           as.numeric(datos_t$Altitud))))
+
+reg_df     <- data.frame(PC1 = scores_df$PC1, Total = base970$Total.Cup.Points)
+modelo_reg <- lm(Total ~ PC1, data = reg_df)
+r2_reg     <- summary(modelo_reg)$r.squared
+
 rangos <- lapply(vars_8, function(v) {
   x <- datos_full[[v]]
   list(min = floor(min(x) * 10) / 10,
@@ -343,6 +367,22 @@ ui <- fluidPage(
               "La línea roja marca la posición de tu lote dentro de los 970 de referencia.")
           )
         )
+      ),
+      fluidRow(
+        column(8,
+          div(class = "card",
+            div(class = "card-title", "Regresión simple: puntaje total ~ CP1"),
+            plotOutput("reg", height = "420px"),
+            div(style = "font-size:15px; color:#444;",
+              "Cada punto es un lote de referencia; la recta es el ajuste por mínimos cuadrados y la franja, su intervalo de confianza del 95 %. Hacia la derecha, mejor calidad sensorial (CP1 más negativo).")
+          )
+        ),
+        column(4,
+          div(class = "card",
+            div(class = "card-title", "Modelo y predicción"),
+            uiOutput("reg_ui")
+          )
+        )
       )
     )
   )
@@ -553,6 +593,69 @@ server <- function(input, output, session) {
                "La lectura de los ejes depende de la orientación de las cargas almacenadas: CP1 resume los atributos sensoriales; CP2 está dominado por Altitud y CP3 contrapone principalmente Aroma/Acidez con Cuerpo/Balance. ",
                "Los umbrales de ±0,8 usados para describir CP2 y CP3 son reglas interpretativas de la interfaz.")
       )
+    )
+  })
+
+  # Predicción del puntaje total para el lote proyectado (intervalo de predicción 95 %)
+  pred_reg <- reactive({
+    ns <- nuevo_score()
+    if (is.null(ns)) return(NULL)
+    p <- predict(modelo_reg, newdata = data.frame(PC1 = ns[1]),
+                 interval = "prediction", level = 0.95)
+    list(x = ns[1], fit = p[1, "fit"], lwr = p[1, "lwr"], upr = p[1, "upr"],
+         fuera = ns[1] < min(reg_df$PC1) || ns[1] > max(reg_df$PC1))
+  })
+
+  output$reg <- renderPlot({
+    p <- ggplot(reg_df, aes(x = PC1, y = Total)) +
+      geom_point(alpha = 0.25, color = "#2563a8", size = 1.4) +
+      geom_smooth(method = "lm", formula = y ~ x, color = "#1a4a7a",
+                  fill = "#9fc3e6", linewidth = 1.1) +
+      scale_x_reverse() +
+      labs(x = paste0("CP1 (", var_exp[1], " %)  ·  más bajo = mayor calidad sensorial"),
+           y = "Puntaje total de catación (Total.Cup.Points)") +
+      theme_minimal(base_size = 15) +
+      theme(panel.grid.minor = element_blank(),
+            plot.background = element_rect(fill = "white", color = NA))
+    pr <- pred_reg()
+    if (!is.null(pr)) {
+      nd <- data.frame(PC1 = pr$x, Total = pr$fit, lwr = pr$lwr, upr = pr$upr)
+      p <- p +
+        geom_errorbar(data = nd, aes(x = PC1, ymin = lwr, ymax = upr),
+                      inherit.aes = FALSE, color = "#c0392b", width = 0.3, linewidth = 0.9) +
+        geom_point(data = nd, aes(x = PC1, y = Total), inherit.aes = FALSE,
+                   color = "#c0392b", size = 5, shape = 17)
+    }
+    p
+  }, bg = "white")
+
+  output$reg_ui <- renderUI({
+    b0 <- coef(modelo_reg)[1]; b1 <- coef(modelo_reg)[2]
+    sig <- summary(modelo_reg)$sigma
+    pr  <- pred_reg()
+    tagList(
+      div(class = "interp-item",
+        div(class = "interp-pc", "Ecuación de la recta"),
+        div(class = "interp-val",
+            sprintf("Puntaje total = %.2f %s %.2f · CP1", b0, if (b1 < 0) "−" else "+", abs(b1)))
+      ),
+      div(class = "interp-item alt",
+        div(class = "interp-pc", "Qué tan bien ajusta"),
+        div(class = "interp-val",
+            sprintf("R² = %.2f: CP1 explica el %.0f %% de la variación del puntaje total. Error típico de la recta: %.1f puntos.",
+                    r2_reg, 100 * r2_reg, sig))
+      ),
+      div(class = "interp-item con",
+        div(class = "interp-pc", "Puntaje total estimado para tu lote"),
+        div(class = "interp-val",
+            if (is.null(pr)) "Presiona «Proyectar este lote» para estimarlo."
+            else sprintf("%.1f puntos (intervalo de predicción del 95 %%: %.1f a %.1f)", pr$fit, pr$lwr, pr$upr))
+      ),
+      if (!is.null(pr) && pr$fuera)
+        div(style = "font-size:15px; color:#9a6700; margin-top:8px; line-height:1.4;",
+            "Tu lote queda fuera del rango de CP1 de los 970 lotes de referencia: la estimación es una extrapolación."),
+      div(style = "font-size:14px; color:#666; margin-top:10px; line-height:1.5;",
+          "Es una regresión descriptiva: el puntaje total se construye sumando los atributos sensoriales, así que CP1 (que los resume) lo explica casi por construcción. No es una predicción independiente ni una certificación del CQI.")
     )
   })
 }
