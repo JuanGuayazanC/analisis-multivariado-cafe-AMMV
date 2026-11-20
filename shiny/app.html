@@ -1579,7 +1579,8 @@ rojo en el plano CP1–CP2 (o CP1–CP3 si se cambia el eje).</li>
 nuevo lote</em> (valor en cada componente y su percentil) e
 <em>Interpretación</em> (etiqueta de calidad, altitud relativa y
 contraste CP3). Más abajo, el panel <em>Regresión simple</em> muestra la
-recta y el puntaje total estimado.</li>
+recta y el puntaje total estimado, y el apartado <em>¿Qué se hizo en la
+regresión?</em> explica el modelo, cómo se lee y sus límites.</li>
 <li><strong>Restablecer medianas</strong> vuelve todos los controles a
 su valor inicial.</li>
 </ol>
@@ -2243,6 +2244,11 @@ body {
   padding: 30px 10px; font-size: 13px;
 }
 .placeholder .icon { font-size: 32px; margin-bottom: 8px; }
+
+.explicacion { font-size: 16px; line-height: 1.55; color: #2a2a3e; }
+.explicacion ol, .explicacion ul { padding-left: 22px; margin: 0; }
+.explicacion li { margin-bottom: 7px; }
+.explicacion code { background: #eef4fb; color: #1a4a7a; padding: 1px 6px; border-radius: 4px; font-size: 15px; }
 &quot;
 
 # ── UI ────────────────────────────────────────────────────────────────────────
@@ -2397,6 +2403,46 @@ ui &lt;- fluidPage(
           div(class = &quot;card&quot;,
             div(class = &quot;card-title&quot;, &quot;Modelo y predicción&quot;),
             uiOutput(&quot;reg_ui&quot;)
+          )
+        )
+      ),
+      fluidRow(
+        column(12,
+          div(class = &quot;card explicacion&quot;,
+            div(class = &quot;card-title&quot;, &quot;¿Qué se hizo en la regresión?&quot;),
+            tags$ol(
+              tags$li(tags$b(&quot;Pregunta. &quot;),
+                &quot;¿Cuánto del puntaje total de catación se explica con la posición del lote en CP1, la componente que resume la calidad sensorial?&quot;),
+              tags$li(tags$b(&quot;Datos. &quot;),
+                paste0(&quot;Los mismos &quot;, format(nrow(reg_df), big.mark = &quot;.&quot;), &quot; lotes de referencia del PCA. La respuesta es &quot;,
+                       &quot;Total.Cup.Points (puntaje total del catador; va de &quot;, round(min(reg_df$Total), 1), &quot; a &quot;,
+                       round(max(reg_df$Total), 1), &quot;) y la variable explicativa es el score de CP1.&quot;)),
+              tags$li(tags$b(&quot;Modelo. &quot;),
+                &quot;Regresión lineal simple por mínimos cuadrados: &quot;,
+                tags$code(sprintf(&quot;puntaje total = %.2f %s %.2f · CP1&quot;,
+                                  coef(modelo_reg)[1], if (coef(modelo_reg)[2] &lt; 0) &quot;−&quot; else &quot;+&quot;, abs(coef(modelo_reg)[2]))),
+                sprintf(&quot;. R² = %.2f y error típico de la recta de %.1f puntos.&quot;, r2_reg, summary(modelo_reg)$sigma)),
+              tags$li(tags$b(&quot;Cómo se lee la pendiente. &quot;),
+                sprintf(&quot;Es negativa porque en esta orientación del PCA un CP1 más bajo significa mejor calidad: cada unidad menos de CP1 equivale a unos %.2f puntos más de puntaje total.&quot;,
+                        abs(coef(modelo_reg)[2]))),
+              tags$li(tags$b(&quot;Qué ocurre al presionar «Proyectar». &quot;),
+                &quot;El lote se estandariza con la media y la desviación de los 970 lotes, se calcula su score de CP1 y la recta devuelve el puntaje total estimado.&quot;),
+              tags$li(tags$b(&quot;Dos intervalos. &quot;),
+                &quot;La franja del gráfico es el intervalo de confianza de la recta (dónde está la relación media). El intervalo de predicción del 95 %, que es el que se informa para un lote nuevo, es más ancho (aprox. ±&quot;,
+                round(1.96 * summary(modelo_reg)$sigma, 1), &quot; puntos) porque incluye la variación propia de cada lote.&quot;)
+            ),
+            div(class = &quot;card-title&quot;, style = &quot;margin-top:14px;&quot;, &quot;Límites que hay que decir&quot;),
+            tags$ul(
+              tags$li(tags$b(&quot;Es descriptiva, no predictiva. &quot;),
+                &quot;El puntaje total se construye sumando los atributos sensoriales y CP1 los resume, así que lo explica casi por construcción. No es una predicción independiente ni una certificación del CQI.&quot;),
+              tags$li(tags$b(&quot;Extrapolación. &quot;),
+                sprintf(&quot;La recta solo es confiable dentro del rango de CP1 de los lotes reales (de %.1f a %.1f). Un perfil con todos los atributos muy altos queda fuera y la aplicación lo avisa.&quot;,
+                        min(reg_df$PC1), max(reg_df$PC1))),
+              tags$li(tags$b(&quot;El ajuste no es parejo. &quot;),
+                &quot;Los lotes de baja calidad se alejan más de la recta que los de calidad alta: allí el modelo lineal es peor.&quot;),
+              tags$li(tags$b(&quot;Es regresión simple. &quot;),
+                &quot;Usa una sola variable explicativa. La regresión múltiple con variables que no forman parte del puntaje (origen, altitud, humedad, defectos y proceso) está en el módulo de regresión (06-regresion) y explica poco del puntaje.&quot;)
+            )
           )
         )
       )

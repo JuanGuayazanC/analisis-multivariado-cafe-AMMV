@@ -69,7 +69,7 @@ shiny::runApp("shiny")
 
 1. **Ajustar los controles.** Hay siete deslizadores sensoriales (escala 0–10) y uno de altitud (metros). Inician en la mediana de los 970 lotes.
 2. **Presionar «Proyectar este lote».** Aparece el punto rojo en el plano CP1–CP2 (o CP1–CP3 si se cambia el eje).
-3. **Leer los paneles de la derecha:** *Scores del nuevo lote* (valor en cada componente y su percentil) e *Interpretación* (etiqueta de calidad, altitud relativa y contraste CP3). Más abajo, el panel *Regresión simple* muestra la recta y el puntaje total estimado.
+3. **Leer los paneles de la derecha:** *Scores del nuevo lote* (valor en cada componente y su percentil) e *Interpretación* (etiqueta de calidad, altitud relativa y contraste CP3). Más abajo, el panel *Regresión simple* muestra la recta y el puntaje total estimado, y el apartado *¿Qué se hizo en la regresión?* explica el modelo, cómo se lee y sus límites.
 4. **Restablecer medianas** vuelve todos los controles a su valor inicial.
 
 Debajo, la aplicación muestra además la varianza por componente, las cargas y la distribución de CP1 con la posición del lote.

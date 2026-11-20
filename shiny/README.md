@@ -34,7 +34,7 @@ Las etiquetas de calidad alta, media o baja son una **interpretación relativa i
 
 ## Regresión simple: puntaje total ~ CP1
 
-La aplicación incluye un panel de **regresión lineal simple** entre el puntaje total de catación (`Total.Cup.Points`) y el score de CP1, ajustada con los 970 lotes de referencia: `puntaje total = 82,16 − 0,89 · CP1`, R² = 0,83. Al proyectar un lote, el panel marca su punto sobre la recta y da el puntaje total estimado con un intervalo de predicción del 95 %. Si el CP1 del lote queda fuera del rango de los lotes de referencia, la aplicación lo avisa como extrapolación.
+La aplicación incluye un panel de **regresión lineal simple** entre el puntaje total de catación (`Total.Cup.Points`) y el score de CP1, ajustada con los 970 lotes de referencia: `puntaje total = 82,16 − 0,89 · CP1`, R² = 0,83. Al proyectar un lote, el panel marca su punto sobre la recta y da el puntaje total estimado con un intervalo de predicción del 95 %. Si el CP1 del lote queda fuera del rango de los lotes de referencia, la aplicación lo avisa como extrapolación. Debajo del panel, el apartado «¿Qué se hizo en la regresión?» explica la pregunta, los datos, el modelo, cómo se lee la pendiente, la diferencia entre intervalo de confianza y de predicción, y los límites.
 
 Es una regresión **descriptiva**: el puntaje total se construye sumando los atributos sensoriales, así que CP1 (que los resume) lo explica casi por construcción. No es una predicción independiente ni una certificación del CQI. El análisis de regresión múltiple con variables que no forman parte del puntaje está en `06-regresion/`.
 

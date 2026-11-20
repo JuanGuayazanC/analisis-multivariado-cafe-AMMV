@@ -227,6 +227,11 @@ body {
   padding: 30px 10px; font-size: 13px;
 }
 .placeholder .icon { font-size: 32px; margin-bottom: 8px; }
+
+.explicacion { font-size: 16px; line-height: 1.55; color: #2a2a3e; }
+.explicacion ol, .explicacion ul { padding-left: 22px; margin: 0; }
+.explicacion li { margin-bottom: 7px; }
+.explicacion code { background: #eef4fb; color: #1a4a7a; padding: 1px 6px; border-radius: 4px; font-size: 15px; }
 "
 
 # ── UI ────────────────────────────────────────────────────────────────────────
@@ -381,6 +386,46 @@ ui <- fluidPage(
           div(class = "card",
             div(class = "card-title", "Modelo y predicción"),
             uiOutput("reg_ui")
+          )
+        )
+      ),
+      fluidRow(
+        column(12,
+          div(class = "card explicacion",
+            div(class = "card-title", "¿Qué se hizo en la regresión?"),
+            tags$ol(
+              tags$li(tags$b("Pregunta. "),
+                "¿Cuánto del puntaje total de catación se explica con la posición del lote en CP1, la componente que resume la calidad sensorial?"),
+              tags$li(tags$b("Datos. "),
+                paste0("Los mismos ", format(nrow(reg_df), big.mark = "."), " lotes de referencia del PCA. La respuesta es ",
+                       "Total.Cup.Points (puntaje total del catador; va de ", round(min(reg_df$Total), 1), " a ",
+                       round(max(reg_df$Total), 1), ") y la variable explicativa es el score de CP1.")),
+              tags$li(tags$b("Modelo. "),
+                "Regresión lineal simple por mínimos cuadrados: ",
+                tags$code(sprintf("puntaje total = %.2f %s %.2f · CP1",
+                                  coef(modelo_reg)[1], if (coef(modelo_reg)[2] < 0) "−" else "+", abs(coef(modelo_reg)[2]))),
+                sprintf(". R² = %.2f y error típico de la recta de %.1f puntos.", r2_reg, summary(modelo_reg)$sigma)),
+              tags$li(tags$b("Cómo se lee la pendiente. "),
+                sprintf("Es negativa porque en esta orientación del PCA un CP1 más bajo significa mejor calidad: cada unidad menos de CP1 equivale a unos %.2f puntos más de puntaje total.",
+                        abs(coef(modelo_reg)[2]))),
+              tags$li(tags$b("Qué ocurre al presionar «Proyectar». "),
+                "El lote se estandariza con la media y la desviación de los 970 lotes, se calcula su score de CP1 y la recta devuelve el puntaje total estimado."),
+              tags$li(tags$b("Dos intervalos. "),
+                "La franja del gráfico es el intervalo de confianza de la recta (dónde está la relación media). El intervalo de predicción del 95 %, que es el que se informa para un lote nuevo, es más ancho (aprox. ±",
+                round(1.96 * summary(modelo_reg)$sigma, 1), " puntos) porque incluye la variación propia de cada lote.")
+            ),
+            div(class = "card-title", style = "margin-top:14px;", "Límites que hay que decir"),
+            tags$ul(
+              tags$li(tags$b("Es descriptiva, no predictiva. "),
+                "El puntaje total se construye sumando los atributos sensoriales y CP1 los resume, así que lo explica casi por construcción. No es una predicción independiente ni una certificación del CQI."),
+              tags$li(tags$b("Extrapolación. "),
+                sprintf("La recta solo es confiable dentro del rango de CP1 de los lotes reales (de %.1f a %.1f). Un perfil con todos los atributos muy altos queda fuera y la aplicación lo avisa.",
+                        min(reg_df$PC1), max(reg_df$PC1))),
+              tags$li(tags$b("El ajuste no es parejo. "),
+                "Los lotes de baja calidad se alejan más de la recta que los de calidad alta: allí el modelo lineal es peor."),
+              tags$li(tags$b("Es regresión simple. "),
+                "Usa una sola variable explicativa. La regresión múltiple con variables que no forman parte del puntaje (origen, altitud, humedad, defectos y proceso) está en el módulo de regresión (06-regresion) y explica poco del puntaje.")
+            )
           )
         )
       )
