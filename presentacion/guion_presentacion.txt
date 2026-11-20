@@ -47,7 +47,17 @@ El orden fue: transformar con Yeo-Johnson las variables problemáticas, estandar
 
 **Transición:** Con los datos listos, aplicamos el PCA.
 
-## Diapositiva 5 - PCA: varianza y cargas
+## Diapositiva 5 - PCA: cómo leerlo
+
+*Tiempo: 0:45 · Presenta: Diego*
+
+El PCA transforma variables relacionadas en nuevos ejes, las componentes, ordenados de la que más resume a la que menos. Antes de ver qué pesa en cada una, miramos dónde caen los lotes en las dos primeras.
+
+Cada punto es un lote. Hacia la derecha mejora la calidad en taza y hacia arriba sube la altitud; el cero de cada eje es el lote promedio. Vemos una sola nube continua, sin grupos separados: el PCA resume la calidad, pero no separa grupos. Para buscarlos usamos otros métodos.
+
+**Transición:** Ahora sí, cuánta variación explica cada eje y qué pesa en cada uno.
+
+## Diapositiva 6 - PCA: varianza y cargas
 
 *Tiempo: 1:05 · Presenta: Diego*
 
@@ -57,15 +67,7 @@ A la derecha, las cargas. CP1 reúne los siete atributos sensoriales, entre 0,35
 
 **Acción:** Señalar el codo y luego el mapa de cargas.
 
-**Transición:** Con esto podemos ubicar cada lote en un mapa de dos ejes.
-
-## Diapositiva 6 - PCA: cómo leerlo
-
-*Tiempo: 0:45 · Presenta: Diego*
-
-Cada punto es un lote. Hacia la derecha mejora la calidad en taza y hacia arriba sube la altitud; el cero de cada eje es el lote promedio. Vemos una sola nube continua, sin grupos separados: el PCA resume la calidad, pero no separa grupos. Para buscarlos usamos otros métodos.
-
-**Transición:** Antes, una mirada a las variables categóricas.
+**Transición:** Antes de buscar grupos, una mirada a las variables categóricas.
 
 ## Diapositiva 7 - Análisis de correspondencias múltiple
 
@@ -149,8 +151,8 @@ Muchas gracias. Quedamos atentos a sus preguntas.
 | 2 | Juan | 0:40 | 1:00 |
 | 3 | Juan | 0:45 | 1:45 |
 | 4 | Juan | 0:50 | 2:35 |
-| 5 | Diego | 1:05 | 3:40 |
-| 6 | Diego | 0:45 | 4:25 |
+| 5 | Diego | 0:45 | 3:20 |
+| 6 | Diego | 1:05 | 4:25 |
 | 7 | Diego | 0:30 | 4:55 |
 | 8 | Diego | 0:45 | 5:40 |
 | 9 | Esteban | 0:55 | 6:35 |
@@ -164,7 +166,6 @@ Muchas gracias. Quedamos atentos a sus preguntas.
 
 ## Ajustes pendientes en el deck antes de ensayar
 
-- **Orden de PCA:** el profesor pidió mostrar la nube de dispersión antes que las cargas; en el deck las cargas están en la diapositiva 5 y la nube en la 6. Si no se reordena, al empezar la diapositiva 5 decir: "primero la varianza y las cargas; enseguida, la nube que lo respalda".
 - **Diapositiva 8:** el texto visible dice que la suma de cuadrados "desciende más hasta k = 3"; la curva baja sin quiebre. Conviene reemplazarlo y mencionar la silueta con k = 2 y el gap.
 - **Diapositiva 10:** "Concentran la mayor densidad de lotes de país y método de proceso" no tiene un cálculo que lo respalde; verificarlo o quitarlo.
 - **Diapositiva 11:** la justificación de k = 3 frente a los 4 grupos del dendrograma solo está en este guion y en las notas.
@@ -188,7 +189,7 @@ Respuestas breves y cifras verificadas, ordenadas por diapositiva.
 - **Humedad = 0:** 174 de 1.070 registros (253 en el archivo raw). La fuente no dice que sean faltantes; es una hipótesis sin confirmar. Un grano normalmente retiene entre 9 y 13 % de humedad.
 - **Altitudes mal digitadas:** quedan lotes con altitud de 1, 12 o 13 m (17 en los 1.070; 4 siguen en los 970). El filtro solo exige altitud mayor que 0.
 
-## Diapositivas 5 y 6 - PCA
+## Diapositivas 5 y 6 - PCA (nube y luego varianza y cargas)
 
 - **Criterio de Kaiser:** el valor propio de CP2 es 0,93, casi 1. Se conserva porque el codo la respalda y se interpreta con claridad.
 - **Intervalos bootstrap (B = 2000):** CP1 67,5–70,9 %; CP2 11,2–12,0 %; CP3 4,8–6,0 %.
