@@ -25,7 +25,7 @@ Buenas tardes. Somos Juan Sebastián Guayazán, Esteban Valente y Diego Nocua, d
 
 La base tiene catorce variables cuantitativas: diez puntajes sensoriales, altitud, humedad y dos conteos de defectos, en escalas distintas y con correlaciones entre los puntajes. Además, 174 de los 1.070 registros tienen humedad igual a cero, y ese cero aparece explícito en la fuente original. El análisis muestra el patrón, pero no su causa: lo describimos como una anomalía observada, no como un faltante confirmado.
 
-Y a simple vista no se ven grupos. Por eso necesitamos reducir dimensionalidad.
+Y a simple vista no se ven grupos. Por eso necesitamos reducir dimensionalidad. Nuestro objetivo es responder dos preguntas: ¿la calidad de los lotes se resume en pocas dimensiones? y ¿existen grupos reales entre ellos?
 
 **Transición:** Con ese diagnóstico organizamos el análisis en etapas.
 
@@ -133,7 +133,7 @@ Sigue en Alta porque CP1 es un promedio ponderado de los siete atributos: una so
 
 *Tiempo: 0:45 · Presenta: Juan*
 
-Primero, el PCA final resume el 80,9 por ciento de la variación en dos componentes, con 970 lotes, pero no demuestra grupos naturales. Segundo, la humedad igual a cero aparece en 174 registros y en la fuente original; detectarla no basta para conocer su causa. Tercero, K-means tiene separación débil y HDBSCAN deja el 58,5 por ciento como ruido.
+Respondemos el objetivo: la calidad sí se resume en dos dimensiones, pero no hay evidencia de grupos naturales. Primero, el PCA final resume el 80,9 por ciento de la variación en dos componentes, con 970 lotes, pero no demuestra grupos naturales. Segundo, la humedad igual a cero aparece en 174 registros y en la fuente original; detectarla no basta para conocer su causa. Tercero, K-means tiene separación débil y HDBSCAN deja el 58,5 por ciento como ruido.
 
 Estos métodos sirven para explorar, no para sustentar etiquetas comerciales: validarlas exigiría una fuente externa, como precios o certificaciones.
 
