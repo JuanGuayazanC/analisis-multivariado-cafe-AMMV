@@ -38,9 +38,9 @@ puntaje total (suma de los 10 atributos sensoriales). Como esos atributos tambi�
 se usan como entradas, esta actividad debe interpretarse como **reconstrucción
 de una regla**, no como predicción independiente de calidad:
 
-- **Alta:** percentil > 75 del puntaje total
-- **Media:** percentil 25–75
-- **Baja:** percentil < 25
+- **Alta:** puntaje total por encima del percentil 75
+- **Media:** entre los percentiles 25 y 75 (incluidos los empates en los cortes)
+- **Baja:** por debajo del percentil 25
 
 ```{r datos}
 library(dplyr)
@@ -48,7 +48,7 @@ library(ggplot2)
 library(MASS)         # lda(), qda()
 library(e1071)        # svm()
 library(randomForest) # randomForest()
-library(caret)        # confusionMatrix(), train()
+library(caret)        # confusionMatrix(), createDataPartition()
 library(car)
 
 data_raw <- read.csv("../data/arabica_data_cleaned.csv")
@@ -61,8 +61,8 @@ vars_originales <- c("Aroma","Flavor","Aftertaste","Acidity","Body","Balance",
 datos <- data_raw %>%
   filter(!is.na(altitude_mean_meters),
          altitude_mean_meters > 0, altitude_mean_meters <= 3000) %>%
-  dplyr::select(all_of(vars_originales)) %>%
-  filter(complete.cases(.)) %>%
+  dplyr::select(all_of(vars_originales), Processing.Method, Country.of.Origin) %>%
+  filter(complete.cases(.[, vars_originales])) %>%
   rename(Sabor=Flavor, Retrogusto=Aftertaste, Acidez=Acidity, Cuerpo=Body,
          Uniformidad=Uniformity, Taza.Limpia=Clean.Cup, Dulzura=Sweetness,
          Puntaje.Catador=Cupper.Points, Humedad=Moisture,
@@ -73,39 +73,52 @@ vars_sens <- c("Aroma","Sabor","Retrogusto","Acidez","Cuerpo","Balance",
                "Uniformidad","Taza.Limpia","Dulzura","Puntaje.Catador")
 vars_11   <- c(vars_sens, "Altitud")
 
-# Transformación YJ
-datos_t <- datos[, vars_11]
-pt_11   <- powerTransform(datos_t, family="yjPower")
-lambdas <- pmax(pmin(coef(pt_11, round=FALSE), 3), -3)
-for (v in names(datos_t)) datos_t[[v]] <- yjPower(datos_t[[v]], lambdas[v])
-
-# Variable objetivo: nivel de calidad
+# Variable objetivo: nivel de calidad (sobre los puntajes originales)
 puntaje_total <- rowSums(datos[, vars_sens])
 q25 <- quantile(puntaje_total, 0.25)
 q75 <- quantile(puntaje_total, 0.75)
-
-datos_t$Calidad <- factor(
+datos$Calidad <- factor(
   case_when(puntaje_total > q75 ~ "Alta",
             puntaje_total < q25 ~ "Baja",
             TRUE                ~ "Media"),
   levels = c("Alta", "Media", "Baja")
 )
 
+cat("Lotes:", nrow(datos), "\n")
 cat("Distribución de clases:\n")
-print(table(datos_t$Calidad))
+print(table(datos$Calidad))
 ```
 
 ---
 
-# 2. Partición train / test
+# 2. Partición train / test y transformación Yeo-Johnson
+
+La partición se hace **antes** de estimar Yeo-Johnson. Los λ se estiman solo con el
+conjunto de entrenamiento y se aplican tal cual al de prueba; si se estimaran con toda
+la base, el conjunto de prueba influiría en el preprocesamiento (fuga de información).
+Los λ se acotan a [−3, 3] porque Uniformidad, Taza Limpia y Dulzura, con casi todos los
+valores en 10, producen estimaciones extremas e inestables.
 
 ```{r split}
 set.seed(42)
-idx_train <- createDataPartition(datos_t$Calidad, p=0.75, list=FALSE)
-train     <- datos_t[ idx_train, ]
-test      <- datos_t[-idx_train, ]
+idx_train <- createDataPartition(datos$Calidad, p=0.75, list=FALSE)
+train_raw <- datos[ idx_train, ]
+test_raw  <- datos[-idx_train, ]
+
+pt_11   <- powerTransform(train_raw[, vars_11], family="yjPower")
+lambdas <- pmax(pmin(coef(pt_11, round=FALSE), 3), -3)
+transformar <- function(d) {
+  out <- d[, vars_11]
+  for (v in vars_11) out[[v]] <- yjPower(d[[v]], lambdas[v])
+  out$Calidad <- d$Calidad
+  out
+}
+train   <- transformar(train_raw)
+test    <- transformar(test_raw)
+datos_t <- transformar(datos)   # solo para dibujar el mapa discriminante
 
 cat("Train:", nrow(train), "lotes  |  Test:", nrow(test), "lotes\n")
+cat("λ estimados en train:\n"); print(round(lambdas, 3))
 ```
 
 ---
@@ -135,11 +148,39 @@ ggplot(scores_lda, aes(LD1, LD2, color=Calidad)) +
 
 ---
 
+## 3.1. La circularidad en números
+
+La clase es una función exacta de los diez atributos: su suma, cortada en dos umbrales.
+Aplicar esa misma regla al conjunto de prueba (con los cortes calculados en train)
+reconstruye la etiqueta casi sin error, sin necesidad de ningún modelo. Por eso las
+exactitudes de esta sección no miden capacidad predictiva.
+
+Como contraste, un LDA ajustado sobre los puntajes **sin transformar** no llega a esa
+cifra: LDA supone clases normales con una covarianza común, y aquí las clases son cortes
+de una suma (la clase Media es una franja ancha y los puntajes son asimétricos), así que
+las fronteras que estima no coinciden con los umbrales reales.
+
+```{r lda-raw}
+suma_train <- rowSums(train_raw[, vars_sens]); suma_test <- rowSums(test_raw[, vars_sens])
+c25 <- quantile(suma_train, 0.25); c75 <- quantile(suma_train, 0.75)
+regla <- factor(ifelse(suma_test > c75, "Alta", ifelse(suma_test < c25, "Baja", "Media")),
+                levels = levels(test_raw$Calidad))
+cat("Exactitud de la regla de la suma (cortes de train):",
+    round(100 * mean(regla == test_raw$Calidad), 1), "%\n")
+
+modelo_lda_raw <- lda(Calidad ~ ., data = train_raw[, c(vars_11, "Calidad")])
+cm_lda_raw <- confusionMatrix(predict(modelo_lda_raw, test_raw)$class, test_raw$Calidad)
+cat("Exactitud LDA sobre puntajes originales:", round(cm_lda_raw$overall["Accuracy"]*100, 1), "%\n")
+print(cm_lda_raw$table)
+```
+
+---
+
 # 4. QDA — Análisis Discriminante Cuadrático
 
 ```{r qda}
 # QDA estima una covarianza por clase: una variable constante dentro de una clase
-# (p. ej., Uniformidad = 10 en todos los lotes "Alta") la vuelve singular.
+# (por ejemplo, Taza.Limpia = 10 en todos los lotes "Alta") la vuelve singular.
 # Se excluyen solo esas variables y se informa cuáles.
 vars_pred <- setdiff(names(train), "Calidad")
 var_ok <- sapply(vars_pred, function(v) all(tapply(train[[v]], train$Calidad, var) > 1e-8))
@@ -200,12 +241,16 @@ imp %>%
 
 ```{r comparacion}
 resultados <- data.frame(
-  Modelo    = c("LDA (clásico)", "QDA (clásico)", "SVM (AA/ML)", "Random Forest (AA/ML)"),
+  Modelo    = c("LDA (clásico)", "QDA (clásico)", "SVM (AA/ML)", "Random Forest (AA/ML)",
+                "LDA sobre puntajes originales"),
   Exactitud = c(cm_lda$overall["Accuracy"], cm_qda$overall["Accuracy"],
-                cm_svm$overall["Accuracy"], cm_rf$overall["Accuracy"]),
+                cm_svm$overall["Accuracy"], cm_rf$overall["Accuracy"],
+                cm_lda_raw$overall["Accuracy"]),
   Kappa     = c(cm_lda$overall["Kappa"], cm_qda$overall["Kappa"],
-                cm_svm$overall["Kappa"], cm_rf$overall["Kappa"])
-) %>% mutate(across(c(Exactitud, Kappa), ~ round(.*100, 1)))
+                cm_svm$overall["Kappa"], cm_rf$overall["Kappa"],
+                cm_lda_raw$overall["Kappa"])
+) %>% mutate(Exactitud = round(Exactitud * 100, 1),   # en %
+           Kappa     = round(Kappa, 3))               # Kappa no es un porcentaje
 
 resultados %>% arrange(desc(Exactitud))
 
@@ -218,7 +263,7 @@ resultados %>% arrange(desc(Exactitud))
 ggplot(resultados, aes(x=reorder(Modelo, Exactitud), y=Exactitud, fill=Modelo)) +
   geom_col(alpha=0.85, width=0.6) +
   geom_text(aes(label=paste0(Exactitud, "%")), hjust=-0.1, size=4) +
-  scale_fill_manual(values=c("#1a4a7a","#2563a8","#27ae60","#6c8ebf")) +
+  scale_fill_manual(values=c("#1a4a7a","#2563a8","#27ae60","#6c8ebf","#999999")) +
   coord_flip() +
   labs(title="Comparación de exactitud — clásico vs AA/ML",
        x="", y="Exactitud en test (%)") +
@@ -226,3 +271,52 @@ ggplot(resultados, aes(x=reorder(Modelo, Exactitud), y=Exactitud, fill=Modelo)) 
   theme_minimal() + theme(legend.position="none",
                            panel.grid.minor=element_blank())
 ```
+
+---
+
+# 8. Predicción sin circularidad: variables que no definen la clase
+
+Para tener una medida honesta de capacidad predictiva, se predice la misma clase usando
+solo variables que **no intervienen** en su construcción: altitud, humedad, defectos,
+método de procesamiento y país de origen (los cinco con más lotes y "Otro"). Se usa la
+misma partición train/test. La referencia mínima es la tasa de no información
+(predecir siempre la clase más frecuente, "Media").
+
+```{r no-circular}
+prep_ext <- function(d) {
+  d %>%
+    mutate(
+      Proceso = ifelse(is.na(Processing.Method) | trimws(Processing.Method) == "", "Desconocido", Processing.Method),
+      Pais    = ifelse(Country.of.Origin %in% top5, Country.of.Origin, "Otro")
+    ) %>%
+    transmute(Calidad, Altitud, Humedad, Defectos.Cat1, Defectos.Cat2,
+              Proceso = factor(Proceso, levels = niveles_proc),
+              Pais    = factor(Pais, levels = c(top5, "Otro")))
+}
+top5 <- names(sort(table(train_raw$Country.of.Origin), decreasing = TRUE))[1:5]
+niveles_proc <- sort(unique(ifelse(is.na(datos$Processing.Method) | trimws(datos$Processing.Method) == "",
+                                   "Desconocido", datos$Processing.Method)))
+train_ext <- prep_ext(train_raw)
+test_ext  <- prep_ext(test_raw)
+
+set.seed(42)
+rf_ext  <- randomForest(Calidad ~ ., data = train_ext, ntree = 500, importance = TRUE)
+cm_rf_ext  <- confusionMatrix(predict(rf_ext, test_ext), test_ext$Calidad)
+lda_ext <- lda(Calidad ~ ., data = train_ext)
+cm_lda_ext <- confusionMatrix(predict(lda_ext, test_ext)$class, test_ext$Calidad)
+
+data.frame(
+  Modelo    = c("LDA (sin variables sensoriales)", "Random Forest (sin variables sensoriales)"),
+  Exactitud = round(100 * c(cm_lda_ext$overall["Accuracy"], cm_rf_ext$overall["Accuracy"]), 1),
+  Kappa     = round(c(cm_lda_ext$overall["Kappa"], cm_rf_ext$overall["Kappa"]), 3),
+  Tasa_no_informacion = round(100 * cm_rf_ext$overall["AccuracyNull"], 1),
+  p_valor_vs_NIR = signif(c(cm_lda_ext$overall["AccuracyPValue"], cm_rf_ext$overall["AccuracyPValue"]), 3)
+)
+print(cm_rf_ext$table)
+```
+
+Esta es la cifra que conviene presentar si se pregunta qué tan bien se puede **predecir**
+la calidad sensorial: con información de origen y del grano verde, sin mirar la taza.
+Las exactitudes de las secciones 3 a 7 solo muestran que los modelos reproducen una regla
+construida con sus propias entradas.
+
