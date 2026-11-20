@@ -74,15 +74,14 @@ intermedios compartidos están en `datos/`.
 ├── 01-pca/                             ← PCA, Kernel PCA, t-SNE, UMAP (README con ruta de sustentación)
 │   ├── figuras/                        ← figuras generadas, por tema
 │   │   ├── revision_profesor/          ← revisión del profesor (PCA y agrupamiento)
-│   │   │   ├── kpca_666/                   ← Kernel PCA (666 lotes)
-│   │   ├── taller_666/                 ← taller PCA (666 lotes)
+│   │   ├── taller_970/                 ← taller PCA (970 lotes)
 │   │   ├── pca_revision/               ← revisión PCA
 │   │   └── proceso/                    ← proceso de depuración de atípicos
-│   ├── pca_final.Rmd/.html             ← PCA final oficial: 627 lotes, 8 variables (demo y anexo)
+│   ├── pca_final.Rmd/.html             ← PCA final oficial: 970 lotes, 8 variables (demo y anexo)
 │   ├── historico/                      ← informes del método anterior (11 y 8 variables); no son el oficial
 │   ├── guia_teorica_reduccion_dimensional.Rmd/.html
-│   ├── depuracion.Rmd/.html            ← cadena de depuración 1.070 → 666 → 627; reconstruye y verifica datos_final_627.rds
-│   ├── figuras_pca.Rmd/.html           ← figuras de varias etapas; distinguir 1.070, 666 y 627 (en figuras/secuencia/)
+│   ├── depuracion.Rmd/.html            ← cadena de depuración 1.070 → 970; reconstruye y verifica datos_final_970.rds
+│   ├── figuras_pca.Rmd/.html           ← figuras de varias etapas; distinguir 1.070 y 970 (en figuras/secuencia/)
 │   ├── metodos_exploratorios.Rmd/.html ← Kernel PCA (10 núcleos), UMAP, t-SNE y MDS sobre todas las bases (en figuras/exploratorios/)
 │   └── historico/                      ← scripts fuente ya incluidos en los Rmd de 01-pca y 00-eda, y el método anterior
 ├── 02-factorial-correspondencias/      ← Semana 7: AF + análisis de correspondencias

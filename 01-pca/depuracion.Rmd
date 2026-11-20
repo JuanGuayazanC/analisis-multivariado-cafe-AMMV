@@ -124,7 +124,7 @@ ggsave("figuras/proceso/paso1_mahalanobis_pca_prelim.png", ggplot(data.frame(l =
 
 # 4. Matriz final de 970 lotes (`datos/datos_final_970.rds`)
 
-Se guarda con la misma estructura que usaban `datos_final_666.rds` y `datos_final_627.rds`, para que `pca_final.Rmd` la lea igual. Los archivos viejos de 666 y 627 no se tocan, porque `figuras_pca.Rmd`, `metodos_exploratorios.Rmd` y la app de Shiny todavía los leen.
+Se guarda con la estructura que leen `pca_final.Rmd`, `figuras_pca.Rmd`, `metodos_exploratorios.Rmd` y la app de Shiny. Estos documentos y la aplicación ya trabajan sobre los 970 lotes; los archivos `datos_final_666.rds` y `datos_final_627.rds` de versiones anteriores se eliminaron porque provenían del error de Mahalanobis descrito arriba.
 
 ```{r final970}
 psin <- readRDS("../datos/base_sin_atipicos.rds")
