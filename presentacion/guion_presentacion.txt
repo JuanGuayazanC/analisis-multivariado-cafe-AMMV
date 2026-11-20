@@ -35,11 +35,11 @@ En la exploración observamos que 174 de los 1.070 registros tienen Humedad igua
 
 *Tiempo: 0:55 · Presenta: Diego*
 
-Primero exploramos las distribuciones, los valores extremos, la asimetría y las correlaciones. Para el PCA final el proceso fue el siguiente, en ocho pasos y en este orden: primero aplicamos la transformación Yeo-Johnson selectivamente a las variables con asimetría absoluta mayor a uno; segundo, estandarizamos cada variable; tercero, ajustamos un PCA preliminar sobre los 1.070 lotes y calculamos distancias de Mahalanobis sobre sus scores para detectar atípicos multivariados. Se retiraron 404 observaciones por encima del umbral chi-cuadrado al 97,5 % con 8 grados de libertad. Con los 666 lotes restantes repetimos el PCA y la misma regla: aparecen 39 atípicos adicionales, que retiramos. Re-estimamos los parámetros Yeo-Johnson y obtenemos la matriz final de 627 lotes y ocho variables.
+Primero exploramos las distribuciones, los valores extremos, la asimetría y las correlaciones. Para el PCA final el proceso fue el siguiente. Primero aplicamos la transformación Yeo-Johnson a las variables con asimetría absoluta mayor a uno y estandarizamos cada variable. Segundo, ajustamos un PCA preliminar sobre los 1.070 lotes y calculamos la distancia de Mahalanobis sobre sus scores, dividiendo cada componente por su propia desviación estándar. Los lotes por encima del umbral chi-cuadrado al 97,5 % con 8 grados de libertad son 100, y los retiramos en una sola pasada: quedan 970 lotes y ocho variables. Tercero, volvimos a medir la asimetría sobre esos 970 lotes: ninguna variable supera uno en valor absoluto, así que el PCA final ya no necesita Yeo-Johnson y solo se estandariza.
 
 Vale la pena precisarlo porque el orden importa: si estandarizamos antes de transformar, los parámetros de Yeo-Johnson quedan calculados sobre datos ya centrados y la corrección de asimetría pierde sentido. Se excluyeron además seis variables: tres por inflación de ceros y tres por efecto techo en 10.
 
-Una aclaración sobre los 404 lotes retirados: el umbral chi² al 97.5% deja por construcción un ~2.5% residual marcado en la nube final — eso es esperado en cualquier dataset real y no indica un error del pipeline. Los 404 son los casos genuinamente problemáticos de la primera pasada; los ~16 que quedan (~2.5% de 666) no se retiran porque hacerlo iterativamente vaciaría los datos.
+Una aclaración sobre los 100 lotes retirados: el umbral chi-cuadrado al 97,5 % deja por construcción un residuo marcado en la nube final. Al repetir la regla sobre los 970 aparecen 63 lotes más (esperaríamos unos 24 por azar), pero no los retiramos: al quitar los extremos la nube se encoge y otros lotes pasan a parecer lejanos, de modo que repetir el filtro seguiría quitando lotes en cada vuelta hasta vaciar los datos.
 
 El clustering responde otra pregunta y usa otra matriz: conserva los 1.070 lotes, combina cuatro componentes principales exploratorios con indicadores de variables categóricas. Por eso sus grupos no son los mismos objetos que las clases de LDA y QDA, que se construyen a partir de puntajes sensoriales.
 
@@ -49,9 +49,9 @@ El clustering responde otra pregunta y usa otra matriz: conserva los 1.070 lotes
 
 *Tiempo: 1:15 · Presenta: Diego*
 
-El PCA transforma variables relacionadas en nuevos ejes que resumen patrones de variación. En el ajuste final, la primera componente explica el 55,1 por ciento y la segunda el 12,5; juntas explican el 67,6 por ciento de la variación de estas ocho variables y estos 627 lotes.
+El PCA transforma variables relacionadas en nuevos ejes que resumen patrones de variación. En el ajuste final, la primera componente explica el 69,3 por ciento y la segunda el 11,6; juntas explican el 80,9 por ciento de la variación de estas ocho variables y estos 970 lotes (intervalo bootstrap del 95 %: 79,3 a 82,5 por ciento).
 
-La primera componente reúne principalmente siete puntajes sensoriales, que tienden a moverse en una dirección común. La segunda está dominada por la altitud. Esto nos ayuda a resumir la información y a visualizarla, pero no significa que el primer eje sea una certificación de calidad ni que el PCA haya descubierto grupos naturales.
+La primera componente reúne principalmente siete puntajes sensoriales, que tienden a moverse en una dirección común. La segunda está dominada por la altitud, con una carga de menos 0,98. Esto nos ayuda a resumir la información y a visualizarla, pero no significa que el primer eje sea una certificación de calidad ni que el PCA haya descubierto grupos naturales.
 
 También revisamos los diagramas de dispersión entre pares de componentes — CP1 vs CP2, CP1 vs CP3, CP2 vs CP3 — para detectar si alguna combinación revelaba una estructura más clara. Ninguna mostró grupos separados nítidamente.
 
@@ -63,7 +63,7 @@ También revisamos los diagramas de dispersión entre pares de componentes — C
 
 *Tiempo: 1:10 · Presenta: Diego*
 
-K-means asigna cada lote al centro más cercano en la matriz completa. El método del codo se aplana gradualmente después de tres grupos, así que usamos k igual a tres como candidato exploratorio; no es un óptimo único demostrado por la curva.
+K-means asigna cada lote al centro más cercano en la matriz completa. El método del codo se aplana gradualmente después de tres grupos, así que usamos k igual a tres como candidato exploratorio. Hay que ser claros: la silueta promedio más alta se da con k igual a dos y el estadístico gap elige k igual a uno, es decir, no hay evidencia de que la matriz esté más agrupada que una referencia uniforme. Por eso k igual a tres es una elección exploratoria, no un óptimo demostrado.
 
 En el dibujo cada punto tiene una sola asignación. Puede parecer que los colores se mezclan porque la matriz se proyecta en dos dimensiones y esa vista deja información fuera. El solapamiento visual no significa que un lote pertenezca a varios grupos.
 
@@ -75,7 +75,7 @@ La Silhouette promedio es 0,116 y 104 lotes tienen valor negativo: la separació
 
 *Tiempo: 0:55 · Presenta: Esteban*
 
-HDBSCAN busca regiones donde se concentran lotes parecidos y no obliga a incluir todos en un grupo. Usamos un tamaño mínimo de clúster de 20 — ese es un hiperparámetro que elegimos nosotros, no el método. Con ese valor encontró cinco grupos de 39, 52, 101, 96 y 89 lotes. Otros 693, el 64,8 por ciento, quedaron como ruido; aquí “ruido” significa que el método no los asignó a una región suficientemente densa, no que sean cafés de mala calidad.
+HDBSCAN busca regiones donde se concentran lotes parecidos y no obliga a incluir todos en un grupo. Usamos un tamaño mínimo de clúster de 10 — ese es un hiperparámetro que elegimos nosotros, no el método. Con ese valor encontró seis grupos de 30, 11, 57, 106, 135 y 105 lotes. Otros 626, el 58,5 por ciento, quedaron como ruido; aquí “ruido” significa que el método no los asignó a una región suficientemente densa, no que sean cafés de mala calidad.
 
 Esta matriz no incluye Humedad y difiere de la que usa K-means. Por eso no presentamos sus etiquetas como equivalentes ni afirmamos que ambos métodos coincidan sin calcular una comparación válida.
 
@@ -87,9 +87,9 @@ Esta matriz no incluye Humedad y difiere de la que usa K-means. Por eso no prese
 
 El siguiente método es Ward.D2, que es clustering jerárquico aglomerativo. A diferencia de K-means, no necesita que le digamos cuántos grupos queremos al inicio: va uniendo los lotes de a pares y tríos, eligiendo siempre la fusión que menos aumenta la varianza interna de cada grupo.
 
-Este dendrograma muestra 80 lotes de la muestra. Cada hoja es un lote; las ramas se van uniendo de abajo hacia arriba. La línea roja marca la altura donde cortamos el árbol para obtener k igual a tres grupos: uno de 15 lotes, uno de 42 y uno de 23. A esa misma altura el dendrograma podría leerse también como cuatro grupos, dependiendo de dónde se trace el corte exacto. Elegimos tres porque la diferencia de altura entre el tercer y cuarto salto era pequeña y el índice Silhouette con k=3 era ligeramente mejor que con k=4; sin embargo reconocemos que k=4 era una opción razonable y que la elección tiene un componente subjetivo.
+Este dendrograma muestra 80 lotes de la muestra. Cada hoja es un lote; las ramas se van uniendo de abajo hacia arriba. La línea roja marca la altura donde cortamos el árbol para obtener k igual a tres grupos: uno de 15 lotes, uno de 42 y uno de 23. A esa misma altura el dendrograma podría leerse también como cuatro grupos, dependiendo de dónde se trace el corte exacto. Elegimos tres como candidato exploratorio porque la diferencia de altura entre el tercer y cuarto salto era pequeña; el índice Silhouette de k=3 (0,115) y el de k=4 (0,114) son prácticamente iguales. Pero hay que decirlo con claridad: el Silhouette más alto se da con k=2 (0,151) y el estadístico gap elige k=1, así que ni uno ni otro respaldan k=3. La elección tiene un componente subjetivo.
 
-El Silhouette promedio de Ward es 0,128, ligeramente mayor que el de K-means de 0,116. El ARI entre K-means y Ward es 0,471: coincidencia moderada. Que dos métodos con lógicas distintas lleguen a agrupaciones similares refuerza que hay una estructura real, aunque débil.
+El Silhouette promedio de Ward es 0,128, ligeramente mayor que el de K-means de 0,116. El ARI entre K-means y Ward es 0,471: coincidencia moderada. Esa coincidencia, calculada en una muestra de 80 lotes, no basta para afirmar que exista una estructura real de grupos.
 
 **Transición:** Veamos qué perfil tiene cada uno de esos tres grupos.
 
@@ -97,11 +97,11 @@ El Silhouette promedio de Ward es 0,128, ligeramente mayor que el de K-means de 
 
 *Tiempo: 0:45 · Presenta: Diego*
 
-Aquí vemos los promedios de atributos sensoriales por grupo en la muestra de 80 lotes. El grupo 1, de 15 lotes, tiene los promedios más altos: 7,71 en aroma y 82,9 puntos totales — es el grupo de perfil sensorial más intenso en casi todos los atributos. El grupo 2, el más numeroso con 42 lotes, tiene 82,7 puntos y un perfil muy similar al grupo 1 pero levemente más bajo; es el grupo mayoritario con calidad alta pero sin el pico del grupo 1. El grupo 3, de 23 lotes, tiene los puntajes más bajos en los siete atributos con 79,9 puntos — sigue siendo café de buena calidad pero con notas sensoriales menos intensas que los otros dos grupos.
+Aquí vemos los promedios de atributos sensoriales por grupo en la muestra de 80 lotes. El grupo 1, de 15 lotes, tiene el mayor promedio en aroma (7,71) y 82,86 puntos totales; su ventaja se concentra ahí, porque en sabor y retrogusto queda prácticamente igual que el grupo 2. El grupo 2, el más numeroso con 42 lotes, tiene 82,72 puntos y supera al grupo 1 en acidez, balance y puntaje del catador: no es un perfil levemente más bajo sino casi idéntico. El grupo 3, de 23 lotes, tiene los promedios más bajos en los siete atributos y 79,90 puntos: sigue siendo café de buena calidad pero con notas menos intensas.
 
-Podríamos describirlos como: lotes de perfil sensorial intenso, lotes de perfil sensorial moderado-alto, y lotes de perfil sensorial moderado. Pero enfatizamos que esta interpretación es exploratoria: las distribuciones se traslapan y los grupos 1 y 2 tienen perfiles muy parecidos. No podemos llamar a estos grupos Specialty, Premium o Commodity sin un criterio externo definido previamente.
+Podríamos describirlos como: un grupo de perfil sensorial alto en dos subtipos casi indistinguibles (grupos 1 y 2) y un grupo de perfil moderado (grupo 3). Pero enfatizamos que esta interpretación es exploratoria: las distribuciones se traslapan y los grupos 1 y 2 tienen perfiles muy parecidos. No podemos llamar a estos grupos Specialty, Premium o Commodity sin un criterio externo definido previamente.
 
-El análisis jerárquico y K-means llegan a conclusiones similares: la estructura de agrupamiento existe, pero es débil.
+El análisis jerárquico y K-means llegan a conclusiones similares: la separación entre grupos es débil y no la respaldan ni el Silhouette ni el gap.
 
 **Transición:** Con estas limitaciones claras, resumimos lo que sí podemos concluir.
 
@@ -109,17 +109,17 @@ El análisis jerárquico y K-means llegan a conclusiones similares: la estructur
 
 *Tiempo: 1:20 · Presenta: Juan*
 
-Esta aplicación permite cambiar los valores de un lote hipotético y ver cómo se proyecta en un PCA de referencia. Voy a ingresar un perfil sensorial alto en todos los atributos — ojo que el máximo real en los datos es 8,8, no es posible escribir 9.
+Esta aplicación permite cambiar los valores de un lote hipotético y ver cómo se proyecta en un PCA de referencia. Voy a ingresar un perfil sensorial alto en todos los atributos — ojo que el máximo real en los datos es 8,5 en la mayoría de atributos, no es posible escribir 9.
 
-**Acción:** Ingresar los valores: Aroma 8,8 · Sabor 8,8 · Retrogusto 8,7 · Acidez 8,5 · Cuerpo 8,6 · Balance 8,7 · Puntaje Catador 8,8. La aplicación indica calidad Alta.
+**Acción:** Ingresar los valores: Aroma 8,5 · Sabor 8,5 · Retrogusto 8,3 · Acidez 8,4 · Cuerpo 8,4 · Balance 8,4 · Puntaje Catador 8,5. La aplicación indica calidad Alta.
 
 Con este perfil la aplicación nos dice calidad Alta. Tiene sentido, todos los puntajes están en el extremo superior de la distribución.
 
 **Acción:** Cambiar Aroma a 7,5 y mostrar que el resultado sigue siendo Alta.
 
-Ahora le bajo bastante el aroma, de 8,8 a 7,5 — y fíjense que sigue diciendo Alta. Esto es porque la primera componente principal es un promedio ponderado de los siete atributos sensoriales juntos; bajar uno solo no arrastra el puntaje compuesto fuera del rango Alto mientras los demás sigan altos. El modelo no te castiga por una sola nota baja si el resto del perfil está bien.
+Ahora le bajo bastante el aroma, de 8,5 a 7,5 — y fíjense que sigue diciendo Alta. Esto es porque la primera componente principal es un promedio ponderado de los siete atributos sensoriales juntos; bajar uno solo no arrastra el puntaje compuesto fuera del rango Alto mientras los demás sigan altos. El modelo no te castiga por una sola nota baja si el resto del perfil está bien.
 
-El percentil nos dice dónde queda este lote frente a la muestra de referencia, no si el café está certificado como Specialty. Esta demostración usa un PCA independiente, ajustado con los 627 lotes de la matriz final; no asigna ni valida los grupos de K-means o HDBSCAN.
+El percentil nos dice dónde queda este lote frente a la muestra de referencia, no si el café está certificado como Specialty. Esta demostración usa un PCA independiente, ajustado con los 970 lotes de la matriz final; no asigna ni valida los grupos de K-means o HDBSCAN.
 
 **Transición:** Con todo lo que vimos, estas son nuestras conclusiones.
 
@@ -127,9 +127,9 @@ El percentil nos dice dónde queda este lote frente a la muestra de referencia, 
 
 *Tiempo: 1:00 · Presenta: Esteban*
 
-Primero, el PCA final resume parte importante de la variación: las dos primeras componentes explican 67,6 por ciento en los 627 lotes de la matriz final. Segundo, el patrón de Humedad igual a cero aparece en 174 registros y en la fuente original; detectarlo no basta para conocer su causa.
+Primero, el PCA final resume parte importante de la variación: las dos primeras componentes explican 80,9 por ciento en los 970 lotes de la matriz final. Segundo, el patrón de Humedad igual a cero aparece en 174 registros y en la fuente original; detectarlo no basta para conocer su causa.
 
-Tercero, K-means produce una partición exploratoria con separación débil según Silhouette. Ward.D2 llega a una estructura similar con ARI de 0,471 respecto a K-means. HDBSCAN encuentra cinco grupos y deja muchos lotes como ruido.
+Tercero, K-means produce una partición exploratoria con separación débil según Silhouette. Ward.D2 coincide de forma moderada con K-means (ARI de 0,471 en la muestra de 80 lotes). HDBSCAN encuentra seis grupos y deja más de la mitad de los lotes como ruido.
 
 En conjunto, estos análisis ayudan a explorar la base, pero no sustentan por sí solos las etiquetas Specialty, Premium o Commodity. Como limitación reconocemos que la interpretación de los grupos es exploratoria: los perfiles que describimos son promedios en la muestra de 80 lotes y no se validaron contra una clasificación externa. Para confirmar que los grupos 1, 2 y 3 corresponden a categorías comerciales reales haría falta una fuente externa de verdad — por ejemplo, precios de mercado o certificaciones de especialidad para esos mismos lotes.
 
