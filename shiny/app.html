@@ -9,7 +9,9 @@
 <meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
 
 
+<meta name="author" content="jsegu" />
 
+<meta name="date" content="2026-11-19" />
 
 <title>app.R</title>
 
@@ -349,48 +351,57 @@ display: none;
 
 
 <h1 class="title toc-ignore">app.R</h1>
+<h4 class="author">jsegu</h4>
+<h4 class="date">2026-11-19</h4>
 
 </div>
 
 
 <pre class="r"><code>library(shiny)
-library(dplyr)
-library(ggplot2)
-library(car)
+library(dplyr)</code></pre>
+<pre><code>## 
+## Adjuntando el paquete: &#39;dplyr&#39;</code></pre>
+<pre><code>## The following objects are masked from &#39;package:stats&#39;:
+## 
+##     filter, lag</code></pre>
+<pre><code>## The following objects are masked from &#39;package:base&#39;:
+## 
+##     intersect, setdiff, setequal, union</code></pre>
+<pre class="r"><code>library(ggplot2)
+library(car)</code></pre>
+<pre><code>## Cargando paquete requerido: carData</code></pre>
+<pre><code>## 
+## Adjuntando el paquete: &#39;car&#39;</code></pre>
+<pre><code>## The following object is masked from &#39;package:dplyr&#39;:
+## 
+##     recode</code></pre>
+<pre class="r"><code># ── Preprocesamiento ──────────────────────────────────────────────────────────
 
-# ── Preprocesamiento ──────────────────────────────────────────────────────────
+# ── Matriz final de 970 lotes (pipeline oficial, misma que el informe) ─────
+# Cargada desde datos/datos_final_970.rds: ya incluye la depuración de atípicos
+# (1.070 → 970, distancia de Mahalanobis corregida). Con esos 970 lotes ninguna
+# variable supera |asimetría| &gt; 1, así que no se aplica Yeo-Johnson (lambdas vacías).
+obj_final &lt;- readRDS(&quot;../datos/datos_final_970.rds&quot;)
 
-# ── Matriz final de 627 lotes (pipeline oficial, misma que el informe) ─────
-# Cargada desde datos/datos_final_627.rds: ya incluye la depuración de atípicos
-# y las lambdas Yeo-Johnson estimadas sobre la matriz final.
-obj_final &lt;- readRDS(&quot;../datos/datos_final_627.rds&quot;)
-
-rename_map &lt;- c(Aroma = &quot;Aroma&quot;, Flavor = &quot;Sabor&quot;, Aftertaste = &quot;Retrogusto&quot;,
-                Acidity = &quot;Acidez&quot;, Body = &quot;Cuerpo&quot;, Balance = &quot;Balance&quot;,
-                Cupper.Points = &quot;Puntaje.Catador&quot;, altitude_mean_meters = &quot;Altitud&quot;)
+# El objeto ya trae las 8 variables con nombres en español.
 vars_8 &lt;- c(&quot;Aroma&quot;, &quot;Sabor&quot;, &quot;Retrogusto&quot;, &quot;Acidez&quot;,
             &quot;Cuerpo&quot;, &quot;Balance&quot;, &quot;Puntaje.Catador&quot;, &quot;Altitud&quot;)
 
-datos_t &lt;- obj_final$datos_limpio
-names(datos_t) &lt;- rename_map[names(datos_t)]
-datos_t &lt;- datos_t[, vars_8]
+datos_t &lt;- obj_final$datos_limpio[, vars_8]
 
-# lambda = 1 para las variables que no se transforman
+# lambda = 1 (identidad) para las variables que no se transforman
 lambdas_8 &lt;- setNames(rep(1, length(vars_8)), vars_8)
 lam &lt;- obj_final$lambdas
-names(lam) &lt;- rename_map[names(lam)]
-lambdas_8[names(lam)] &lt;- lam
-# variables transformadas con Yeo-Johnson (las que tienen lambda estimada)
-vars_yj &lt;- names(lam)
+if (length(lam) &gt; 0) lambdas_8[names(lam)] &lt;- lam
+# variables transformadas con Yeo-Johnson (vacío en el modelo de 970 lotes)
+vars_yj &lt;- obj_final$vars_transformar
 
 pca       &lt;- prcomp(datos_t, center = TRUE, scale. = TRUE)
 scores_df &lt;- as.data.frame(pca$x)
 var_exp   &lt;- round(pca$sdev^2 / sum(pca$sdev^2) * 100, 1)
 
-# valores crudos de los 627 lotes, para rangos y percentiles
-datos_full &lt;- obj_final$datos_originales
-names(datos_full)[match(names(rename_map), names(datos_full))] &lt;- rename_map[names(rename_map)]
-datos_full &lt;- datos_full[, vars_8]
+# valores crudos de los 970 lotes, para rangos y percentiles
+datos_full &lt;- obj_final$datos_originales[, vars_8]
 
 rangos &lt;- lapply(vars_8, function(v) {
   x &lt;- datos_full[[v]]
@@ -593,9 +604,9 @@ ui &lt;- fluidPage(
   div(class = &quot;app-header&quot;,
     h2(&quot;Explorador PCA — Calidad de Café Arábica · CQI&quot;),
     p(class = &quot;subtitle&quot;,
-      &quot;Ajusta los atributos sensoriales y agroclimáticos de un lote nuevo para ubicarlo en el espacio de componentes principales respecto a los 627 lotes de referencia&quot;),
+      &quot;Ajusta los atributos sensoriales y agroclimáticos de un lote nuevo para ubicarlo en el espacio de componentes principales respecto a los 970 lotes de referencia&quot;),
     div(class = &quot;stat-chips&quot;,
-      span(class = &quot;chip&quot;, &quot;627 lotes · matriz final&quot;),
+      span(class = &quot;chip&quot;, &quot;970 lotes · matriz final&quot;),
       span(class = &quot;chip&quot;, &quot;8 variables (7 sensoriales + altitud)&quot;),
       span(class = &quot;chip&quot;, paste0(&quot;CP1 explica &quot;, var_exp[1], &quot;% de la varianza&quot;)),
       span(class = &quot;chip&quot;, paste0(&quot;CP1+CP2 = &quot;, var_exp[1] + var_exp[2], &quot;%&quot;))
@@ -633,8 +644,8 @@ ui &lt;- fluidPage(
       div(class = &quot;sidebar-panel&quot;,
         div(class = &quot;info-box&quot;,
           tags$b(&quot;¿Cómo funciona?&quot;), &quot; Ajusta los puntajes del lote que quieres analizar.
-          Al presionar «Proyectar», el lote se transforma con el mismo preprocesamiento
-          del modelo (Yeo-Johnson) y se ubica en el espacio PCA de los 627 lotes de referencia.&quot;
+          Al presionar «Proyectar», el lote se estandariza con el mismo preprocesamiento
+          del modelo y se ubica en el espacio PCA de los 970 lotes de referencia.&quot;
         ),
 
         div(class = &quot;group-label&quot;, &quot;Puntajes sensoriales  ·  escala 0 – 10&quot;),
@@ -701,7 +712,7 @@ ui &lt;- fluidPage(
             div(class = &quot;card-title&quot;, &quot;Distribución de CP1 y tu lote&quot;),
             plotOutput(&quot;dens&quot;, height = &quot;320px&quot;),
             div(style = &quot;font-size:12px; color:#666;&quot;,
-              &quot;La línea roja marca la posición de tu lote dentro de los 627 de referencia.&quot;)
+              &quot;La línea roja marca la posición de tu lote dentro de los 970 de referencia.&quot;)
           )
         )
       )
@@ -745,7 +756,7 @@ server &lt;- function(input, output, session) {
       labs(
         x = paste0(&quot;CP&quot;, e[1], &quot;  (&quot;, var_exp[e[1]], &quot; % de la varianza)&quot;),
         y = paste0(&quot;CP&quot;, e[2], &quot;  (&quot;, var_exp[e[2]], &quot; % de la varianza)&quot;),
-        caption = &quot;Cada punto es uno de los 627 lotes del Coffee Quality Institute (CQI)&quot;
+        caption = &quot;Cada punto es uno de los 970 lotes del Coffee Quality Institute (CQI)&quot;
       ) +
       theme_minimal(base_size = 13) +
       theme(
@@ -854,7 +865,7 @@ server &lt;- function(input, output, session) {
         )
       }),
       div(style = &quot;font-size:11px; color:#aaa; margin-top:8px;&quot;,
-          &quot;p = percentil dentro de los 627 lotes de referencia&quot;)
+          &quot;p = percentil dentro de los 970 lotes de referencia&quot;)
     )
   })
 
@@ -887,9 +898,9 @@ server &lt;- function(input, output, session) {
     }
 
     pc3_txt &lt;- if (ns[3] &gt; 0.8) {
-      &quot;Mayor peso relativo de Aroma y Acidez frente a Cuerpo y Balance&quot;
-    } else if (ns[3] &lt; -0.8) {
       &quot;Mayor peso relativo de Cuerpo y Balance frente a Aroma y Acidez&quot;
+    } else if (ns[3] &lt; -0.8) {
+      &quot;Mayor peso relativo de Aroma y Acidez frente a Cuerpo y Balance&quot;
     } else {
       &quot;Perfil intermedio en el contraste sensorial de CP3&quot;
     }
@@ -919,6 +930,7 @@ server &lt;- function(input, output, session) {
 }
 
 shinyApp(ui, server)</code></pre>
+<div style="width: 100% ; height: 400px ; text-align: center; box-sizing: border-box; -moz-box-sizing: border-box; -webkit-box-sizing: border-box;" class="muted well">Shiny applications not supported in static R Markdown documents</div>
 
 
 
