@@ -25,43 +25,23 @@ knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE,
 
 # 1. Datos
 
+Se usa la misma base que el resto del proyecto: los 1.070 lotes con altitud válida,
+las **8 variables activas** del PCA (7 sensoriales y altitud), Yeo-Johnson solo en las
+variables con |asimetría| > 1 y estandarización (`datos/base_1070.rds`, generada en
+`01-pca/depuracion.Rmd`). Se excluyen Uniformidad, Taza Limpia y Dulzura por efecto techo,
+igual que en el PCA. Los λ son los de máxima verosimilitud, sin recortarlos a un rango fijo.
+
+Se trabaja con los 1.070 lotes completos: la matriz de distancias tiene unos 572.000 pares,
+un tamaño que `cmdscale` e `isoMDS` manejan sin problema.
+
 ```{r datos}
 library(dplyr)
 library(ggplot2)
-library(car)
-library(smacof)    # MDS métrico y no métrico
 
-data_raw <- read.csv("../data/arabica_data_cleaned.csv")
-
-vars_originales <- c("Aroma","Flavor","Aftertaste","Acidity","Body","Balance",
-                     "Uniformity","Clean.Cup","Sweetness","Cupper.Points",
-                     "Moisture","Category.One.Defects","Category.Two.Defects",
-                     "altitude_mean_meters")
-
-datos <- data_raw %>%
-  filter(!is.na(altitude_mean_meters),
-         altitude_mean_meters > 0, altitude_mean_meters <= 3000) %>%
-  select(all_of(vars_originales)) %>%
-  filter(complete.cases(.)) %>%
-  rename(Sabor=Flavor, Retrogusto=Aftertaste, Acidez=Acidity, Cuerpo=Body,
-         Uniformidad=Uniformity, Taza.Limpia=Clean.Cup, Dulzura=Sweetness,
-         Puntaje.Catador=Cupper.Points, Humedad=Moisture,
-         Defectos.Cat1=Category.One.Defects, Defectos.Cat2=Category.Two.Defects,
-         Altitud=altitude_mean_meters)
-
-vars_11 <- c("Aroma","Sabor","Retrogusto","Acidez","Cuerpo","Balance",
-             "Uniformidad","Taza.Limpia","Dulzura","Puntaje.Catador","Altitud")
-
-# Transformación YJ (pipeline estándar del proyecto)
-datos_t <- datos[, vars_11]
-pt_11   <- powerTransform(datos_t, family="yjPower")
-lambdas <- pmax(pmin(coef(pt_11, round=FALSE), 3), -3)
-for (v in names(datos_t)) datos_t[[v]] <- yjPower(datos_t[[v]], lambdas[v])
-
-# Muestra para MDS (el algoritmo es O(n²))
-set.seed(42)
-idx_muestra <- sample(nrow(datos_t), 150)
-datos_mds   <- scale(datos_t[idx_muestra, ])
+base <- readRDS("../datos/base_1070.rds")
+datos_mds <- as.matrix(base$Z)
+cat("Lotes:", nrow(datos_mds), " Variables:", paste(colnames(datos_mds), collapse = ", "), "\n")
+cat("Variables transformadas con Yeo-Johnson:", paste(base$yj, collapse = ", "), "\n")
 ```
 
 ---
@@ -70,7 +50,8 @@ datos_mds   <- scale(datos_t[idx_muestra, ])
 
 El MDS clásico reconstruye coordenadas en un espacio de baja dimensión a partir
 de una **matriz de distancias**, preservando las distancias originales lo mejor posible.
-Es matemáticamente equivalente a PCA sobre la matriz de doble centrado.
+Con distancias euclídeas es matemáticamente equivalente al PCA: los valores propios de la matriz
+de productos internos doblemente centrada son los del PCA (multiplicados por n − 1).
 
 ```{r mds-clasico}
 D <- dist(datos_mds, method="euclidean")
@@ -78,7 +59,10 @@ mds_clasico <- cmdscale(D, k=2, eig=TRUE)
 
 # En MDS clásico pueden aparecer autovalores negativos. La proporción se calcula
 # sobre la inercia positiva; no se suman valores absolutos de autovalores negativos.
-eig_positivos <- mds_clasico$eig[mds_clasico$eig > 0]
+# Con distancias euclídeas solo hay p = 8 autovalores no nulos; el resto son ceros
+# numéricos (±1e-12) que no deben contarse como autovalores negativos reales.
+tol <- 1e-8 * max(abs(mds_clasico$eig))
+eig_positivos <- mds_clasico$eig[mds_clasico$eig > tol]
 if (length(eig_positivos) < 2) {
   stop("No hay al menos dos autovalores positivos para representar el MDS en 2D.")
 }
@@ -86,8 +70,10 @@ var_exp <- mds_clasico$eig[1:2] / sum(eig_positivos)
 cat("Proporción de inercia positiva representada por las 2 dimensiones:\n")
 cat("Dim1:", round(var_exp[1]*100, 1), "%  Dim2:", round(var_exp[2]*100, 1),
     "%  Total:", round(sum(var_exp[1:2])*100, 1), "%\n")
-cat("Autovalores negativos:", sum(mds_clasico$eig < 0),
-    "(indican que la matriz de distancias no es perfectamente euclídea).\n")
+cat("Autovalores positivos:", length(eig_positivos),
+    " | Autovalores negativos (más allá del error numérico):", sum(mds_clasico$eig < -tol), "\n")
+cat("Con distancia euclídea no aparecen autovalores negativos reales; si aparecieran,",
+    "indicarían que la matriz de distancias no es euclídea.\n")
 ```
 
 ```{r mds-clasico-viz, fig.width=9, fig.height=7}
@@ -96,9 +82,9 @@ colnames(mds_df) <- c("Dim1", "Dim2")
 
 ggplot(mds_df, aes(Dim1, Dim2)) +
   geom_point(alpha=0.4, color="#2563a8", size=1.8) +
-  geom_hline(yintercept=0, linetype="dashed", color="#ccc") +
-  geom_vline(xintercept=0, linetype="dashed", color="#ccc") +
-  labs(title="MDS Clásico (Torgerson) — 150 lotes",
+  geom_hline(yintercept=0, linetype="dashed", color="#cccccc") +
+  geom_vline(xintercept=0, linetype="dashed", color="#cccccc") +
+  labs(title=paste0("MDS Clásico (Torgerson) — ", nrow(datos_mds), " lotes"),
        subtitle=paste0("Dim1 ", round(var_exp[1]*100,1),
                        "% + Dim2 ", round(var_exp[2]*100,1), "%"),
        caption="Distancia euclídea en espacio YJ-estandarizado",
@@ -117,7 +103,8 @@ Escala orientativa de Kruskal (1964): < 5 % excelente; 5–10 % bueno;
 10–20 % aceptable; > 20 % pobre.
 
 ```{r mds-nometrico}
-mds_nm <- MASS::isoMDS(D, k=2)
+set.seed(2026)
+mds_nm <- MASS::isoMDS(D, k=2, trace=FALSE)
 cat("Stress (MDS no métrico):", round(mds_nm$stress, 1),
     ifelse(mds_nm$stress < 5, "— Excelente (< 5%)",
     ifelse(mds_nm$stress < 10, "— Bueno (5–10%)",
@@ -130,8 +117,8 @@ colnames(nm_df) <- c("Dim1","Dim2")
 
 ggplot(nm_df, aes(Dim1, Dim2)) +
   geom_point(alpha=0.4, color="#27ae60", size=1.8) +
-  geom_hline(yintercept=0, linetype="dashed", color="#ccc") +
-  geom_vline(xintercept=0, linetype="dashed", color="#ccc") +
+  geom_hline(yintercept=0, linetype="dashed", color="#cccccc") +
+  geom_vline(xintercept=0, linetype="dashed", color="#cccccc") +
   labs(title=paste0("MDS No Métrico (Kruskal) — Stress = ",
                     round(mds_nm$stress, 2), "%"),
        caption="Preserva orden de distancias, no magnitudes",
@@ -151,6 +138,7 @@ d_orig <- as.vector(D)
 d_mds  <- as.vector(dist(mds_clasico$points))
 
 shepard_df <- data.frame(original=d_orig, mds=d_mds)
+set.seed(2026)
 shepard_df <- dplyr::slice_sample(
   shepard_df,
   n = min(2000L, nrow(shepard_df))
@@ -181,6 +169,8 @@ D_pca <- as.vector(dist(pca_ref$x[, 1:2, drop = FALSE]))
 
 cat("Correlación entre distancias por pares (MDS 2D vs PCA 2D):",
     round(cor(D_mds, D_pca), 4), "\n")
+cat("Correlación entre CP1 y Dim1 (en valor absoluto):",
+    round(abs(cor(mds_clasico$points[, 1], pca_ref$x[, 1])), 4), "\n")
 cat("Esta correlación describe la semejanza de las configuraciones 2D; no prueba",
     "que ambas representaciones conserven toda la distancia original.\n")
 ```
