@@ -1,5 +1,5 @@
 ---
-title: "Depuración de atípicos: 1.070 → 666 → 627"
+title: "Depuración de atípicos: 1.070 → 970"
 subtitle: "Cadena de preprocesamiento del PCA · Coffee Quality Institute"
 author: "Juan Sebastián Guayazán · Esteban Valente · Diego Nocua"
 date: "`r format(Sys.Date(), '%d de %B de %Y')`"
@@ -14,32 +14,12 @@ output:
 knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, fig.align = "center")
 ```
 
-> Este documento explica cómo se construyó y verificó la matriz utilizada por el PCA. El resultado estadístico que se presenta como definitivo está desarrollado en [pca_final.Rmd](pca_final.Rmd).
-
-## Cómo leer este informe
-
-La ruta principal tiene tres momentos: **(1) caracterizar la base inicial de 1.070 lotes, (2) documentar la selección sucesiva de observaciones hasta llegar a 627 y (3) reconstruir y contrastar el objeto final guardado en `datos/datos_final_627.rds`**.
-
-Hay dos procedimientos que conviene distinguir:
-
-- La primera sección genera objetos de preparación y una selección exploratoria basada en Mahalanobis sobre la matriz estandarizada de 1.070 lotes. Es una rama de preparación y diagnóstico.
-- La secuencia que se presenta como **1.070 → 666 → 627** se desarrolla en las secciones 3 y 5. Allí se calculan distancias a partir de scores del PCA preliminar y, después, sobre la matriz de 666 lotes.
-
-Por tanto, no se deben intercambiar automáticamente los objetos `base_sin_atipicos.rds`, `datos_final_666.rds` y `datos_final_627.rds`: corresponden a etapas y construcciones distintas del documento.
-
-**Alcance:** los bloques de código de este informe se conservan como fuente del procedimiento. Las explicaciones que siguen describen lo que ejecuta cada bloque; no implican que se haya vuelto a ejecutar R al editar este documento.
+> Este documento reúne la cadena de depuración que usan todos los análisis de PCA y métodos posteriores. Para el resultado final del PCA ver `pca_final.Rmd`.
 
 
-# 1. Preparación inicial de la base de 1.070 lotes
+# 1. Base de 1.070 lotes y transformación Yeo-Johnson selectiva
 
-Se parte del archivo original y se aplica el filtro de altitud (mayor que 0 y hasta 3.000 metros), junto con la eliminación de registros incompletos en las 14 variables indicadas en el código. Para el preprocesamiento de esta sección se seleccionan después **8 variables**: siete atributos sensoriales y la altitud.
-
-La transformación Yeo-Johnson se aplica selectivamente a las variables cuya asimetría absoluta supera 1. Después se estandariza la matriz. El bloque estima los parámetros sobre la base que recibe y construye dos objetos:
-
-- `base_1070.rds`: matriz inicial transformada y estandarizada.
-- `base_sin_atipicos.rds`: subconjunto obtenido mediante el umbral de Mahalanobis aplicado directamente a esa matriz estandarizada.
-
-**Nota metodológica:** esta selección inicial no debe confundirse con la secuencia posterior 1.070 → 666 → 627, que utiliza el procedimiento descrito en la sección 3.
+Filtro original (altitud entre 0 y 3.000 m, sin NA), 8 variables, Yeo-Johnson solo en las variables con |asimetría| > 1, y estandarización. Se guardan `base_1070.rds` y `base_sin_atipicos.rds` en `datos/`.
 
 ```{r 1-cadena}
 # Preprocesamiento común para todos los métodos.
@@ -81,13 +61,9 @@ cat("1070:", nrow(p1070$Z), " YJ:", p1070$yj, "\n")
 cat("sin atipicos:", nrow(psin$Z), " eliminados:", sum(!keep), " YJ:", psin$yj, "\n")
 ```
 
-# 2. Diagnóstico de Mahalanobis sobre la base inicial
+# 2. Distancia de Mahalanobis en la base de 1.070
 
-Se calcula la distancia de Mahalanobis para los 1.070 registros de la matriz estandarizada y se compara con el cuantil 97,5 % de una distribución chi-cuadrado con 8 grados de libertad. El histograma representa las distancias en escala logarítmica y marca el umbral utilizado.
-
-Esta sección permite visualizar cuántos registros quedan por encima del criterio en esta matriz. **Estar por encima del umbral significa ser identificado como atípico bajo este diagnóstico; la interpretación de su exclusión debe leerse dentro de la secuencia de depuración documentada más adelante.**
-
-Las figuras generadas por el bloque se guardan en `figuras/proceso/`.
+Umbral χ² al 97,5 % con 8 grados de libertad. Las figuras de este documento se guardan en `figuras/proceso/`.
 
 ```{r 2-cadena}
 suppressMessages(library(ggplot2))
@@ -103,157 +79,65 @@ ggsave("figuras/proceso/1070_mahalanobis.png", g, width = 8, height = 6.5, dpi =
 cat("ok\n")
 ```
 
-# 3. Secuencia principal de depuración: 1.070 → 666 → 627
+# 3. Cadena de depuración: 1.070 → 970 (una sola pasada)
 
-Esta es la sección central para explicar la reducción de la muestra. El código sigue cuatro momentos:
-
-1. **PCA preliminar sobre 1.070 lotes:** calcula scores y obtiene una distancia basada en los scores estandarizados por la desviación de cada componente. Los registros que superan el umbral chi-cuadrado se marcan en esta primera etapa.
-2. **Matriz de 666 lotes:** se retiran los 404 registros identificados en el primer paso y se ajusta un nuevo PCA sobre los 666 restantes.
-3. **Segundo diagnóstico:** se calcula Mahalanobis sobre la matriz de 666 lotes estandarizada. El criterio identifica 39 registros por encima del umbral.
-4. **Matriz de 627 lotes:** se conservan los registros que no superan el segundo umbral y se ajusta el PCA correspondiente a esta etapa.
-
-La secuencia documentada queda así:
-
-| Etapa | Lotes | Cambio |
-|---|---:|---:|
-| Base inicial | 1.070 | — |
-| Después del primer criterio | 666 | 404 identificados |
-| Después del segundo criterio | 627 | 39 identificados |
-
-El código imprime los conteos y las varianzas explicadas en cada ajuste. Los porcentajes de varianza de los PCA preliminares pertenecen a sus respectivas matrices y **no deben presentarse como porcentajes del PCA final**.
-
-El PCA final oficial, con la preparación reestimada sobre los 627 registros, se desarrolla en [pca_final.Rmd](pca_final.Rmd).
+> **Corrección (revisión de Diego).** La versión anterior calculaba la distancia como `rowSums((pre$x / pre$sdev)^2)`. En R, dividir una matriz entre un vector recicla el vector **por filas**, no por columnas: cada score quedaba dividido entre la desviación de una componente que no le correspondía. Por eso salían 404 "atípicos" en vez de 100, y la cadena terminaba en 666 y luego en 627 lotes. Lo correcto es dividir cada columna de scores entre su propia desviación con `sweep(pre$x, 2, pre$sdev, "/")`. Con todas las componentes, esa suma es exactamente la distancia de Mahalanobis sobre la matriz estandarizada, la misma de la sección 1.
+>
+> El filtro se aplica **una sola vez**. Al quitar los extremos la nube se encoge y otros lotes pasan a parecer lejanos; repetir el filtro seguiría quitando lotes en cada vuelta. Abajo se muestra cuántos marcaría una segunda pasada solo como referencia; no se retiran.
 
 ```{r 3-cadena}
 suppressMessages(library(ggplot2))
 b <- readRDS("../datos/base_1070.rds")
 T <- b$trans
 pre <- prcomp(T, center = TRUE, scale. = TRUE)
-dm2_pre <- rowSums((pre$x / pre$sdev)^2)
 lim <- qchisq(0.975, 8)
+
+# Distancia correcta: cada columna de scores entre su propia desviación
+dm2_pre <- rowSums(sweep(pre$x, 2, pre$sdev, "/")^2)
 out1 <- dm2_pre > lim
-cat("Paso 1 (PCA preliminar, 1070): varianza", round(summary(pre)$importance[2,1:3]*100,1), " atipicos:", sum(out1), "\n")
-M <- T[!out1, ]
-p666 <- prcomp(M, center = TRUE, scale. = TRUE)
-cat("Paso 2 (PCA 666):", round(summary(p666)$importance[2,1:3]*100,1), " n=", nrow(M), "\n")
-Zm <- scale(M)
-md2 <- mahalanobis(Zm, colMeans(Zm), cov(Zm))
-out2 <- md2 > lim
-cat("Paso 3 (Mahalanobis sobre 666 estandarizada): atipicos:", sum(out2), " quedan:", sum(!out2), "\n")
-F <- M[!out2, ]
-pf <- prcomp(F, center = TRUE, scale. = TRUE)
-cat("Paso 4 (PCA final):", round(summary(pf)$importance[2,1:3]*100,1), " n=", nrow(F), "\n")
+cat("PCA preliminar (1070): varianza", round(summary(pre)$importance[2, 1:3] * 100, 1), " atipicos:", sum(out1), " quedan:", sum(!out1), "\n")
+
+# Comprobación: coincide con la distancia de Mahalanobis de la sección 1
+md_ref <- mahalanobis(b$Z, colMeans(b$Z), cov(b$Z))
+cat("Máxima diferencia con mahalanobis():", signif(max(abs(dm2_pre - md_ref)), 3), "\n")
+
+# Lo que daba el código anterior (reciclaje por filas), solo para documentar el error
+dm2_mal <- rowSums((pre$x / pre$sdev)^2)
+cat("Código anterior: marcaba", sum(dm2_mal > lim), "lotes (error de reciclaje)\n")
+
+# PCA sobre los 970 lotes (λ y estandarización re-estimados sobre el subconjunto)
+psin <- readRDS("../datos/base_sin_atipicos.rds")
+stopifnot(nrow(psin$Z) == sum(!out1))
+pf <- prcomp(psin$Z, center = TRUE, scale. = TRUE)
+cat("PCA final (", nrow(psin$Z), " lotes): varianza", round(summary(pf)$importance[2, 1:3] * 100, 1), "\n")
+
+# Solo referencia: una segunda pasada sobre los 970 (no se aplica)
+md_2a <- mahalanobis(psin$Z, colMeans(psin$Z), cov(psin$Z))
+cat("Referencia: una segunda pasada marcaría", sum(md_2a > lim), "lotes más (no se retiran)\n")
+
 th <- theme_minimal(base_size = 13) + theme(panel.grid.minor = element_blank(), plot.background = element_rect(fill = NA, color = NA), panel.background = element_rect(fill = NA, color = NA), legend.position = "bottom")
 ggsave("figuras/proceso/paso1_mahalanobis_pca_prelim.png", ggplot(data.frame(l = log10(dm2_pre), out = out1), aes(l, fill = out)) + geom_histogram(bins = 45, color = "white") +
   geom_vline(xintercept = log10(lim), color = "#c0392b", linewidth = 1) + scale_fill_manual(values = c("FALSE" = "#9fc3e6", "TRUE" = "#c0392b"), labels = c("Dentro", "Fuera")) +
-  labs(title = "Paso 1 · distancia sobre los scores del PCA preliminar", subtitle = sprintf("%d lotes fuera del umbral χ² (8 g.l.) = %.1f", sum(out1), lim), x = "log10(d²)", y = "Lotes", fill = NULL) + th,
-  width = 8, height = 6.5, dpi = 200, bg = "transparent")
-ggsave("figuras/proceso/paso3_mahalanobis_666.png", ggplot(data.frame(l = log10(md2), out = out2), aes(l, fill = out)) + geom_histogram(bins = 45, color = "white") +
-  geom_vline(xintercept = log10(lim), color = "#c0392b", linewidth = 1) + scale_fill_manual(values = c("FALSE" = "#9fc3e6", "TRUE" = "#c0392b"), labels = c("Dentro", "Fuera")) +
-  labs(title = "Paso 3 · distancia en la matriz de 666 lotes", subtitle = sprintf("%d lotes fuera del umbral", sum(out2)), x = "log10(d²)", y = "Lotes", fill = NULL) + th,
+  labs(title = "Distancia de Mahalanobis sobre los scores del PCA preliminar", subtitle = sprintf("%d lotes fuera del umbral χ² (8 g.l.) = %.1f", sum(out1), lim), x = "log10(d²)", y = "Lotes", fill = NULL) + th,
   width = 8, height = 6.5, dpi = 200, bg = "transparent")
 ```
 
-# 4. Reconstrucción del objeto de 666 lotes
+# 4. Matriz final de 970 lotes (`datos/datos_final_970.rds`)
 
-Este bloque vuelve a construir la matriz de análisis de 8 variables desde el CSV, aplica la transformación Yeo-Johnson a las variables que cumplen el criterio de asimetría y utiliza el diagnóstico basado en los scores del PCA preliminar para identificar los registros que se retiran.
+Se guarda con la misma estructura que usaban `datos_final_666.rds` y `datos_final_627.rds`, para que `pca_final.Rmd` la lea igual. Los archivos viejos de 666 y 627 no se tocan, porque `figuras_pca.Rmd`, `metodos_exploratorios.Rmd` y la app de Shiny todavía los leen.
 
-El objeto resultante se guarda en `datos/datos_final_666.rds` e incluye la matriz transformada, las variables transformadas, los parámetros estimados y los índices de los registros identificados. También conserva los datos originales correspondientes a los registros retenidos.
-
-Esta reconstrucción permite disponer de un objeto intermedio explícito para los análisis posteriores. Sus cifras de varianza corresponden al PCA de 666 lotes, no al PCA final de 627.
-
-```{r 4-cadena}
-library(dplyr)
-library(car)
-
-data <- read.csv("../data/arabica_data_cleaned.csv")
-
-vars_cuantitativas <- c("Aroma", "Flavor", "Aftertaste", "Acidity", "Body", "Balance",
-                        "Uniformity", "Clean.Cup", "Sweetness", "Cupper.Points",
-                        "Moisture", "Category.One.Defects", "Category.Two.Defects",
-                        "altitude_mean_meters")
-
-data_f <- data %>%
-  filter(is.na(altitude_mean_meters) | (altitude_mean_meters > 0 & altitude_mean_meters <= 3000)) %>%
-  filter(!is.na(altitude_mean_meters))
-datos <- data_f %>% select(all_of(vars_cuantitativas))
-
-vars_8 <- setdiff(names(datos),
-                  c("Category.One.Defects", "Category.Two.Defects", "Moisture",
-                    "Sweetness", "Uniformity", "Clean.Cup"))
-datos_t <- datos[, vars_8]
-
-skew <- function(x) mean((x - mean(x))^3) / sd(x)^3
-skew_pre <- sapply(datos_t, skew)
-vars_transformar <- names(skew_pre[abs(skew_pre) > 1])
-if (length(vars_transformar) > 0) {
-  pt_sel <- powerTransform(datos_t[, vars_transformar, drop = FALSE], family = "yjPower")
-  lambdas_sel <- coef(pt_sel, round = FALSE)
-  for (v in vars_transformar) datos_t[[v]] <- yjPower(datos_t[[v]], lambdas_sel[v])
-}
-
-pca_prelim <- prcomp(datos_t, center = TRUE, scale. = TRUE)
-dm2_prelim <- rowSums((pca_prelim$x / pca_prelim$sdev)^2)
-umbral_chi2 <- qchisq(0.975, df = ncol(datos_t))
-idx_atipicos <- which(dm2_prelim > umbral_chi2)
-
-datos_limpio <- datos_t[-idx_atipicos, ]
-
-cat("Variables transformadas (YJ):", vars_transformar, "\n")
-cat("Lotes retirados:", length(idx_atipicos), "de", nrow(datos_t), "\n")
-cat("Matriz final:", nrow(datos_limpio), "x", ncol(datos_limpio), "\n")
-
-pca_check <- prcomp(datos_limpio, center = TRUE, scale. = TRUE)
-print(round(summary(pca_check)$importance[2, 1:3] * 100, 1))
-
-saveRDS(list(datos_limpio = datos_limpio,
-             vars_transformar = vars_transformar,
-             lambdas = lambdas_sel,
+```{r final970}
+psin <- readRDS("../datos/base_sin_atipicos.rds")
+p1070 <- readRDS("../datos/base_1070.rds")
+md <- mahalanobis(p1070$Z, colMeans(p1070$Z), cov(p1070$Z))
+idx_atipicos <- which(md > qchisq(0.975, 8))
+saveRDS(list(datos_limpio = psin$trans,
+             vars_transformar = psin$yj,
+             lambdas = psin$lambdas,
              idx_atipicos = idx_atipicos,
-             datos_originales = datos[-idx_atipicos, ]),
-        "../datos/datos_final_666.rds")
-```
-
-```{r keep627}
-base1070 <- readRDS("../datos/base_1070.rds")
-lim <- qchisq(0.975, 8)
-pre1070 <- prcomp(base1070$trans, center = TRUE, scale. = TRUE)
-out1 <- rowSums((pre1070$x / pre1070$sdev)^2) > lim
-Mtr <- base1070$trans[!out1, ]; Zm <- scale(Mtr)
-out2 <- mahalanobis(Zm, colMeans(Zm), cov(Zm)) > lim
-keep_idx627 <- which(!out1)[!out2]
-d0 <- read.csv("../data/arabica_data_cleaned.csv")
-vars14 <- c("Aroma","Flavor","Aftertaste","Acidity","Body","Balance","Uniformity","Clean.Cup","Sweetness","Cupper.Points","Moisture","Category.One.Defects","Category.Two.Defects","altitude_mean_meters")
-bb <- d0[!is.na(d0$altitude_mean_meters) & d0$altitude_mean_meters > 0 & d0$altitude_mean_meters <= 3000, ]
-bb <- bb[complete.cases(bb[, vars14]), ]
-X8 <- bb[, c("Aroma","Flavor","Aftertaste","Acidity","Body","Balance","Cupper.Points","altitude_mean_meters")]
-```
-
-# 5. Reconstrucción y verificación de la matriz final de 627 lotes
-
-El último bloque reconstruye los índices de retención de la secuencia anterior y recupera las filas correspondientes desde la base original. Luego toma el objeto existente `datos_final_627.rds` y realiza tres comprobaciones:
-
-1. **Correspondencia de filas originales:** compara los datos originales conservados en el objeto con las filas reconstruidas.
-2. **Parámetros Yeo-Johnson:** reestima los parámetros sobre los 627 registros para las variables transformadas y calcula la diferencia frente a los parámetros almacenados.
-3. **Matriz transformada:** compara la matriz reconstruida con `datos_limpio` del objeto guardado.
-
-El bloque imprime las diferencias y **no sobrescribe** el archivo RDS existente. Esto permite verificar la correspondencia entre la reconstrucción y el objeto que utiliza el PCA final.
-
-## Lectura final para la sustentación
-
-La muestra que llega al PCA oficial contiene **627 lotes y 8 variables**. La transformación Yeo-Johnson se vuelve a estimar sobre esos 627 registros y, posteriormente, se estandarizan las variables para ajustar el PCA. Para interpretar la selección de componentes, las cargas y los scores, continúa con [PCA final](pca_final.Rmd).
-
-**Precaución:** los objetos de 1.070, 666 y 627 registros representan etapas diferentes. No combines sus porcentajes de varianza, scores o cargas como si provinieran de un mismo ajuste.
-
-```{r final627}
-suppressMessages(library(car))
-R <- as.data.frame(X8[keep_idx627, ])
-old <- readRDS("../datos/datos_final_627.rds")
-cat("Filas originales iguales:", isTRUE(all.equal(as.matrix(old$datos_originales), as.matrix(R), check.attributes = FALSE)), "\n")
-yj627 <- c("Aroma","Flavor","Aftertaste","Acidity","Body","Balance","Cupper.Points")
-lam627 <- coef(powerTransform(R[, yj627], family = "yjPower"), round = FALSE)
-T627 <- R
-for (v in yj627) T627[[v]] <- yjPower(R[[v]], lam627[v])
-cat("Diferencia máxima en λ:", max(abs(lam627 - old$lambdas[yj627])), "\n")
-cat("Diferencia máxima en datos_limpio:", max(abs(as.matrix(T627) - as.matrix(old$datos_limpio))), "\n")
+             datos_originales = psin$raw),
+        "../datos/datos_final_970.rds")
+cat("Lotes retirados:", length(idx_atipicos), "de", nrow(p1070$Z), "\n")
+cat("Matriz final:", nrow(psin$trans), "x", ncol(psin$trans), "\n")
+cat("Variables transformadas (YJ):", psin$yj, "\n")
 ```

@@ -1,5 +1,4 @@
-n inicial 1070 = 1070; atipicos 1a pasada = 404; 2a pasada = 39; n final = 627
-Verificacion contra datos_final_627.rds: TRUE
+n inicial 1070 = 1070; atipicos (una pasada) = 100; n final = 970
 
 == Simetria (medcouple) y tipo de diagrama de cajas ==
         variable medcouple asimetria                 boxplot atipicos_clasico
@@ -24,35 +23,35 @@ Verificacion contra datos_final_627.rds: TRUE
 == Yeo-Johnson: solo variables con |asimetria| > 1 en la base de 1.070 ==
 Variables transformadas: Aroma, Sabor, Retrogusto, Acidez, Cuerpo, Balance, Puntaje.Catador
 Lambdas estimadas sobre 1.070 (PCA preliminar): 3.59, 2.739, 2.619, 3.291, 3.079, 2.295, 2.177
-Lambdas re-estimadas sobre 627 (PCA final): 1.08, 3.805, 1.793, 1.514, 0.929, 0.343, 2.293
-Asimetria antes (raw, 627): Aroma -0.06 | Sabor -0.28 | Retrogusto -0.2 | Acidez -0.07 | Cuerpo -0.1 | Balance -0.18 | Puntaje.Catador -0.23 | Altitud -0.43
-Asimetria despues (transformada, 627): Aroma -0.05 | Sabor -0.06 | Retrogusto -0.14 | Acidez -0.03 | Cuerpo -0.1 | Balance -0.22 | Puntaje.Catador -0.13 | Altitud -0.43
+Lambdas re-estimadas sobre 970 (PCA final): ninguna; sin los 100 atipicos ninguna variable tiene |asimetria| > 1, asi que no se transforma
+Asimetria antes (raw, 970): Aroma -0.24 | Sabor -0.45 | Retrogusto -0.47 | Acidez -0.02 | Cuerpo -0.17 | Balance -0.35 | Puntaje.Catador -0.32 | Altitud -0.69
+Asimetria despues (transformada, 970): Aroma -0.24 | Sabor -0.45 | Retrogusto -0.47 | Acidez -0.02 | Cuerpo -0.17 | Balance -0.35 | Puntaje.Catador -0.32 | Altitud -0.69
 
-== Supuestos del PCA (627 lotes) ==
-prcomp centra internamente (center = TRUE); Altitud tiene media ~1351 m antes de centrar
-Atipicos multivariados restantes (d2 > chi2 0.975, 8 g.l.): 32 de 627 (esperados por azar ~16)
+== Supuestos del PCA (970 lotes) ==
+prcomp centra internamente (center = TRUE); Altitud tiene media ~1321 m antes de centrar
+Atipicos multivariados restantes (d2 > chi2 0.975, 8 g.l.): 63 de 970 (esperados por azar ~24)
 
 == Varianza por componente con IC 95 % (bootstrap B = 2000) ==
  componente varianza ic_inf ic_sup acum_CP1_CP2
-        CP1     55.1   52.6   57.7         67.6
-        CP2     12.5   12.3   12.9         67.6
-        CP3      8.9    7.9   10.0         67.6
-        CP4      6.7    6.1    7.6         67.6
-        CP5      6.1    5.3    6.7         67.6
-        CP6      3.9    3.5    4.5         67.6
-        CP7      3.7    3.1    4.0         67.6
-        CP8      3.1    2.6    3.4         67.6
-IC acumulado CP1+CP2: 65.2 a 70.3 %
+        CP1     69.3   67.5   70.9         80.9
+        CP2     11.6   11.2   12.0         80.9
+        CP3      5.3    4.8    6.0         80.9
+        CP4      4.1    3.7    4.6         80.9
+        CP5      3.8    3.3    4.1         80.9
+        CP6      2.4    2.1    2.7         80.9
+        CP7      1.9    1.7    2.2         80.9
+        CP8      1.6    1.3    1.7         80.9
+IC acumulado CP1+CP2: 79.3 a 82.5 %
 
 == Cargas CP1-CP3 ==
                   PC1   PC2   PC3
-Aroma           -0.33 -0.08  0.51
-Sabor           -0.41  0.10  0.27
-Retrogusto      -0.40 -0.01 -0.17
-Acidez          -0.35  0.00  0.42
-Cuerpo          -0.34  0.07 -0.56
-Balance         -0.40  0.01 -0.36
-Puntaje.Catador -0.41  0.03 -0.05
-Altitud         -0.05 -0.99 -0.06
+Aroma           -0.35 -0.02 -0.64
+Sabor           -0.39  0.07 -0.21
+Retrogusto      -0.39  0.10  0.02
+Acidez          -0.36 -0.03 -0.15
+Cuerpo          -0.35  0.09  0.68
+Balance         -0.38  0.05  0.23
+Puntaje.Catador -0.39  0.07  0.04
+Altitud         -0.13 -0.98  0.08
 
 t-SNE: perplejidad 30, semilla 2026. UMAP: 15 vecinos, min_dist 0.1, semilla 2026. Exploratorios.

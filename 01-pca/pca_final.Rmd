@@ -1,5 +1,5 @@
 ---
-title: "PCA final: 627 lotes, 8 variables"
+title: "PCA final: 970 lotes, 8 variables"
 subtitle: "Revisión según la sustentación · Coffee Quality Institute"
 author: "Juan Sebastián Guayazán · Esteban Valente · Diego Nocua"
 date: "`r format(Sys.Date(), '%d de %B de %Y')`"
@@ -15,39 +15,21 @@ output:
 knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, fig.align = "center")
 ```
 
-> **Resultado de referencia:** este informe ajusta el PCA sobre la matriz final de **627 lotes y 8 variables**. La secuencia de depuración que permite llegar a esa matriz se documenta en [depuracion.Rmd](depuracion.Rmd). Las figuras y tablas generadas por este documento se guardan en `figuras/revision_profesor/`.
+> **Qué contiene:** el PCA final oficial (970 lotes, 8 variables) con la cadena de depuración 1.070 → 970 (una sola pasada de Mahalanobis). Es el análisis que se muestra en la presentación y el que se usa en la demo. Las figuras de cada sección se guardan en `figuras/revision_profesor/`.
 
-## Ruta de lectura
+# Introducción y datos
 
-1. **Preparación y trazabilidad:** se reconstruye la selección de filas y se contrasta con el objeto RDS final.
-2. **Diagnósticos de distribución:** se comparan medidas de asimetría y reglas de diagramas de cajas.
-3. **Transformación:** se documenta la decisión de aplicar Yeo-Johnson selectivamente y reestimar sus parámetros sobre la matriz final.
-4. **Ajuste e interpretación:** se examinan el centrado, las distancias restantes, la varianza explicada, los scores y las cargas.
-5. **Exploración complementaria:** t-SNE y UMAP se muestran como representaciones exploratorias, no como sustitutos del PCA.
+- Revisión PCA según recomendaciones de la sustentación.
+- Trabaja sobre la misma cadena de depuración (1.070 -> 970) y produce:
+- - medcouple y diagrama de cajas clásico vs ajustado (robusto para asimetría)
+- - justificación de Yeo-Johnson solo en las variables con asimetría
+- - supuestos del PCA (centrado, atípicos)
+- - gráfico del codo con intervalos de confianza bootstrap
+- - dispersión de scores ANTES de las cargas, cargas de CP1-CP3 y biplot
+- - t-SNE y UMAP exploratorios coloreados por método de proceso
+- Salida: figuras/revision_profesor/ y resultados_revision_profesor.txt
 
-Los bloques de código se mantienen como fuente del análisis. La edición de la explicación no ejecuta R ni actualiza por sí sola las figuras o el HTML publicado.
-
-# Introducción y alcance
-
-El objeto de análisis es una matriz de **627 observaciones y 8 variables**: Aroma, Sabor, Retrogusto, Acidez, Cuerpo, Balance, Puntaje del Catador y Altitud. Las siete primeras corresponden a atributos sensoriales; la última es una variable agroclimática.
-
-Este informe contiene:
-
-- diagnóstico de asimetría mediante medcouple y asimetría muestral;
-- comparación entre reglas clásicas y robustas para identificar valores extremos en los datos originales;
-- justificación y verificación de la transformación Yeo-Johnson;
-- diagnóstico de centrado y observaciones multivariadamente extremas;
-- varianza explicada por componente e intervalos bootstrap;
-- representación de scores, cargas y biplot;
-- representaciones exploratorias mediante t-SNE y UMAP.
-
-**Alcance de la selección de componentes:** el código calcula la varianza explicada y sus intervalos de confianza mediante remuestreo bootstrap. La gráfica del codo sirve como apoyo para la decisión; el código no implementa una regla automática que seleccione por sí sola el número definitivo de componentes.
-
-Las salidas se escriben en `figuras/revision_profesor/` y en `resultados_revision_profesor.txt`.
-
-# 1. Preparación del entorno
-
-Este bloque carga las bibliotecas utilizadas, fija la semilla aleatoria en 2026 y prepara un contenedor de texto para reunir los resultados numéricos que se imprimen al final del documento.
+# 1. Preparación de datos
 
 ```{r sec1}
 
@@ -58,13 +40,7 @@ add <- function(...) out_txt <<- c(out_txt, paste0(...))
 
 ```
 
-# 2. Reconstrucción y verificación de la matriz final
-
-A partir del CSV se aplican los filtros de altitud y de registros completos en las 14 variables señaladas en el código. Después se seleccionan las 8 variables del PCA. La información de método de procesamiento y color se conserva aparte como metadatos para describir los scores; no forma parte de la matriz de componentes.
-
-El bloque recupera la matriz inicial transformada, reproduce los dos criterios de selección y obtiene los índices de las filas que llegan a la muestra final. Luego contrasta los datos originales reconstruidos con los almacenados en `datos_final_627.rds`. La instrucción `stopifnot` detiene la ejecución si esa correspondencia no se cumple.
-
-Este paso es importante para la trazabilidad: permite comprobar que el objeto utilizado por el PCA corresponde a las mismas filas y en el mismo orden que la selección reconstruida.
+# 2. Datos y cadena de depuración (idéntica a depuracion.Rmd)
 
 ```{r sec2}
 d <- read.csv("../data/arabica_data_cleaned.csv")
@@ -75,36 +51,25 @@ meta <- b[, c("Processing.Method", "Color")]
 X8 <- b[, c("Aroma","Flavor","Aftertaste","Acidity","Body","Balance","Cupper.Points","altitude_mean_meters")]
 names(X8) <- c("Aroma","Sabor","Retrogusto","Acidez","Cuerpo","Balance","Puntaje.Catador","Altitud")
 base <- readRDS("../datos/base_1070.rds")
-T1070 <- base$trans
 lim <- qchisq(0.975, 8)
-pre <- prcomp(T1070, center = TRUE, scale. = TRUE)
-out1 <- rowSums((pre$x / pre$sdev)^2) > lim
-M <- T1070[!out1, ]
-Zm <- scale(M)
-out2 <- mahalanobis(Zm, colMeans(Zm), cov(Zm)) > lim
-keep_idx <- which(!out1)[!out2]
-# Matriz final oficial: mismos 627 lotes (mismo orden), con λ Yeo-Johnson re-estimados sobre los 627
-fin <- readRDS("../datos/datos_final_627.rds")
-F627 <- fin$datos_limpio
-names(F627) <- names(X8)
+# Una sola pasada de Mahalanobis sobre la base de 1.070 transformada y estandarizada.
+# Corrección: el código anterior usaba rowSums((pre$x / pre$sdev)^2), que recicla sdev por filas
+# y marcaba 404 lotes; la distancia correcta marca 100 (ver depuracion.Rmd, sección 3).
+md1070 <- mahalanobis(base$Z, colMeans(base$Z), cov(base$Z))
+out1 <- md1070 > lim
+keep_idx <- which(!out1)
+# Matriz final oficial: 970 lotes. Yeo-Johnson se re-evalúa sobre los 970 con la misma regla (|asimetría| > 1)
+fin <- readRDS("../datos/datos_final_970.rds")
+F970 <- fin$datos_limpio
+names(F970) <- names(X8)
 stopifnot(isTRUE(all.equal(as.matrix(fin$datos_originales), as.matrix(X8[keep_idx, ]), check.attributes = FALSE)))
-meta627 <- meta[keep_idx, ]
-raw627 <- X8[keep_idx, ]
-add("n inicial 1070 = ", nrow(X8), "; atipicos 1a pasada = ", sum(out1), "; 2a pasada = ", sum(out2), "; n final = ", nrow(F627))
-add("Verificacion contra datos_final_627.rds: ", nrow(readRDS("../datos/datos_final_627.rds")$datos_limpio) == nrow(F627))
+meta970 <- meta[keep_idx, ]
+raw970 <- X8[keep_idx, ]
+add("n inicial 1070 = ", nrow(X8), "; atipicos (una pasada) = ", sum(out1), "; n final = ", nrow(F970))
 
 ```
 
-# 3. Diagnóstico de simetría y valores extremos en la base original
-
-El diagnóstico se calcula sobre `X8`, es decir, sobre las 8 variables seleccionadas antes de la transformación Yeo-Johnson y antes de limitar el análisis a las 627 filas finales. Por eso, los conteos de esta tabla describen la base inicial filtrada, no el número de observaciones extremas que permanecen en el PCA final.
-
-El código calcula medcouple y asimetría muestral. Según la regla documentada en el propio análisis:
-
-- si el valor absoluto del medcouple supera 0,1, utiliza el boxplot ajustado de Hubert-Vandervieren;
-- en caso contrario, utiliza una regla robusta basada en mediana y MAD.
-
-La tabla y la figura comparan los conteos de la regla clásica con los de la regla robusta elegida para cada variable. La identificación de valores extremos es un diagnóstico descriptivo; debe interpretarse junto con el procedimiento multivariado de depuración.
+# 3. Simetría y diagrama de cajas (clásico vs ajustado)
 
 ```{r sec3}
 mc <- sapply(X8, function(x) mc(x))
@@ -138,55 +103,41 @@ dev.off()
 
 ```
 
-# 4. Transformación Yeo-Johnson
-
-La transformación se aplica de forma selectiva: el objeto de referencia identifica las variables que superaron el umbral de asimetría absoluta mayor que 1 en la base de 1.070 lotes. El informe compara los parámetros estimados en esa base con los parámetros reestimados sobre los 627 registros finales.
-
-También calcula la asimetría antes de transformar los datos originales de la muestra final y después de aplicar la transformación almacenada en el objeto final. Así se documenta el efecto de la transformación sin asumir que todas las variables deban transformarse.
+# 4. Justificación de Yeo-Johnson
 
 ```{r sec4}
 add("\n== Yeo-Johnson: solo variables con |asimetria| > 1 en la base de 1.070 ==")
 add("Variables transformadas: ", paste(names(base$lambdas), collapse = ", "))
 add("Lambdas estimadas sobre 1.070 (PCA preliminar): ", paste(round(base$lambdas, 3), collapse = ", "))
-add("Lambdas re-estimadas sobre 627 (PCA final): ", paste(round(fin$lambdas, 3), collapse = ", "))
-skew_627_raw <- sapply(raw627, function(x) mean((x - mean(x))^3) / sd(x)^3)
-skew_627_trans <- sapply(F627, function(x) mean((x - mean(x))^3) / sd(x)^3)
-add("Asimetria antes (raw, 627): ", paste(names(skew_627_raw), round(skew_627_raw, 2), collapse = " | "))
-add("Asimetria despues (transformada, 627): ", paste(names(skew_627_trans), round(skew_627_trans, 2), collapse = " | "))
+add("Lambdas re-estimadas sobre 970 (PCA final): ", if (length(fin$lambdas)) paste(round(fin$lambdas, 3), collapse = ", ") else "ninguna; sin los 100 atipicos ninguna variable tiene |asimetria| > 1, asi que no se transforma")
+skew_970_raw <- sapply(raw970, function(x) mean((x - mean(x))^3) / sd(x)^3)
+skew_970_trans <- sapply(F970, function(x) mean((x - mean(x))^3) / sd(x)^3)
+add("Asimetria antes (raw, 970): ", paste(names(skew_970_raw), round(skew_970_raw, 2), collapse = " | "))
+add("Asimetria despues (transformada, 970): ", paste(names(skew_970_trans), round(skew_970_trans, 2), collapse = " | "))
 
 ```
 
-# 5. Centrado y diagnóstico multivariado de la matriz final
-
-El bloque estandariza la matriz final y calcula nuevamente las distancias de Mahalanobis para contar cuántos registros superan el umbral chi-cuadrado utilizado. También deja constancia de que el ajuste posterior centra y escala las variables.
-
-**Interpretación prudente:** este bloque documenta el centrado y un diagnóstico de distancias multivariadas. No contiene una batería completa de pruebas formales para todos los supuestos posibles del PCA; por eso conviene presentar sus resultados exactamente con ese alcance.
+# 5. Supuestos del PCA
 
 ```{r sec5}
-Zf <- scale(F627, center = TRUE, scale = TRUE)
-add("\n== Supuestos del PCA (627 lotes) ==")
-add("prcomp centra internamente (center = TRUE); Altitud tiene media ~", round(mean(F627[, 8])), " m antes de centrar")
-md627 <- mahalanobis(Zf, colMeans(Zf), cov(Zf))
-add("Atipicos multivariados restantes (d2 > chi2 0.975, 8 g.l.): ", sum(md627 > lim), " de ", nrow(Zf), " (esperados por azar ~", round(0.025 * nrow(Zf)), ")")
+Zf <- scale(F970, center = TRUE, scale = TRUE)
+add("\n== Supuestos del PCA (970 lotes) ==")
+add("prcomp centra internamente (center = TRUE); Altitud tiene media ~", round(mean(F970[, 8])), " m antes de centrar")
+md970 <- mahalanobis(Zf, colMeans(Zf), cov(Zf))
+add("Atipicos multivariados restantes (d2 > chi2 0.975, 8 g.l.): ", sum(md970 > lim), " de ", nrow(Zf), " (esperados por azar ~", round(0.025 * nrow(Zf)), ")")
 
 ```
 
-# 6. Ajuste del PCA y varianza explicada
-
-Se ajusta el PCA sobre la matriz final transformada, centrando y escalando las variables. Para evaluar la variabilidad de la proporción explicada por cada componente, el código realiza **2.000 remuestras bootstrap**: en cada una vuelve a ajustar el PCA y calcula las proporciones de varianza.
-
-A partir de esas remuestras se construyen intervalos percentiles del 95 % para cada componente y para la varianza acumulada de CP1 y CP2. La gráfica presenta los primeros seis componentes con sus intervalos.
-
-La lectura debe combinar la magnitud de la varianza explicada, la forma del codo y la incertidumbre bootstrap. Los intervalos describen variabilidad bajo el remuestreo implementado; no son una garantía de que exista un único número correcto de componentes.
+# 6. PCA final, codo con IC bootstrap
 
 ```{r sec6}
-pca <- prcomp(F627, center = TRUE, scale. = TRUE)
+pca <- prcomp(F970, center = TRUE, scale. = TRUE)
 prop <- pca$sdev^2 / sum(pca$sdev^2)
 B <- 2000
 boot_prop <- matrix(NA, B, 8)
 for (i in seq_len(B)) {
-  idx <- sample(nrow(F627), replace = TRUE)
-  s <- prcomp(F627[idx, ], center = TRUE, scale. = TRUE)$sdev^2
+  idx <- sample(nrow(F970), replace = TRUE)
+  s <- prcomp(F970[idx, ], center = TRUE, scale. = TRUE)$sdev^2
   boot_prop[i, ] <- s / sum(s)
 }
 ci <- t(apply(boot_prop, 2, quantile, c(0.025, 0.975)))
@@ -206,29 +157,21 @@ dev.off()
 
 ```
 
-# 7. Distribución de scores por método de procesamiento
-
-Los scores de CP1 y CP2 ubican cada uno de los 627 lotes en el espacio definido por los dos primeros componentes. El gráfico colorea los puntos según el método de procesamiento, conserva los cinco métodos más frecuentes y agrupa los demás en la categoría "Otro".
-
-Los colores permiten explorar si se observan patrones asociados al método de procesamiento. La visualización, por sí sola, no demuestra causalidad ni establece grupos estadísticamente confirmados.
+# 7. Dispersión de scores ANTES de las cargas
 
 ```{r sec7}
-sc <- data.frame(CP1 = pca$x[, 1], CP2 = pca$x[, 2], CP3 = pca$x[, 3], Proceso = meta627$Processing.Method)
+sc <- data.frame(CP1 = pca$x[, 1], CP2 = pca$x[, 2], CP3 = pca$x[, 3], Proceso = meta970$Processing.Method)
 sc$Proceso[is.na(sc$Proceso) | sc$Proceso == ""] <- "Sin dato"
 top <- names(sort(table(sc$Proceso), decreasing = TRUE))[1:5]
 sc$Proceso[!(sc$Proceso %in% top)] <- "Otro"
 p_sc <- ggplot(sc, aes(CP1, CP2, color = Proceso)) + geom_point(alpha = 0.7, size = 1.6) +
-  labs(title = "Dispersión de los lotes en CP1 y CP2 (627 lotes)", x = sprintf("CP1 (%.1f %%)", prop[1] * 100), y = sprintf("CP2 (%.1f %%)", prop[2] * 100), color = "Método de proceso") +
+  labs(title = "Dispersión de los lotes en CP1 y CP2 (970 lotes)", x = sprintf("CP1 (%.1f %%)", prop[1] * 100), y = sprintf("CP2 (%.1f %%)", prop[2] * 100), color = "Método de proceso") +
   theme_minimal(base_size = 13)
 ggsave("figuras/revision_profesor/dispersion_CP1_CP2.png", p_sc, width = 8, height = 6, dpi = 200)
 
 ```
 
-# 8. Cargas de CP1–CP3 y biplot
-
-Las cargas corresponden a los coeficientes de las variables en los tres primeros componentes. Su signo y magnitud ayudan a interpretar qué variables contribuyen a cada dirección del espacio reducido. La interpretación debe hacerse componente por componente y teniendo presente que el signo global de un componente puede invertirse sin cambiar la solución matemática del PCA.
-
-El biplot representa simultáneamente observaciones y variables en el plano de los dos primeros componentes. Es una vista conjunta de la estructura; para leer las contribuciones con precisión, consulta también la matriz de cargas guardada en CSV.
+# 8. Cargas de CP1-CP3 y biplot
 
 ```{r sec8}
 L <- round(pca$rotation[, 1:3], 2)
@@ -236,16 +179,12 @@ write.csv(L, "figuras/revision_profesor/cargas_CP1_CP3.csv")
 add("\n== Cargas CP1-CP3 ==")
 add(paste(capture.output(print(L)), collapse = "\n"))
 png("figuras/revision_profesor/biplot.png", width = 1800, height = 1400, res = 180)
-biplot(pca, choices = 1:2, cex = c(0.4, 0.9), col = c("grey40", "#c0392b"), xlab = sprintf("CP1 (%.1f %%)", prop[1] * 100), ylab = sprintf("CP2 (%.1f %%)", prop[2] * 100), main = "Biplot (627 lotes)")
+biplot(pca, choices = 1:2, cex = c(0.4, 0.9), col = c("grey40", "#c0392b"), xlab = sprintf("CP1 (%.1f %%)", prop[1] * 100), ylab = sprintf("CP2 (%.1f %%)", prop[2] * 100), main = "Biplot (970 lotes)")
 dev.off()
 
 ```
 
-# 9. t-SNE y UMAP: exploración complementaria
-
-t-SNE y UMAP generan representaciones bidimensionales no lineales de la matriz estandarizada. En este documento se usan con parámetros explícitos y semilla fijada para facilitar la reproducibilidad.
-
-Estas figuras son complementarias: sus ejes no equivalen a CP1 y CP2, las distancias globales no tienen la misma interpretación que en el PCA y la estructura observada depende de los parámetros del método. No deben presentarse como resultados del PCA ni como evidencia suficiente de conglomerados.
+# 9. t-SNE y UMAP exploratorios
 
 ```{r sec9}
 set.seed(2026)
