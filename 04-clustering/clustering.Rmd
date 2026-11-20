@@ -8,15 +8,36 @@ output:
     toc: true
     toc_float: true
     toc_depth: 3
-    code_folding: show
+    code_folding: hide
     theme: flatly
     df_print: paged
+    css: ../estilos_presentacion.css
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, warning = TRUE, message = FALSE,
                       fig.align = "center", fig.width = 8, fig.height = 6)
+fm <- function(x, d = 0) format(round(x, d), nsmall = d, decimal.mark = ",", big.mark = ".")
 ```
+
+::: {.resumen}
+**En resumen.** Se agrupan los 1.070 lotes con K-means (k = 3, solución exploratoria) y Ward.D2 (muestra de 80 lotes). La separación es débil: la silueta de K-means es 0,116 y 104 lotes (9,7 %) tienen silueta negativa; la silueta promedio es incluso mayor con k = 2 (0,151) y el estadístico gap elige k = 1. El acuerdo entre K-means y Ward es moderado (ARI 0,471). Los grupos **no** son categorías comerciales (Specialty, Premium, Commodity).
+:::
+
+# Qué responde este informe
+
+**Pregunta:** ¿se pueden agrupar los lotes de café en grupos que tengan sentido, y qué tan confiables son esos grupos?
+
+Cada sección sigue el mismo esquema: *qué se hace y por qué*, *el resultado* y *cómo se lee*.
+
+| Sección | Qué se hace | Qué se concluye |
+|---|---|---|
+| 1–3 | Preparar datos, PCA exploratorio y matriz X | Espacio de 4 scores PCA + indicadores categóricos |
+| 4 | Elegir k con el codo | k = 3 es un candidato exploratorio, no un óptimo |
+| 5 | K-means | Separación débil; grupos solapados; procedimiento estable |
+| 6 | Ward.D2 | Árbol sobre una muestra de 80 lotes |
+| 7 | Comparación | Acuerdo moderado; no prueba grupos reales |
+| Anexo | Robustez con y sin atípicos | La conclusión no cambia al quitar los atípicos |
 
 # Propósito y alcance
 
@@ -83,6 +104,8 @@ cat("Variables PCA activas:", paste(vars_activas, collapse = ", "), "\n")
 cat("Variables con |sesgo| > 1:", paste(vars_transformar, collapse = ", "), "\n")
 ```
 
+**Cómo se lee.** Se trabaja con los `r fm(nrow(datos_modelo))` lotes del filtro de altitud (sin retirar atípicos) y 8 variables activas. `r length(vars_transformar)` de ellas superan |sesgo| 1 y se transforman con Yeo-Johnson (en la base de 1.070 lotes, los siete atributos sensoriales).
+
 Yeo-Johnson se aplica selectivamente siguiendo el criterio del informe PCA actual
 (|sesgo| > 1). Se conserva la estimación de máxima verosimilitud de car; no se
 fuerzan lambdas a un rango arbitrario.
@@ -108,6 +131,8 @@ varianza_acumulada_4pc <-
 cat("Varianza acumulada por las primeras 4 CP:",
     round(varianza_acumulada_4pc * 100, 1), "%\n")
 ```
+
+**Cómo se lee.** Las primeras 4 componentes del PCA exploratorio conservan el `r fm(varianza_acumulada_4pc * 100, 1)` % de la varianza; son las que alimentan el clustering. Son componentes de los 1.070 lotes, no las del PCA final de 970.
 
 # 2. Variables categóricas y alineación de filas
 
@@ -157,6 +182,8 @@ cat("Filas PCA:", nrow(pca_exploratorio$x), "\n")
 stopifnot(nrow(dummies) == nrow(pca_exploratorio$x))
 ```
 
+**Cómo se lee.** Hay `r ncol(dummies)` columnas indicadoras (una por categoría de proceso, color y país) para los mismos `r fm(nrow(dummies))` lotes de los scores: la comprobación de alineación pasó.
+
 # 3. Construir y escalar X
 
 El código de clase estandariza X antes de ejecutar los algoritmos. Aquí se
@@ -180,6 +207,8 @@ cat("Proporción de suma de cuadrados, bloque numérico:",
 cat("Proporción de suma de cuadrados, bloque categórico:",
     round(sum(X_dum^2) / sum(X_stand^2) * 100, 1), "%\n")
 ```
+
+**Cómo se lee.** La matriz X tiene `r ncol(X_stand)` columnas. Gracias a la ponderación, el bloque numérico aporta el `r fm(sum(X_num^2) / sum(X_stand^2) * 100, 1)` % de la suma de cuadrados y el categórico el `r fm(sum(X_dum^2) / sum(X_stand^2) * 100, 1)` %: ninguno domina solo por tener más columnas.
 
 # 4. Elegir k con el método del codo
 
@@ -208,7 +237,7 @@ grafico_wss <- fviz_nbclust(
 grafico_wss
 ```
 
-La curva reproducida para esta matriz se aplana gradualmente después de k = 3.
+**Cómo se lee.** La curva baja de forma gradual y no tiene un quiebre claro; se aplana poco a poco después de k = 3.
 Se fija k = 3 como candidato de trabajo para describir la solución y compararla
 con otros métodos; no se afirma que exista un óptimo estadístico único.
 
@@ -236,6 +265,8 @@ tabla_tamanos$porcentaje <- 100 * tabla_tamanos$lotes / nrow(X_stand)
 tabla_tamanos
 ```
 
+**Cómo se lee.** Los tres grupos tienen `r paste(tabla_tamanos$lotes, collapse = ', ')` lotes (`r paste(fm(tabla_tamanos$porcentaje, 1), collapse = ' %, ')` %). No hay un grupo diminuto ni uno que domine.
+
 Cada lote recibe una sola etiqueta de cluster en la matriz completa. El gráfico
 reduce esa matriz a dos dimensiones para poder verla; por eso, puntos de grupos
 distintos pueden quedar cerca o superpuestos en el plano. La proyección no cambia
@@ -262,6 +293,8 @@ names(sil_por_cluster)[2] <- "silhouette_promedio"
 sil_por_cluster
 ```
 
+**Cómo se lee.** BSS/TSS es el porcentaje de la variación total que queda **entre** grupos: `r fm(100 * km$betweenss / km$totss, 1)` %; el resto es variación dentro de los grupos. La silueta promedio es `r fm(mean(sil_km[, 3]), 3)` (va de −1 a 1; por debajo de 0,25 se considera que no hay estructura sustancial) y `r sum(sil_km[, 3] < 0)` lotes (`r fm(mean(sil_km[, 3] < 0) * 100, 1)` %) tienen silueta negativa: quedan más cerca de otro grupo que del propio. Conclusión: **separación débil**.
+
 ```{r silhouette-k, fig.width=8, fig.height=5}
 set.seed(42)
 fviz_nbclust(
@@ -279,6 +312,8 @@ fviz_nbclust(
   ) +
   theme_minimal(base_size = 13)
 ```
+
+**Cómo se lee.** La silueta promedio más alta se da con k = 2, no con k = 3. Esto confirma que k = 3 es una elección exploratoria para poder describir y comparar, no un óptimo.
 
 ```{r fviz-cluster, fig.width=9, fig.height=7}
 grafico_kmeans <- fviz_cluster(
@@ -314,6 +349,8 @@ ggsave(
 
 grafico_kmeans
 ```
+
+**Cómo se lee.** Cada punto es un lote y cada color un grupo. Las envolventes son ayudas visuales, no fronteras reales. Los grupos se **traslapan** en el plano porque X tiene más dimensiones que las dos que se dibujan; cada lote tiene una sola etiqueta calculada en la matriz completa.
 
 ## 5.2 Sensibilidad a la inicialización
 
@@ -352,6 +389,8 @@ cat("Repeticiones idénticas a la referencia:",
     sum(ari_repeticiones == 1), "de 20\n")
 ```
 
+**Cómo se lee.** El ARI mide qué tanto coinciden dos particiones (1 = idénticas). Con 20 semillas distintas el ARI frente a la solución de referencia va de `r fm(min(ari_repeticiones), 3)` a `r fm(max(ari_repeticiones), 3)`, y `r sum(ari_repeticiones == 1)` de 20 repeticiones son idénticas. Eso indica que el **procedimiento es estable**; no indica que los grupos sean naturales.
+
 ## 5.3 Perfil en las variables originales
 
 Las etiquetas de K-means se unen a las variables originales usando el mismo orden
@@ -382,6 +421,8 @@ perfil_km <- datos_perfil_km %>%
 
 perfil_km
 ```
+
+**Cómo se lee.** El grupo con el mayor puntaje total promedio es el `r perfil_km$cluster[which.max(perfil_km$Total.Cup.Points)]` (`r fm(max(perfil_km$Total.Cup.Points), 1)` puntos) y el menor el `r perfil_km$cluster[which.min(perfil_km$Total.Cup.Points)]` (`r fm(min(perfil_km$Total.Cup.Points), 1)`). Son **diferencias de promedio con distribuciones que se traslapan**, no categorías. `Total.Cup.Points` se usa solo para perfilar, no para ajustar.
 
 No se asignan los nombres Specialty, Premium o Commodity desde el algoritmo.
 Para defender esas categorías se deben definir cortes externos de calidad y
@@ -414,6 +455,8 @@ cat("Tamaño de los grupos Ward en la muestra:\n")
 print(table(grupos_ward))
 ```
 
+**Cómo se lee.** El dendrograma une lotes parecidos de abajo hacia arriba; la altura de cada unión es la distancia a la que se fusionan. El corte en k = 3 da grupos de `r paste(table(grupos_ward), collapse = ', ')` lotes en la muestra. Las alturas de las últimas fusiones son graduales (5,53 · 4,50 · 3,75 · 3,17, según `revision_clustering_profesor.R`), así que el árbol también admitiría 4 grupos; se mantiene k = 3 como elección exploratoria.
+
 Ward se ajustó sobre 80 lotes, mientras K-means usa los 1.070.
 Por tanto, el dendrograma ilustra el método y sus grupos no se comparan como si
 fueran etiquetas de toda la base.
@@ -438,6 +481,8 @@ perfil_ward <- datos_filtrados[idx_ward, ] %>%
   mutate(across(where(is.numeric) & !lotes, ~ round(., 2)))
 perfil_ward
 ```
+
+**Cómo se lee.** En la muestra de 80 lotes, el grupo con más puntaje total es el `r perfil_ward$grupo_ward[which.max(perfil_ward$Total.Cup.Points)]` (`r fm(max(perfil_ward$Total.Cup.Points), 2)`) y el menor el `r perfil_ward$grupo_ward[which.min(perfil_ward$Total.Cup.Points)]` (`r fm(min(perfil_ward$Total.Cup.Points), 2)`). Dos grupos casi no se distinguen entre sí; el tercero es el más bajo en casi todos los atributos. Por eso no se nombran como categorías comerciales.
 
 # 7. Comparación K-means y Ward.D2
 
@@ -467,12 +512,14 @@ resumen_metodos
 cat("ARI K-means / Ward.D2, muestra:", round(ari_km_ward, 3), "\n")
 ```
 
+**Cómo se lee.** El ARI entre K-means y Ward en la misma muestra de 80 lotes es `r fm(ari_km_ward, 3)`: coincidencia moderada, que no basta para afirmar que existan grupos reales. Las siluetas de la tabla no son comparables entre sí porque se calculan sobre conjuntos distintos (todos los lotes o una muestra de 80).
+
 Las métricas de Ward se restringen a una muestra de 80 y no son directamente
 comparables con las de K-means sobre los 1.070 lotes. Ambos métodos usan distancia
 euclídea y buscan grupos compactos; sus resultados dependen de la representación
 y ponderación de las variables.
 
-# 8. Conclusión
+# Conclusiones
 
 El flujo de código sigue el procedimiento visto en clase. La solución k = 3 es
 una elección visual exploratoria del codo, no una certificación de que existan
@@ -494,8 +541,8 @@ estructura cambia al quitar los atípicos.
 estandarizadas, sin las variables categóricas ni la ponderación por bloques. Por eso sus
 siluetas (≈ 0,26) no son comparables con la del análisis principal (0,116), y aquí Ward se
 ajusta con todos los lotes, no con la muestra de 80. Con minPts = 15, HDBSCAN en R deja todos los
-lotes como ruido en esta matriz; los cinco grupos que se presentan vienen del script de Python
-(`hdbscan_python.py`), que usa otra matriz y otro tamaño mínimo de grupo (20).
+lotes como ruido en esta matriz; los seis grupos que se presentan vienen del script de Python
+(`hdbscan_python.py`), que usa otra matriz (la del análisis principal) y tamaño mínimo de grupo 10.
 
 ```{r robustez-agrupamiento}
 suppressMessages(library(cluster))
@@ -519,3 +566,5 @@ for (base in c("../datos/base_1070.rds", "../datos/base_sin_atipicos.rds")) {
   } else cat("HDBSCAN: paquete dbscan no instalado\n")
 }
 ```
+
+**Cómo se lee.** Para cada base se muestran las siluetas de K-means con k de 2 a 6, la de k = 3, la de Ward y el resultado de HDBSCAN. Si las siluetas se mantienen bajas y parecidas con y sin los 100 atípicos, la conclusión de **separación débil no depende de haberlos retirado**. Esta matriz es otra (solo las 8 variables numéricas), por eso sus siluetas no se comparan con las del análisis principal.

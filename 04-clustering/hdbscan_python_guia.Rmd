@@ -1,0 +1,108 @@
+---
+title: "HDBSCAN en Python: guía del script y de sus resultados"
+subtitle: "hdbscan_python.py · Coffee Quality Institute"
+author: "Juan Sebastián Guayazán · Esteban Valente · Diego Nocua"
+date: "`r format(Sys.Date(), '%d de %B de %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: flatly
+    css: ../estilos_presentacion.css
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE, fig.align = "center")
+suppressMessages(library(knitr))
+tabla <- function(x, ...) kable(x, format.args = list(decimal.mark = ",", big.mark = "."), row.names = FALSE, ...)
+fm <- function(x, d = 0) format(round(x, d), nsmall = d, decimal.mark = ",", big.mark = ".")
+
+# Resultados guardados por el script (este documento NO ejecuta Python)
+res <- read.csv("hdbscan_resultados.csv")
+tam <- read.csv("hdbscan_tamanos.csv", check.names = FALSE)
+names(tam) <- c("cluster", "lotes", "porcentaje")
+n <- nrow(res)
+n_ruido <- sum(res$cluster == -1)
+n_cl <- length(setdiff(unique(res$cluster), -1))
+asig <- res[res$cluster != -1, ]
+```
+
+::: {.resumen}
+**En resumen.** El script `hdbscan_python.py` reconstruye en Python la misma matriz de agrupamiento del análisis en R (4 componentes PCA y variables categóricas) y aplica HDBSCAN con tamaño mínimo 10. Sobre `r fm(n)` lotes encuentra **`r n_cl` grupos** y deja **`r fm(n_ruido)` lotes (`r fm(100 * n_ruido / n, 1)` %) como ruido**. Ruido significa que el lote no quedó en una zona densa; no que sea un café de mala calidad. Estos son los resultados que usa la presentación.
+:::
+
+# Qué es y para qué sirve
+
+**Pregunta que responde:** ¿hay zonas densas de lotes parecidos, y cuántos lotes quedan fuera de ellas?
+
+HDBSCAN es un método de agrupamiento basado en **densidad**: busca regiones donde se concentran lotes parecidos y, a diferencia de K-means, no obliga a asignar todos los lotes a un grupo ni exige fijar el número de grupos de antemano.
+
+Este documento es la **guía del script y de sus resultados guardados**. No ejecuta Python: lee los archivos que el script ya generó (`hdbscan_resultados.csv` y `hdbscan_tamanos.csv`).
+
+# Cómo ejecutarlo
+
+Desde cualquier carpeta, con Python y los paquetes de `requirements-hdbscan.txt` instalados:
+
+```bash
+py 04-clustering/hdbscan_python.py
+```
+
+El script lee `data/arabica_data_cleaned.csv`, no recibe objetos del análisis en R y escribe tres archivos en `04-clustering/`: `hdbscan_resultados.csv` (etiqueta, probabilidad y puntaje de atipicidad por lote), `hdbscan_tamanos.csv` (tamaño de cada grupo) y `hdbscan_clusters.png` (gráfico PC1–PC2). Opciones útiles: `--min-cluster-size` y `--min-samples` (ambos 10 por defecto) y `--no-plot`.
+
+# Cómo funciona
+
+| Paso | Qué hace el script |
+|---|---|
+| 1. Filtro | Conserva lotes con altitud entre 0 y 3.000 m y sin faltantes en las variables usadas. Lee la categoría de color `None` como una categoría real (pandas la confundiría con un valor faltante). |
+| 2. Variables numéricas | 8 variables: 7 atributos sensoriales y la altitud. Aplica Yeo-Johnson solo a las de \|sesgo\| > 1 y estandariza. |
+| 3. PCA | Se queda con las 4 primeras componentes, las estandariza y las divide entre √4. |
+| 4. Variables categóricas | Método de proceso, color y país (5 principales y «Otro»), codificadas como indicadores y divididas entre √3. Así el bloque categórico no domina solo por tener más columnas. |
+| 5. HDBSCAN | `hdbscan.HDBSCAN(min_cluster_size = 10, min_samples = 10)` sobre la matriz X de 4 componentes + indicadores. |
+| 6. Salidas | Etiquetas por lote, tamaños de grupo y el gráfico PC1–PC2. |
+
+> **Nota de coherencia.** La matriz reproduce la del análisis en R (`clustering_HDBSCAN.Rmd`) y, por eso, **no** es la del PCA final de 970 lotes: usa los 1.070 lotes sin retirar atípicos.
+
+# Resultados
+
+```{r tam}
+tam$cluster <- ifelse(tam$cluster == -1, "Ruido (-1)", paste("Grupo", tam$cluster))
+tabla(setNames(tam, c("Grupo", "Lotes", "% de los lotes")), align = "lrr", caption = "Tamaño de cada grupo")
+```
+
+**Cómo se lee.**
+
+- Los `r n_cl` grupos suman **`r fm(nrow(asig))` lotes** (`r fm(100 * nrow(asig) / n, 1)` %). Los más grandes son el `r tam$cluster[tam$lotes == max(tam$lotes[!grepl("Ruido", tam$cluster)])][1]` (`r max(tam$lotes[!grepl("Ruido", tam$cluster)])` lotes) y los más pequeños tienen solo `r min(tam$lotes)` a `r sort(tam$lotes)[2]` lotes.
+- **El ruido es el «grupo» más grande**: `r fm(n_ruido)` lotes, `r fm(100 * n_ruido / n, 1)` %. Eso indica que, en esta representación, la mayor parte de los lotes **no forma zonas densas bien definidas**: es coherente con una nube continua, sin grupos naturales separados.
+
+```{r perfil}
+perfil <- aggregate(res[res$cluster != -1, c("Aroma", "Flavor", "Aftertaste", "Acidity", "Body", "Balance", "Cupper.Points", "Total.Cup.Points")],
+                    by = list(Grupo = res$cluster[res$cluster != -1]), FUN = mean)
+perfil[, -1] <- round(perfil[, -1], 2)
+perfil$Lotes <- as.integer(table(res$cluster[res$cluster != -1]))
+names(perfil) <- c("Grupo", "Aroma", "Sabor", "Retrogusto", "Acidez", "Cuerpo", "Balance", "Puntaje catador", "Puntaje total", "Lotes")
+tabla(perfil[, c(1, 10, 2:9)], align = "rrrrrrrrrr", caption = "Promedios por grupo en la escala original (sin ruido)")
+```
+
+**Cómo se lee.** Los promedios de los grupos difieren poco entre sí (el puntaje total va de `r fm(min(perfil[["Puntaje total"]]), 1)` a `r fm(max(perfil[["Puntaje total"]]), 1)`). Son diferencias de promedio con distribuciones que se traslapan, **no categorías comerciales**; el script solo describe, no valida.
+
+```{r prob}
+p <- asig$probability
+```
+
+**Probabilidad de pertenencia.** Entre los lotes asignados a un grupo, la probabilidad media es `r fm(mean(p), 2)` (mediana `r fm(median(p), 2)`): `r fm(100 * mean(p >= 0.99), 0)` % de ellos están en el núcleo del grupo (probabilidad cercana a 1) y el resto está en la periferia.
+
+# Qué no se afirma
+
+- **No se compara con K-means:** esta matriz no incluye la humedad y los grupos se calculan de otra forma, así que no se comparan sus etiquetas ni se calcula un ARI entre ambos métodos.
+- **No es una cifra única:** el resultado depende de la matriz y de los parámetros. En R, con `dbscan::hdbscan` y minPts = 10, el ruido es 57,0 % (610 lotes); aquí, con Python, 58,5 % (626). Son dos implementaciones distintas del mismo algoritmo y en ambas **más de la mitad** de los lotes queda como ruido.
+- **Los grupos no son categorías comerciales** (Specialty, Premium, Commodity): validar eso exigiría un criterio externo.
+
+# Código fuente
+
+<details><summary>Ver el código completo de `hdbscan_python.py`</summary>
+
+```{r codigo, results="asis"}
+cat("<pre><code class='python'>", htmltools::htmlEscape(paste(readLines("hdbscan_python.py", encoding = "UTF-8", warn = FALSE), collapse = "\n")), "</code></pre>", sep = "")
+```
+
+</details>
