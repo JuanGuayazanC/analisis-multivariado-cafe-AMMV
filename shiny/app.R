@@ -257,12 +257,12 @@ ui <- fluidPage(
       div(class = "pc-badge",
         div(class = "pc-name", "CP2"),
         div(class = "pc-var",  paste0(var_exp[2], "%")),
-        div(class = "pc-desc", "Contraste entre atributos")
+        div(class = "pc-desc", "Altitud de cultivo")
       ),
       div(class = "pc-badge",
         div(class = "pc-name", "CP3"),
         div(class = "pc-var",  paste0(var_exp[3], "%")),
-        div(class = "pc-desc", "Componente de altitud")
+        div(class = "pc-desc", "Contraste sensorial fino")
       ),
       div(class = "pc-badge",
         div(class = "pc-name", "CP4"),
@@ -306,8 +306,8 @@ ui <- fluidPage(
               radioButtons("ejes", NULL,
                 choices = setNames(
                   c("12", "13"),
-                  c(paste0("CP1 vs CP2 — Calidad sensorial  ↔  Contraste atributos (", var_exp[1], "% + ", var_exp[2], "%)"),
-                    paste0("CP1 vs CP3 — Calidad sensorial  ↔  Altitud              (", var_exp[1], "% + ", var_exp[3], "%)"))
+                  c(paste0("CP1 vs CP2 — Calidad sensorial  ↔  Altitud (", var_exp[1], "% + ", var_exp[2], "%)"),
+                    paste0("CP1 vs CP3 — Calidad sensorial  ↔  Contraste sensorial              (", var_exp[1], "% + ", var_exp[3], "%)"))
                 ),
                 selected = "12", inline = FALSE)
             )
@@ -508,7 +508,8 @@ server <- function(input, output, session) {
     if (is.null(ns)) return(NULL)
 
     pct_pc1     <- mean(scores_df$PC1 <= ns[1]) * 100
-    pct_pc3     <- mean(scores_df$PC3 <= ns[3]) * 100
+    pct_pc2     <- mean(scores_df$PC2 <= ns[2]) * 100
+    pct_altitud <- 100 - pct_pc2   # CP2 tiene carga negativa dominante en Altitud
     pct_calidad <- 100 - pct_pc1   # PC1 negativo = mayor calidad sensorial
 
     if (pct_calidad >= 75) {
@@ -522,20 +523,20 @@ server <- function(input, output, session) {
       badge_text  <- "Calidad sensorial baja"
     }
 
-    pc2_txt <- if (ns[2] > 0.8) {
-      "Perfil con mayor peso en atributos secundarios (Retrogusto, Balance, Cuerpo)"
-    } else if (ns[2] < -0.8) {
-      "Perfil con mayor peso en atributos primarios (Aroma, Sabor, Acidez, Puntaje Catador)"
+    pc2_txt <- if (ns[2] < -0.8) {
+      paste0("Altitud relativamente alta — percentil ", round(pct_altitud), " en el dataset")
+    } else if (ns[2] > 0.8) {
+      paste0("Altitud relativamente baja — percentil ", round(pct_altitud), " en el dataset")
     } else {
-      "Perfil equilibrado entre atributos primarios y secundarios"
+      paste0("Altitud cercana al centro de la distribución — percentil ", round(pct_altitud), " en el dataset")
     }
 
     pc3_txt <- if (ns[3] > 0.8) {
-      paste0("Altitud de cultivo alta — percentil ", round(pct_pc3), " en el dataset")
+      "Mayor peso relativo de Aroma y Acidez frente a Cuerpo y Balance"
     } else if (ns[3] < -0.8) {
-      paste0("Altitud de cultivo baja — percentil ", round(pct_pc3), " en el dataset")
+      "Mayor peso relativo de Cuerpo y Balance frente a Aroma y Acidez"
     } else {
-      paste0("Altitud de cultivo típica — percentil ", round(pct_pc3), " en el dataset")
+      "Perfil intermedio en el contraste sensorial de CP3"
     }
 
     tagList(
@@ -543,18 +544,18 @@ server <- function(input, output, session) {
       div(style = "font-size:12px; color:#666; margin-bottom:10px;",
           sprintf("Superior al %.0f%% de los lotes en calidad sensorial (CP1, percentil %d).",
                   pct_calidad, round(pct_calidad))),
-      div(class = "interp-item con",
-        div(class = "interp-pc", "CP2 · Contraste entre atributos sensoriales"),
+      div(class = "interp-item alt",
+        div(class = "interp-pc", "CP2 · Altitud de cultivo"),
         div(class = "interp-val", pc2_txt)
       ),
-      div(class = "interp-item alt",
-        div(class = "interp-pc", "CP3 · Altitud de cultivo"),
+      div(class = "interp-item con",
+        div(class = "interp-pc", "CP3 · Contraste entre atributos sensoriales"),
         div(class = "interp-val", pc3_txt)
       ),
       div(style = "font-size:11px; color:#aaa; margin-top:10px; line-height:1.5;",
         paste0("CP1 captura el ", var_exp[1], "% de la varianza total. ",
                "Score negativo en CP1 indica mayor calidad sensorial ",
-               "(los 7 atributos sensoriales cargan negativamente en CP1).")
+               "(los 7 atributos sensoriales cargan negativamente en CP1; CP2 está dominado por Altitud y CP3 contrapone principalmente Aroma/Acidez con Cuerpo/Balance).")
       )
     )
   })
