@@ -8,14 +8,16 @@ output:
     toc: true
     toc_float: true
     toc_depth: 3
-    code_folding: show
+    code_folding: hide
     theme: flatly
     df_print: paged
+    css: ../estilos_presentacion.css
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE,
                       fig.align = "center", fig.width = 8, fig.height = 6)
+fm <- function(x, d = 0) format(round(x, d), nsmall = d, decimal.mark = ",", big.mark = ".")
 ```
 
 > **Semana 14 del programa:** Regresión lineal simple y múltiple, selección de
@@ -29,6 +31,25 @@ knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE,
 > ni que generalice a una medición independiente.
 
 ---
+
+::: {.resumen}
+**En resumen.** El puntaje total de catación es **la suma de los diez atributos sensoriales**, así que cualquier modelo que los use como predictores tiene R² ≈ 1: reconstruye la suma, no predice calidad. Incluso un solo atributo (el sabor) explica el 71 % de la variación. El modelo que sí responde una pregunta real usa solo origen, altitud, humedad, defectos y proceso: su R² predictivo en prueba es 0,13, es decir, explica poco del puntaje.
+:::
+
+# Qué responde este informe
+
+**Preguntas:** (1) ¿cuánto del puntaje total de catación se explica con los atributos sensoriales y la altitud? (2) ¿qué se puede estimar del puntaje usando solo variables que **no** forman parte de la suma (origen, altitud, humedad, defectos y proceso)?
+
+Cada sección sigue el mismo esquema: *qué se hace y por qué*, *el resultado* y *cómo se lee*.
+
+| Sección | Qué se hace | Mensaje principal |
+|---|---|---|
+| 1 | Datos y respuesta | El puntaje total es la suma de los diez atributos |
+| 2 | Regresión simple | Un solo atributo ya explica mucho |
+| 3–4 | Regresión múltiple y diagnósticos | R² ≈ 1 por construcción; los diagnósticos no son sustantivos |
+| 5 | Selección de variables | Stepwise y mejor subconjunto |
+| 6 | Predicción | El ajuste es casi perfecto por la identidad contable |
+| 7 | Modelo sin circularidad | La cifra que conviene presentar |
 
 # 1. Datos y variable respuesta
 
@@ -73,10 +94,13 @@ summary(datos$Puntaje.Total)
 # Un lote tiene todos los atributos y el puntaje total en 0: es un registro vacío,
 # no una catación real. Con residuo de −21,5 puntos domina la regresión simple
 # (su intercepto) y los diagnósticos, así que se excluye.
-cat("Lotes con Puntaje.Total = 0:", sum(datos$Puntaje.Total == 0), "\n")
+n_cero <- sum(datos$Puntaje.Total == 0)
+cat("Lotes con Puntaje.Total = 0:", n_cero, "\n")
 datos <- datos %>% filter(Puntaje.Total > 0)
 cat("Lotes analizados:", nrow(datos), "\n")
 ```
+
+**Cómo se lee.** Se parte de los lotes con altitud válida y registros completos. Hay `r n_cero` lote(s) con puntaje total 0, un registro vacío (todos los atributos en 0) que se excluye porque domina la regresión; quedan **`r fm(nrow(datos))` lotes**.
 
 ## 1.1. El puntaje total es la suma de los diez atributos
 
@@ -85,6 +109,9 @@ diferencia <- datos$Puntaje.Total - rowSums(datos[, setdiff(vars_pred, "Altitud"
 cat("Puntaje.Total − suma de los 10 atributos:\n"); print(summary(round(diferencia, 3)))
 cat("Lotes con diferencia exactamente 0:", sum(abs(diferencia) < 1e-9), "de", nrow(datos), "\n")
 ```
+
+**Cómo se lee.** La diferencia entre el puntaje total y la suma de los diez atributos es **exactamente cero** en `r fm(sum(abs(diferencia) < 1e-9))` de `r fm(nrow(datos))` lotes, y en el resto no pasa de `r fm(max(abs(diferencia)), 2)` puntos (diferencias de redondeo del registro). Es decir, el puntaje total no es una medida independiente: es la suma.
+
 
 Por construcción, el modelo múltiple de las secciones 3 a 6 recupera esta identidad
 contable: los coeficientes de los diez atributos son ≈ 1, la altitud ≈ 0 y R² ≈ 1. Los
@@ -114,8 +141,12 @@ ggplot(datos, aes(x=.data[[mejor_var]], y=.data$Puntaje.Total)) +
   geom_smooth(method="lm", color="#e74c3c", se=TRUE) +
   labs(title=paste0("Regresión simple: Puntaje.Total ~ ", mejor_var),
        subtitle=paste0("R² = ", round(summary(modelo_simple)$r.squared, 4))) +
-  theme_minimal()
+  theme_minimal(base_size = 14)
 ```
+
+**Qué hacemos y por qué.** La regresión lineal simple ajusta una recta entre una variable explicativa y la respuesta. Se elige el predictor más correlacionado con el puntaje total: **`r mejor_var`** (r = `r fm(cors[mejor_var, ], 3)`).
+
+**Cómo se lee.** La recta es *Puntaje.Total* = `r fm(coef(modelo_simple)[1], 2)` + `r fm(coef(modelo_simple)[2], 2)` · *`r mejor_var`*: cada punto más en `r mejor_var` se asocia con unos `r fm(coef(modelo_simple)[2], 2)` puntos más en el total. El R² es `r fm(summary(modelo_simple)$r.squared, 3)`: ese atributo solo explica el `r fm(100 * summary(modelo_simple)$r.squared)` % de la variación del puntaje total. La franja roja es el intervalo de confianza de la recta.
 
 ---
 
@@ -127,6 +158,10 @@ modelo_completo  <- lm(formula_completa, data=datos)
 
 glance(modelo_completo)
 ```
+
+**Qué hacemos y por qué.** La regresión múltiple usa todos los predictores a la vez: `Puntaje.Total = b0 + b1·Aroma + ... + b11·Altitud`.
+
+**Cómo se lee.** El R² es `r fm(summary(modelo_completo)$r.squared, 4)` y el error típico residual `r fm(summary(modelo_completo)$sigma, 3)` puntos: el ajuste es casi perfecto **porque el puntaje total es la suma de los atributos**, no porque el modelo "prediga" calidad.
 
 ```{r coeficientes}
 tidy(modelo_completo, conf.int=TRUE) %>%
@@ -145,8 +180,10 @@ tidy(modelo_completo, conf.int=TRUE) %>%
   coord_flip() +
   labs(title="Coeficientes estimados — modelo completo",
        x="", y="Estimación (IC 95%)") +
-  theme_minimal()
+  theme_minimal(base_size = 14)
 ```
+
+**Cómo se lee.** Cada barra es el coeficiente de una variable (cuánto cambia el puntaje total por una unidad más de esa variable, manteniendo las demás) y la línea negra su intervalo de confianza del 95 %. Los coeficientes de los atributos sensoriales son `r fm(min(coef(modelo_completo)[setdiff(vars_pred, 'Altitud')]), 3)` a `r fm(max(coef(modelo_completo)[setdiff(vars_pred, 'Altitud')]), 3)` (muy cerca de 1: la suma) y el de la altitud es `r format(coef(modelo_completo)['Altitud'], digits = 2, decimal.mark = ',')` (prácticamente 0).
 
 ---
 
@@ -163,6 +200,8 @@ cat("Factor de inflación de varianza (VIF):\n")
 round(vif(modelo_completo), 2)
 ```
 
+**Cómo se lee.** Los gráficos de diagnóstico revisan los supuestos (residuos sin patrón, normalidad, varianza constante y puntos influyentes). Aquí **no tienen interpretación sustantiva**: los residuos son solo errores de redondeo del registro. El VIF mide cuánto se infla la varianza de un coeficiente por la correlación entre predictores; el máximo es `r fm(max(vif(modelo_completo)), 1)` (variable `r names(which.max(vif(modelo_completo)))`): un VIF mayor de 10 indica colinealidad severa y entre 5 y 10, moderada: aquí la colinealidad es a lo sumo moderada.
+
 ---
 
 # 5. Selección de variables
@@ -177,6 +216,8 @@ cat("\n\nComparación R² ajustado:\n")
 cat("Modelo completo: ", round(summary(modelo_completo)$adj.r.squared, 4), "\n")
 cat("Modelo stepwise:", round(summary(modelo_step)$adj.r.squared, 4), "\n")
 ```
+
+**Cómo se lee.** El procedimiento stepwise con criterio **AIC** agrega y quita variables para equilibrar ajuste y complejidad. Conserva `r length(coef(modelo_step)) - 1` de las `r length(coef(modelo_completo)) - 1` variables y el R² ajustado casi no cambia (`r fm(summary(modelo_completo)$adj.r.squared, 4)` frente a `r fm(summary(modelo_step)$adj.r.squared, 4)`): prescindir de variables cuesta poco.
 
 ## 5.2. Mejor subconjunto
 
@@ -196,8 +237,10 @@ data.frame(
   facet_wrap(~Métrica, scales="free_y") +
   labs(title="Criterios de selección de subconjunto",
        x="Número de variables", y="") +
-  theme_minimal() + theme(legend.position="none")
+  theme_minimal(base_size = 14) + theme(legend.position="none")
 ```
+
+**Cómo se lee.** Para cada número de variables se muestra el mejor subconjunto según tres criterios: R² ajustado (más alto es mejor), Cp de Mallows y BIC (más bajos son mejores). El R² ajustado se maximiza con `r which.max(reg_sum$adjr2)` variables y el BIC se minimiza con `r which.min(reg_sum$bic)`: a partir de ahí agregar variables mejora poco.
 
 ---
 
@@ -228,6 +271,10 @@ cat("R² predictivo en test:", round(r2_test, 4), "\n")
 cat("Correlación(real, predicho)^2:", round(r2_correlacion, 4), "\n")
 ```
 
+**Qué hacemos y por qué.** Para saber si el modelo generaliza, se separa un 25 % de los lotes como **prueba** (el modelo no los ve al ajustarse) y se mide el error ahí.
+
+**Cómo se lee.** En los `r fm(nrow(datos_test))` lotes de prueba, el RMSE es `r fm(rmse, 3)` puntos, el MAE `r fm(mae, 3)` y el R² predictivo `r fm(r2_test, 4)`. Un R² predictivo cercano a 1 aquí **no demuestra** capacidad predictiva real: se debe a que el puntaje total es la suma de los atributos que el modelo recibe como entrada.
+
 ```{r prediccion-viz, fig.width=7, fig.height=6}
 data.frame(real=datos_test$Puntaje.Total, pred=pred_vals) %>%
   ggplot(aes(real, pred)) +
@@ -236,8 +283,10 @@ data.frame(real=datos_test$Puntaje.Total, pred=pred_vals) %>%
   labs(title="Valores reales vs predichos — modelo lineal múltiple",
        subtitle=paste0("R² predictivo = ", round(r2_test,4), "  |  RMSE = ", round(rmse,4)),
        x="Puntaje real", y="Puntaje predicho") +
-  theme_minimal()
+  theme_minimal(base_size = 14)
 ```
+
+**Cómo se lee.** Cada punto es un lote de prueba; todos caen sobre la diagonal (predicho = real). Es el reflejo gráfico de la identidad contable.
 
 ---
 
@@ -272,7 +321,16 @@ cat("RMSE en test:", round(sqrt(mean((te_ext$Puntaje.Total - pred_ext)^2)), 3),
 cat("Referencia: desviación estándar del puntaje en test:", round(sd(te_ext$Puntaje.Total), 3), "\n")
 ```
 
+**Cómo se lee.** Con este modelo el R² predictivo en prueba es `r fm(r2_ext, 3)` y el RMSE `r fm(sqrt(mean((te_ext$Puntaje.Total - pred_ext)^2)), 2)` puntos, frente a una desviación estándar de `r fm(sd(te_ext$Puntaje.Total), 2)`: el origen y el estado del grano verde explican `r if (r2_ext < 0.15) 'muy poco' else if (r2_ext < 0.4) 'una parte moderada' else 'una parte importante'` del puntaje total. Para la altitud, el coeficiente es de `r fm(100 * coef(modelo_ext)['Altitud'], 2)` puntos por cada 100 m más. Es la cifra honesta para presentar: contrasta con el R² ≈ 1 del modelo con los atributos sensoriales, que solo refleja cómo se calcula el puntaje.
+
 Este modelo responde una pregunta real (¿cuánto del puntaje se explica por el origen y el
 estado del grano verde?) y su R² predictivo es la cifra que conviene presentar; el R² ≈ 1
 del modelo con los atributos sensoriales solo confirma cómo se calcula el puntaje.
+
+# Conclusiones
+
+1. **El puntaje total es la suma de los diez atributos** (diferencia cero en `r fm(sum(abs(diferencia) < 1e-9))` de `r fm(nrow(datos))` lotes y de redondeo en el resto): cualquier modelo con esos atributos tiene R² ≈ 1.
+2. La regresión múltiple, el stepwise y la selección de subconjunto **reconstruyen** esa suma; los diagnósticos y los valores p no tienen interpretación sustantiva.
+3. El modelo sin circularidad (origen, altitud, humedad, defectos y proceso) alcanza un R² predictivo de `r fm(r2_ext, 3)`: es la medida de capacidad predictiva real.
+4. Estos modelos son **descriptivos**; no permiten predecir la calidad antes de la catación ni sustituyen la evaluación del CQI.
 

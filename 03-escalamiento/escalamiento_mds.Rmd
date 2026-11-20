@@ -8,18 +8,48 @@ output:
     toc: true
     toc_float: true
     toc_depth: 3
-    code_folding: show
+    code_folding: hide
     theme: flatly
     df_print: paged
+    css: ../estilos_presentacion.css
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE,
                       fig.align = "center", fig.width = 8, fig.height = 6)
+fm <- function(x, d = 0) format(round(x, d), nsmall = d, decimal.mark = ",", big.mark = ".")
 ```
 
-> **Semana 8 del programa:** Escalamiento y representación de proximidades —
-> mapas, similitudes, distancias e interpretación aplicada.
+```{r calculos-previos, include=FALSE}
+# Resultados clave para el resumen (se recalculan y muestran más abajo)
+base0 <- readRDS("../datos/base_1070.rds")
+X0 <- as.matrix(base0$Z)
+D0 <- dist(X0, method = "euclidean")
+cm0 <- cmdscale(D0, k = 2, eig = TRUE)
+tol0 <- 1e-8 * max(abs(cm0$eig))
+ve0 <- cm0$eig[1:2] / sum(cm0$eig[cm0$eig > tol0])
+set.seed(2026)
+nm0 <- MASS::isoMDS(D0, k = 2, trace = FALSE)
+```
+
+> **Semana 8 del programa:** escalamiento y representación de proximidades: mapas, similitudes, distancias e interpretación aplicada.
+
+::: {.resumen}
+**En resumen.** El escalamiento multidimensional (MDS) dibuja los `r fm(nrow(X0))` lotes en un plano de modo que lotes parecidos queden cerca. El MDS clásico con distancias euclídeas equivale al PCA: dos dimensiones representan el `r fm(100 * sum(ve0), 1)` % de la inercia. El MDS no métrico, que solo conserva el orden de las distancias, tiene un stress de `r fm(nm0$stress, 1)` %. En ninguno de los mapas aparecen grupos separados: la nube es continua.
+:::
+
+# Qué responde este informe
+
+**Pregunta:** ¿se puede representar en un mapa de dos dimensiones qué tan parecidos son los lotes entre sí, y qué tan fiel es ese mapa?
+
+Cada sección sigue el mismo esquema: *qué se hace y por qué*, *el resultado* y *cómo se lee*.
+
+| Sección | Técnica | Para qué sirve |
+|---|---|---|
+| 2 | MDS clásico (Torgerson) | Reconstruir coordenadas a partir de distancias |
+| 3 | MDS no métrico (Kruskal) | Conservar solo el orden de las distancias |
+| 4 | Diagrama de Shepard | Medir qué tan fiel es el mapa |
+| 5 | Comparación con el PCA | Mostrar que MDS clásico y PCA coinciden |
 
 ---
 
@@ -43,6 +73,8 @@ datos_mds <- as.matrix(base$Z)
 cat("Lotes:", nrow(datos_mds), " Variables:", paste(colnames(datos_mds), collapse = ", "), "\n")
 cat("Variables transformadas con Yeo-Johnson:", paste(base$yj, collapse = ", "), "\n")
 ```
+
+**Cómo se lee.** Se representan `r fm(nrow(datos_mds))` lotes descritos por `r ncol(datos_mds)` variables ya transformadas y estandarizadas. Cada par de lotes tiene una distancia; el MDS busca colocar los puntos en el plano para que las distancias del mapa se parezcan a esas distancias.
 
 ---
 
@@ -76,6 +108,8 @@ cat("Con distancia euclídea no aparecen autovalores negativos reales; si aparec
     "indicarían que la matriz de distancias no es euclídea.\n")
 ```
 
+**Cómo se lee.** Las dos primeras dimensiones representan el `r fm(100 * var_exp[1], 1)` % y el `r fm(100 * var_exp[2], 1)` % de la inercia positiva (juntas, `r fm(100 * sum(var_exp), 1)` %). Hay `r length(eig_positivos)` autovalores positivos (uno por variable) y ninguno negativo real: la matriz de distancias es euclídea. La primera dimensión concentra casi toda la información, igual que el CP1 del PCA.
+
 ```{r mds-clasico-viz, fig.width=9, fig.height=7}
 mds_df <- as.data.frame(mds_clasico$points)
 colnames(mds_df) <- c("Dim1", "Dim2")
@@ -90,8 +124,10 @@ ggplot(mds_df, aes(Dim1, Dim2)) +
        caption="Distancia euclídea en espacio YJ-estandarizado",
        x=paste0("Dimensión 1 (", round(var_exp[1]*100,1), "%)"),
        y=paste0("Dimensión 2 (", round(var_exp[2]*100,1), "%)")) +
-  theme_minimal(base_size=12) + theme(panel.grid.minor=element_blank())
+  theme_minimal(base_size=14) + theme(panel.grid.minor=element_blank())
 ```
+
+**Cómo se lee.** Cada punto es un lote; lotes cercanos en el mapa son parecidos en las ocho variables. Los ejes no tienen unidades propias: la dimensión 1 recoge sobre todo la calidad sensorial general y la dimensión 2 la altitud (como en el PCA). La nube es continua, sin grupos separados.
 
 ---
 
@@ -111,6 +147,8 @@ cat("Stress (MDS no métrico):", round(mds_nm$stress, 1),
     ifelse(mds_nm$stress < 20, "— Aceptable (10–20%)", "— Pobre (> 20%)"))), "\n")
 ```
 
+**Cómo se lee.** El **stress** mide cuánto se distorsiona el orden de las distancias al pasar a 2 dimensiones: cuanto menor, mejor. Aquí es `r fm(mds_nm$stress, 1)` %, que según la escala de Kruskal es `r if (mds_nm$stress < 5) 'excelente' else if (mds_nm$stress < 10) 'bueno' else if (mds_nm$stress < 20) 'aceptable' else 'pobre'`.
+
 ```{r mds-nometrico-viz, fig.width=9, fig.height=7}
 nm_df <- as.data.frame(mds_nm$points)
 colnames(nm_df) <- c("Dim1","Dim2")
@@ -123,8 +161,10 @@ ggplot(nm_df, aes(Dim1, Dim2)) +
                     round(mds_nm$stress, 2), "%"),
        caption="Preserva orden de distancias, no magnitudes",
        x="Dimensión 1", y="Dimensión 2") +
-  theme_minimal(base_size=12) + theme(panel.grid.minor=element_blank())
+  theme_minimal(base_size=14) + theme(panel.grid.minor=element_blank())
 ```
+
+**Cómo se lee.** Es el mismo tipo de mapa, pero los ejes no conservan las magnitudes de las distancias, solo su orden. Si aparece una forma distinta a la del MDS clásico, es porque se prioriza el orden de los vecinos. Tampoco aquí se ven grupos separados.
 
 ---
 
@@ -150,8 +190,10 @@ shepard_df %>%
   geom_abline(slope=1, intercept=0, color="red", linetype="dashed") +
   labs(title="Diagrama de Shepard — MDS clásico",
        x="Distancia original", y="Distancia en el mapa MDS") +
-  theme_minimal()
+  theme_minimal(base_size=14)
 ```
+
+**Cómo se lee.** Cada punto es un par de lotes (se dibuja una muestra de 2.000 pares). Si el mapa fuera perfecto, todos caerían sobre la diagonal roja. La correlación entre las distancias originales y las del mapa es `r fm(cor(d_orig, d_mds), 2)`. Los puntos quedan **por debajo de la diagonal**: el mapa de 2 dimensiones **comprime** las distancias porque descarta las dimensiones restantes. Es normal en cualquier reducción de dimensión y es el costo de ver los datos en un plano.
 
 ---
 
@@ -174,3 +216,12 @@ cat("Correlación entre CP1 y Dim1 (en valor absoluto):",
 cat("Esta correlación describe la semejanza de las configuraciones 2D; no prueba",
     "que ambas representaciones conserven toda la distancia original.\n")
 ```
+
+**Cómo se lee.** Con distancias euclídeas, el MDS clásico y el PCA producen la misma configuración (salvo rotaciones o reflexiones, por eso no se comparan eje a eje sino las distancias entre pares): la correlación entre distancias es `r fm(cor(D_mds, D_pca), 4)` y entre CP1 y la dimensión 1, `r fm(abs(cor(mds_clasico$points[, 1], pca_ref$x[, 1])), 4)`. Es la equivalencia teórica entre ambos métodos.
+
+# Conclusiones
+
+1. El MDS clásico con distancia euclídea **equivale al PCA**: dos dimensiones representan el `r fm(100 * sum(var_exp), 1)` % de la inercia.
+2. El MDS no métrico tiene un stress de `r fm(mds_nm$stress, 1)` %, que se considera `r if (mds_nm$stress < 5) 'excelente' else if (mds_nm$stress < 10) 'bueno' else if (mds_nm$stress < 20) 'aceptable' else 'pobre'` según Kruskal.
+3. Ningún mapa muestra grupos separados: los lotes forman una nube continua, coherente con el PCA y con la separación débil del clustering.
+4. Los mapas son una **representación aproximada**: el diagrama de Shepard muestra que las distancias se comprimen al pasar a 2 dimensiones.
