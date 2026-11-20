@@ -86,8 +86,12 @@ intermedios compartidos están en `datos/`.
 │   ├── metodos_exploratorios.Rmd/.html ← Kernel PCA (10 núcleos), UMAP, t-SNE y MDS sobre todas las bases (en figuras/exploratorios/)
 │   └── historico/                      ← scripts fuente ya incluidos en los Rmd de 01-pca y 00-eda, y el método anterior
 ├── 02-factorial-correspondencias/      ← Semana 7: AF + análisis de correspondencias
+│                                     factorial_correspondencias.html es la versión de Esteban (19-nov).
+│                                     No re-renderizar el .Rmd: es la versión anterior. historico/ tiene la otra.
 ├── 03-escalamiento/                    ← Semana 8: MDS y representación de proximidades
 ├── 04-clustering/                      ← K-means, Ward.D2, HDBSCAN y revisión del agrupamiento (R y Python)
+│                                     clustering_HDBSCAN.html es la versión de Esteban (19-nov).
+│                                     No re-renderizar clustering_HDBSCAN.Rmd: es la versión anterior.
 │   └── figuras/revision_profesor/      ← figuras de la revisión de agrupamiento
 ├── 05-clasificacion/                   ← Semanas 12-13: LDA, QDA, SVM, Random Forest
 ├── 06-regresion/                       ← Semana 14: regresión lineal multivariada
