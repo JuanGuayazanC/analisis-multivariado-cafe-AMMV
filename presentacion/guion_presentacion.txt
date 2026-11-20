@@ -169,6 +169,7 @@ Muchas gracias. Quedamos atentos a sus preguntas.
 - **Demo (diapositiva 12):** correr la app de 970 lotes desde la raíz del repositorio actualizado (`shiny::runApp("shiny")`) y dejarla abierta en el navegador antes de llegar a la diapositiva.
 - **Perfil alto de la demo:** la aplicación marcará el panel de regresión como extrapolación (el CP1 de ese perfil queda fuera del rango de los lotes reales); es esperable y sirve para explicar los límites de la recta.
 - **Orden de la presentación:** el deck sigue el orden de este guion (la nube de dispersión del PCA es la diapositiva 5 y la varianza con cargas la 6).
+
 ---
 
 # Apoyo para preguntas (no se lee)
