@@ -8,12 +8,38 @@ output:
     toc: true
     toc_float: true
     theme: flatly
+    code_folding: hide
+    css: ../estilos_presentacion.css
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, fig.align = "center")
 for (d in c("figuras/exploratorios/kpca_1070","figuras/exploratorios/kpca_sin_atip","figuras/exploratorios/umap_tsne_1070","figuras/exploratorios/umap_tsne_sin_atip","figuras/exploratorios/mds_1070","figuras/exploratorios/mds_sin_atip","figuras/taller_970")) dir.create(d, recursive = TRUE, showWarnings = FALSE)
 ```
+
+```{r helpers, include=FALSE}
+suppressMessages(library(knitr))
+options(knitr.kable.NA = "—")
+fm <- function(x, d = 0) format(round(x, d), nsmall = d, decimal.mark = ",", big.mark = ".")
+```
+
+::: {.resumen}
+**En resumen.** Se comparan cuatro familias de métodos de reducción de dimensionalidad: **Kernel PCA** (10 núcleos), **t-SNE**, **UMAP** y **MDS** (clásico y no métrico), sobre los 1.070 lotes y sobre los 970 lotes sin atípicos. Ninguno muestra grupos claramente separados: los lotes forman una nube continua, igual que en el PCA final. Son una mirada **exploratoria** complementaria; sus ejes no se interpretan y su forma depende de los parámetros.
+:::
+
+# Qué responde este informe
+
+**Pregunta:** si en lugar del PCA lineal se usan métodos no lineales, ¿aparecen grupos que el PCA no ve?
+
+Cada sección sigue el mismo esquema: *qué se hace y por qué*, *el resultado* y *cómo se lee*.
+
+| Sección | Método | Para qué sirve | Mensaje principal |
+|---|---|---|---|
+| 1 | Kernel PCA (10 núcleos) | PCA en un espacio transformado por un núcleo | Solo el núcleo lineal reproduce el PCA; varios núcleos no son válidos |
+| 2 | Métodos del taller (970 lotes) | PCA, Kernel PCA, t-SNE y UMAP en la matriz final | Una sola nube |
+| 3 | UMAP y t-SNE | Conservar vecindades locales | La forma depende de los parámetros |
+| 4 | MDS no métrico y Shepard | Conservar el orden de las distancias | El mapa comprime distancias |
+| 5 | MDS con zoom | Ver el centro de la nube | Pocos lotes extremos dominan la escala |
 
 > Métodos exploratorios. Ninguno de ellos define grupos. Las figuras se guardan en `figuras/exploratorios/`. El PCA oficial está en `pca_final.Rmd`.
 >
@@ -90,15 +116,49 @@ kpca_base <- function(X, carpeta_fig, p = ncol(X)) {
 
 ```{r exp1}
 set.seed(2026)
+res_kp <- list()
 for (base in c("../datos/base_1070.rds", "../datos/base_sin_atipicos.rds")) {
   tag <- if (base == "../datos/base_1070.rds") "1070" else "sin_atip"
   X <- readRDS(base)$Z
   tabla <- kpca_base(X, sprintf("figuras/exploratorios/kpca_%s", tag))
+  res_kp[[tag]] <- tabla
   write.csv(tabla, sprintf("figuras/exploratorios/varianza_kpca_%s.csv", tag), row.names = FALSE)
   cat("== base", tag, "n =", nrow(X), "\n")
-  print(tabla[, c("kernel", "CP1", "CP2", "CP3", "acum_CP1_8", "autovalores_neg")])
 }
 ```
+
+**Qué hacemos y por qué.** El Kernel PCA es un PCA que se calcula después de transformar los datos con un **núcleo** (una función de similitud), lo que permite capturar estructuras no lineales. Se prueban 10 núcleos. Un cuidado clave: el porcentaje de varianza explicada se calcula sobre la **inercia total** del espacio transformado (la traza de la matriz núcleo centrada), no solo sobre las primeras componentes.
+
+```{r kp-1070}
+knitr::kable(res_kp[["1070"]][, c("kernel", "CP1", "CP2", "CP3", "acum_CP1_8", "autovalores_neg")],
+             col.names = c("Núcleo", "CP1 (%)", "CP2 (%)", "CP3 (%)", "Primeras 8 (%)", "Autovalores negativos"),
+             format.args = list(decimal.mark = ","), caption = "Kernel PCA sobre 1.070 lotes")
+```
+
+```{r kp-970}
+knitr::kable(res_kp[["sin_atip"]][, c("kernel", "CP1", "CP2", "CP3", "acum_CP1_8", "autovalores_neg")],
+             col.names = c("Núcleo", "CP1 (%)", "CP2 (%)", "CP3 (%)", "Primeras 8 (%)", "Autovalores negativos"),
+             format.args = list(decimal.mark = ","), caption = "Kernel PCA sobre 970 lotes sin atípicos")
+```
+
+```{r kp-texto, include=FALSE}
+k9 <- res_kp[["sin_atip"]]
+g <- function(nm, col) k9[k9$kernel == nm, col]
+invalidos <- k9$kernel[k9$autovalores_neg > 0]
+```
+
+**Cómo se lee.**
+
+- **Núcleo lineal (`vanilladot`)**: reproduce exactamente el PCA clásico (CP1 `r fm(g('vanilladot', 'CP1'), 1)` %, CP2 `r fm(g('vanilladot', 'CP2'), 1)`; las 8 componentes suman 100 %). Es la referencia.
+- **Núcleo RBF**: con σ = 0,1 la inercia se reparte más (CP1 `r fm(g('rbfdot_sigma0.1', 'CP1'), 1)` %, 8 componentes `r fm(g('rbfdot_sigma0.1', 'acum_CP1_8'), 1)` %); con σ = 1 el núcleo es tan local que la inercia se dispersa en casi tantas direcciones como lotes (las 8 primeras suman solo `r fm(g('rbfdot_sigma1', 'acum_CP1_8'), 1)` %) y no resume la estructura.
+- **Núcleos polinómicos**: concentran más en CP1 a mayor grado (`r fm(g('polydot_grado2', 'CP1'), 1)` % con grado 2 y `r fm(g('polydot_grado3', 'CP1'), 1)` % con grado 3).
+- **Núcleos no válidos**: `r paste(invalidos, collapse = ', ')` tienen autovalores **negativos**: sus matrices no son semidefinidas positivas, no definen un espacio euclídeo y sus porcentajes se reportan solo como referencia (por ejemplo, el CP1 de `splinedot` no es una varianza real).
+
+```{r kp-fig, out.width='48%', fig.show='hold', fig.cap='Kernel PCA sobre 970 lotes: componentes 1 a 4 de a pares. Izquierda: núcleo lineal (igual al PCA). Derecha: RBF con sigma = 0,1.'}
+knitr::include_graphics(c('figuras/exploratorios/kpca_sin_atip/pairs_vanilladot.png', 'figuras/exploratorios/kpca_sin_atip/pairs_rbfdot_sigma0.1.png'))
+```
+
+**Cómo se lee la figura.** Cada celda enfrenta dos componentes. Con el núcleo lineal se ve una nube alargada y continua; con el RBF la nube se curva en forma de herradura (un efecto típico de este núcleo), pero sigue siendo continua: no aparecen grupos separados.
 
 # 2. Métodos del taller sobre 970 lotes
 
@@ -196,6 +256,26 @@ cat("Kernel RBF sigma=1 (fracción de la inercia total):", res$kpca_rbf_sigma1_v
 cat("Kernel polinomial grado 2 (fracción de la inercia total):", res$kpca_poly_var, "\n")
 ```
 
+**Qué hacemos y por qué.** Se repite el análisis del taller sobre la matriz final de 970 lotes: PCA, Kernel PCA (RBF con dos valores de σ), t-SNE (perplejidad 30 y 5) y UMAP (15 y 5 vecinos). Se usan varias configuraciones para ver cuánto depende el resultado de los parámetros.
+
+**Cómo se lee los números.** La traza de la matriz de correlaciones es `r fm(res$varianza_total, 0)` (una unidad por variable) y su determinante `r format(res$varianza_generalizada, digits = 2, scientific = FALSE, decimal.mark = ",")`, un valor muy pequeño que indica **alta redundancia** entre variables. El PCA explica `r fm(res$pca_var[1], 1)` %, `r fm(res$pca_var[2], 1)` %, `r fm(res$pca_var[3], 1)` % y `r fm(res$pca_var[4], 1)` % en sus cuatro primeras componentes.
+
+```{r taller-pca, out.width='48%', fig.show='hold', fig.cap='PCA de 970 lotes. Izquierda: gráfico del codo. Derecha: biplot.'}
+knitr::include_graphics(c('figuras/taller_970/pca_codo.png', 'figuras/taller_970/pca_biplot.png'))
+```
+
+**Cómo se lee.** El codo cae después de la segunda componente (la mayor parte de la variación está en CP1 y CP2). En el biplot, las flechas de los siete atributos sensoriales apuntan en la misma dirección y la de la altitud es casi perpendicular.
+
+```{r taller-nl, out.width='48%', fig.show='hold', fig.cap='Izquierda: t-SNE con perplejidad 30. Derecha: UMAP con 15 vecinos (970 lotes).'}
+knitr::include_graphics(c('figuras/taller_970/tsne_perp30.png', 'figuras/taller_970/umap_vecinos15.png'))
+```
+
+```{r taller-nl2, out.width='48%', fig.show='hold', fig.cap='Izquierda: t-SNE con perplejidad 5. Derecha: UMAP con 5 vecinos (970 lotes).'}
+knitr::include_graphics(c('figuras/taller_970/tsne_perp5.png', 'figuras/taller_970/umap_vecinos5.png'))
+```
+
+**Cómo se lee.** Con parámetros más locales (perplejidad 5, 5 vecinos) aparecen pequeñas islas y filamentos; con parámetros más globales (30 y 15) la nube se une. Eso muestra que **la forma depende de los parámetros**: las islas no deben leerse como grupos reales. En t-SNE y UMAP las distancias entre islas y los ejes no tienen significado.
+
 # 3. UMAP y t-SNE sobre 1.070 lotes y 970 lotes sin atípicos
 
 UMAP con 15 y 5 vecinos; t-SNE con perplejidad 30 y 5.
@@ -224,12 +304,25 @@ for (base in c("../datos/base_1070.rds", "../datos/base_sin_atipicos.rds")) {
 }
 ```
 
+**Qué hacemos y por qué.** Se repite UMAP y t-SNE con las dos bases (1.070 y 970 lotes) para ver si retirar los 100 atípicos cambia la estructura. Es una comprobación de **robustez**.
+
+```{r ut-fig, out.width='48%', fig.show='hold', fig.cap='UMAP con 15 vecinos. Izquierda: 1.070 lotes. Derecha: 970 lotes sin atípicos.'}
+knitr::include_graphics(c('figuras/exploratorios/umap_tsne_1070/umap_vecinos15.png', 'figuras/exploratorios/umap_tsne_sin_atip/umap_vecinos15.png'))
+```
+
+```{r ut-fig2, out.width='48%', fig.show='hold', fig.cap='t-SNE con perplejidad 30. Izquierda: 1.070 lotes. Derecha: 970 lotes sin atípicos.'}
+knitr::include_graphics(c('figuras/exploratorios/umap_tsne_1070/tsne_perp30.png', 'figuras/exploratorios/umap_tsne_sin_atip/tsne_perp30.png'))
+```
+
+**Cómo se lee.** Las dos bases dan formas parecidas: una nube continua. Con los 1.070 lotes aparecen algunos puntos y pequeños grupos de lotes aislados en el borde, que corresponden a lotes inusuales. La conclusión no cambia con ninguna de las dos bases: **no hay grupos naturales claros**.
+
 # 4. MDS: no métrico y diagrama de Shepard
 
 Escalamiento multidimensional sobre 1.070 lotes y sobre 970 lotes sin atípicos.
 
 ```{r exp6}
 suppressMessages(library(MASS))
+mds_res <- data.frame()
 for (base in c("../datos/base_1070.rds", "../datos/base_sin_atipicos.rds")) {
   tag <- if (base == "../datos/base_1070.rds") "1070" else "sin_atip"
   X <- as.matrix(readRDS(base)$Z); n <- nrow(X)
@@ -248,8 +341,18 @@ for (base in c("../datos/base_1070.rds", "../datos/base_sin_atipicos.rds")) {
   abline(0, 1, col = "red", lty = 2)
   dev.off()
   cat(tag, "n=", n, " stress no métrico (%) =", round(stress_nm, 1), " corr(original, 2D clásico) =", round(cor(dor, dcl), 3), "\n")
+  mds_res <- rbind(mds_res, data.frame(Base = if (tag == "1070") "1.070 lotes" else "970 lotes", Lotes = n, `Stress no métrico (%)` = round(stress_nm, 1), `Correlación distancias originales y mapa 2D` = round(cor(dor, dcl), 3), check.names = FALSE))
 }
+knitr::kable(mds_res, format.args = list(decimal.mark = ","), caption = "Calidad de los mapas MDS")
 ```
+
+**Qué hacemos y por qué.** El MDS dibuja los lotes en el plano para que las distancias del mapa se parezcan a las originales. El **MDS no métrico** conserva solo el *orden* de las distancias; su calidad se mide con el **stress** (menor es mejor; según Kruskal, menos de 5 % es excelente, 5–10 % bueno y 10–20 % aceptable). El **diagrama de Shepard** compara las distancias originales con las del mapa.
+
+```{r mds-fig, out.width='48%', fig.show='hold', fig.cap='MDS sobre 1.070 lotes. Izquierda: MDS no métrico. Derecha: diagrama de Shepard del MDS clásico.'}
+knitr::include_graphics(c('figuras/exploratorios/mds_1070/mds_no_metrico.png', 'figuras/exploratorios/mds_1070/shepard_clasico.png'))
+```
+
+**Cómo se lee.** El stress de `r fm(mds_res[[3]][1], 1)` % (1.070 lotes) y `r fm(mds_res[[3]][2], 1)` % (970 lotes) se considera `r if (max(mds_res[[3]]) < 5) 'excelente' else if (max(mds_res[[3]]) < 10) 'bueno' else if (max(mds_res[[3]]) < 20) 'aceptable' else 'pobre'`. En el diagrama de Shepard los puntos quedan **por debajo de la diagonal roja**: el mapa de 2 dimensiones comprime las distancias porque descarta las demás dimensiones; la correlación con las distancias originales es `r fm(mds_res[[4]][1], 2)` (1.070) y `r fm(mds_res[[4]][2], 2)` (970).
 
 # 5. MDS no métrico con zoom al 98 % central
 
@@ -271,3 +374,18 @@ mtext(sprintf("Zoom al 98 %% central; %d lotes fuera de la escala", out), side =
 dev.off()
 cat("stress", round(nm$stress, 1), " fuera:", out, "\n")
 ```
+
+**Qué hacemos y por qué.** En el MDS no métrico de 1.070 lotes unos pocos puntos extremos estiran la escala y comprimen el resto. Aquí se hace zoom al 98 % central para ver la forma de la nube.
+
+```{r zoom-fig, fig.cap='MDS no métrico con zoom al 98 % central (1.070 lotes).'}
+knitr::include_graphics('figuras/exploratorios/mds_zoom_1070.png')
+```
+
+**Cómo se lee.** Quedan fuera de la escala `r out` lotes (el 2 % de los puntos más extremos). En el centro, la nube es continua y sin grupos separados.
+
+# Conclusiones
+
+1. **Kernel PCA:** solo el núcleo lineal reproduce el PCA; los núcleos `tanhdot`, `besseldot` y `splinedot` no son válidos (autovalores negativos) y el RBF con σ = 1 es demasiado local.
+2. **t-SNE y UMAP:** la forma depende de los parámetros; con valores locales aparecen islas que no son grupos reales.
+3. **MDS:** el mapa es una representación aproximada (las distancias se comprimen al pasar a 2 dimensiones) y no muestra grupos.
+4. **En conjunto:** ningún método no lineal encuentra grupos que el PCA no vea. Los datos forman un continuo y el PCA final de 970 lotes es la referencia.
