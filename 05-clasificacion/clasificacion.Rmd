@@ -8,14 +8,16 @@ output:
     toc: true
     toc_float: true
     toc_depth: 3
-    code_folding: show
+    code_folding: hide
     theme: flatly
     df_print: paged
+    css: ../estilos_presentacion.css
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE,
                       fig.align = "center", fig.width = 8, fig.height = 6)
+fm <- function(x, d = 0) format(round(x, d), nsmall = d, decimal.mark = ",", big.mark = ".")
 ```
 
 > **Semanas 12-13 del programa:** Clasificación y discriminación — enfoque clásico
@@ -30,6 +32,21 @@ knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE,
 > evidencia de capacidad para predecir una calidad independiente o futura**.
 
 ---
+
+# Qué responde este informe
+
+**Pregunta:** ¿qué tan bien clasifican LDA, QDA, SVM y Random Forest los lotes en calidad Alta, Media o Baja, y qué significa realmente esa exactitud?
+
+Cada sección sigue el mismo esquema: *qué se hace y por qué*, *el resultado* y *cómo se lee*.
+
+| Sección | Modelo | Mensaje principal |
+|---|---|---|
+| 1–2 | Datos, clase y partición | La clase se construye con la suma de los atributos |
+| 3 | LDA | Exactitud alta, pero circular |
+| 3.1 | La circularidad en números | La regla de la suma reconstruye la clase sin ningún modelo |
+| 4–6 | QDA, SVM y Random Forest | Reconstruyen la misma regla |
+| 7 | Comparación | Reconstruyen una buena parte de la regla; SVM y Random Forest mejor que LDA y QDA |
+| 8 | Predicción sin circularidad | La cifra honesta: origen y grano verde predicen poco |
 
 # 1. Datos y variable objetivo — regla de clasificación construida
 
@@ -89,6 +106,8 @@ cat("Distribución de clases:\n")
 print(table(datos$Calidad))
 ```
 
+**Cómo se lee.** Se trabaja con `r fm(nrow(datos))` lotes. La clase se obtiene de la **suma de los diez atributos sensoriales**: Alta si supera `r fm(q75, 1)` puntos (percentil 75), Baja si queda por debajo de `r fm(q25, 1)` (percentil 25) y Media en el medio. Por construcción, las clases son aproximadamente 25 %, 50 % y 25 % (`r paste(table(datos$Calidad), collapse = ' · ')` lotes).
+
 ---
 
 # 2. Partición train / test y transformación Yeo-Johnson
@@ -121,6 +140,8 @@ cat("Train:", nrow(train), "lotes  |  Test:", nrow(test), "lotes\n")
 cat("λ estimados en train:\n"); print(round(lambdas, 3))
 ```
 
+**Cómo se lee.** El 75 % de los lotes (`r fm(nrow(train))`) se usa para ajustar y el 25 % (`r fm(nrow(test))`) para probar, con la proporción de clases conservada. Los λ de la transformación se estiman **solo con el entrenamiento** para no filtrar información del conjunto de prueba. Tres variables casi constantes en 10 producen λ extremos, por eso se acotan a [−3, 3].
+
 ---
 
 # 3. LDA — Análisis Discriminante Lineal (clásico)
@@ -134,6 +155,10 @@ cat("Exactitud LDA:", round(cm_lda$overall["Accuracy"]*100, 1), "%\n")
 print(cm_lda$table)
 ```
 
+**Qué hacemos y por qué.** El análisis discriminante lineal (LDA) separa las clases con fronteras lineales, suponiendo que cada clase es normal con la misma covarianza. La **matriz de confusión** cruza la clase real (columnas) con la predicha (filas): la diagonal son los aciertos.
+
+**Cómo se lee.** La exactitud en prueba es `r fm(100 * cm_lda$overall['Accuracy'], 1)` % (kappa `r fm(cm_lda$overall['Kappa'], 3)`). Solo `r cm_lda$table['Alta', 'Baja'] + cm_lda$table['Baja', 'Alta']` lote(s) se confunde(n) entre Alta y Baja; el resto de los errores involucran a la clase Media, que es una franja ancha entre las otras dos.
+
 ```{r lda-viz, fig.width=9, fig.height=6}
 scores_lda <- as.data.frame(predict(modelo_lda, datos_t)$x)
 scores_lda$Calidad <- datos_t$Calidad
@@ -143,8 +168,10 @@ ggplot(scores_lda, aes(LD1, LD2, color=Calidad)) +
   scale_color_manual(values=c("Alta"="#27ae60","Media"="#f39c12","Baja"="#e74c3c")) +
   labs(title="LDA — Mapa discriminante (LD1 vs LD2)",
        x="Discriminante 1", y="Discriminante 2") +
-  theme_minimal() + theme(panel.grid.minor=element_blank())
+  theme_minimal(base_size = 14) + theme(panel.grid.minor=element_blank())
 ```
+
+**Cómo se lee.** Cada punto es un lote proyectado en los dos ejes discriminantes y su color es la clase real. Las tres clases se ordenan a lo largo del primer eje, pero **se tocan y se traslapan**: no hay tres nubes separadas, sino una nube continua cortada en tres franjas. Es coherente con el PCA y con la separación débil del clustering.
 
 ---
 
@@ -174,6 +201,8 @@ cat("Exactitud LDA sobre puntajes originales:", round(cm_lda_raw$overall["Accura
 print(cm_lda_raw$table)
 ```
 
+**Cómo se lee.** Aplicar la regla de la suma con los cortes de entrenamiento acierta el `r fm(100 * mean(regla == test_raw$Calidad), 1)` % de los lotes de prueba sin usar ningún modelo. El LDA sobre los puntajes originales llega a `r fm(100 * cm_lda_raw$overall['Accuracy'], 1)` %. Esto muestra la **circularidad**: la clase es una función de los atributos que se le dan al modelo, así que acertar no significa predecir nada nuevo.
+
 ---
 
 # 4. QDA — Análisis Discriminante Cuadrático
@@ -194,6 +223,10 @@ cat("Exactitud QDA:", round(cm_qda$overall["Accuracy"]*100, 1), "%\n")
 print(cm_qda$table)
 ```
 
+**Qué hacemos y por qué.** El QDA permite una covarianza distinta por clase (fronteras curvas). Si una variable es constante dentro de una clase se vuelve singular, y se excluye.
+
+**Cómo se lee.** La exactitud es `r fm(100 * cm_qda$overall['Accuracy'], 1)` % (kappa `r fm(cm_qda$overall['Kappa'], 3)`). Variables excluidas: `r if (all(var_ok)) 'ninguna' else paste(vars_pred[!var_ok], collapse = ', ')`.
+
 ---
 
 # 5. SVM — Máquinas de Soporte Vectorial (AA/ML)
@@ -207,6 +240,10 @@ cm_svm <- confusionMatrix(pred_svm, test$Calidad)
 cat("Exactitud SVM:", round(cm_svm$overall["Accuracy"]*100, 1), "%\n")
 print(cm_svm$table)
 ```
+
+**Qué hacemos y por qué.** La máquina de soporte vectorial (SVM) con núcleo radial busca una frontera no lineal que separe las clases con el mayor margen.
+
+**Cómo se lee.** Exactitud `r fm(100 * cm_svm$overall['Accuracy'], 1)` % (kappa `r fm(cm_svm$overall['Kappa'], 3)`).
 
 ---
 
@@ -222,6 +259,10 @@ cat("Exactitud Random Forest:", round(cm_rf$overall["Accuracy"]*100, 1), "%\n")
 print(cm_rf$table)
 ```
 
+**Qué hacemos y por qué.** El bosque aleatorio promedia muchos árboles de decisión; además mide qué variables importan más (cuánto cae la exactitud si se desordena una variable).
+
+**Cómo se lee.** Exactitud `r fm(100 * cm_rf$overall['Accuracy'], 1)` % (kappa `r fm(cm_rf$overall['Kappa'], 3)`).
+
 ```{r rf-importancia, fig.width=8, fig.height=5}
 imp <- as.data.frame(importance(modelo_rf))
 imp$Variable <- rownames(imp)
@@ -232,8 +273,10 @@ imp %>%
   coord_flip() +
   labs(title="Random Forest — Importancia de variables",
        x="", y="Disminución media de exactitud") +
-  theme_minimal()
+  theme_minimal(base_size = 14)
 ```
+
+**Cómo se lee.** Las variables más importantes son `r paste(head(imp$Variable[order(-imp$MeanDecreaseAccuracy)], 3), collapse = ', ')`: justo atributos que forman parte de la suma que define la clase. La altitud y otras variables externas pesan muy poco.
 
 ---
 
@@ -268,9 +311,11 @@ ggplot(resultados, aes(x=reorder(Modelo, Exactitud), y=Exactitud, fill=Modelo)) 
   labs(title="Comparación de exactitud — clásico vs AA/ML",
        x="", y="Exactitud en test (%)") +
   ylim(0, 105) +
-  theme_minimal() + theme(legend.position="none",
+  theme_minimal(base_size = 14) + theme(legend.position="none",
                            panel.grid.minor=element_blank())
 ```
+
+**Cómo se lee.** Los modelos que reciben los atributos sensoriales reconstruyen la etiqueta con exactitudes de `r fm(min(resultados$Exactitud[1:4]), 1)` % a `r fm(max(resultados$Exactitud[1:4]), 1)` %. El SVM (`r fm(100 * cm_svm$overall['Accuracy'], 1)` %) y el Random Forest (`r fm(100 * cm_rf$overall['Accuracy'], 1)` %) reconstruyen mejor la etiqueta que LDA y QDA (`r fm(100 * cm_lda$overall['Accuracy'], 1)` % y `r fm(100 * cm_qda$overall['Accuracy'], 1)` %) porque dibujan fronteras más flexibles; y ninguno llega a la regla de la suma (`r fm(100 * mean(regla == test_raw$Calidad), 1)` %). Todos reproducen una regla que ya está en sus entradas, así que la comparación no dice cuál predice mejor la calidad. El LDA sobre puntajes originales (`r fm(resultados$Exactitud[5], 1)` %) queda por debajo porque sus supuestos no encajan con una clase definida como cortes de una suma.
 
 ---
 
@@ -315,8 +360,17 @@ data.frame(
 print(cm_rf_ext$table)
 ```
 
+**Cómo se lee.** Sin ningún atributo sensorial, el Random Forest llega a `r fm(100 * cm_rf_ext$overall['Accuracy'], 1)` % y el LDA a `r fm(100 * cm_lda_ext$overall['Accuracy'], 1)` %, frente a una tasa de no información de `r fm(100 * cm_rf_ext$overall['AccuracyNull'], 1)` % (acertar siempre «Media»). Es decir, **el origen y el estado del grano verde ayudan poco**: la mejora sobre la referencia es de unos `r fm(100 * (cm_rf_ext$overall['Accuracy'] - cm_rf_ext$overall['AccuracyNull']), 1)` puntos porcentuales. Esta es la cifra honesta de capacidad predictiva.
+
 Esta es la cifra que conviene presentar si se pregunta qué tan bien se puede **predecir**
 la calidad sensorial: con información de origen y del grano verde, sin mirar la taza.
 Las exactitudes de las secciones 3 a 7 solo muestran que los modelos reproducen una regla
 construida con sus propias entradas.
+
+# Conclusiones
+
+1. La clase de calidad es la **suma de los atributos sensoriales cortada en percentiles**; los cuatro modelos la reconstruyen con `r fm(min(resultados$Exactitud[1:4]), 1)` a `r fm(max(resultados$Exactitud[1:4]), 1)` % de exactitud, pero eso solo confirma una regla que ya está en sus entradas.
+2. La regla de la suma sola acierta `r fm(100 * mean(regla == test_raw$Calidad), 1)` %: no hace falta un modelo para reproducirla.
+3. Con variables que **no** definen la clase (origen, altitud, humedad, defectos, proceso), el Random Forest alcanza `r fm(100 * cm_rf_ext$overall['Accuracy'], 1)` % frente a `r fm(100 * cm_rf_ext$overall['AccuracyNull'], 1)` % de la referencia: poca capacidad predictiva real.
+4. Estos modelos **no validan** los grupos del clustering: clasifican una etiqueta construida con los mismos puntajes.
 
