@@ -12,12 +12,12 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, fig.align = "center")
-for (d in c("figuras/exploratorios/kpca_1070","figuras/exploratorios/kpca_sin_atip","figuras/exploratorios/kpca_627","figuras/exploratorios/kpca_666","figuras/exploratorios/umap_tsne_1070","figuras/exploratorios/umap_tsne_sin_atip","figuras/exploratorios/mds_1070","figuras/exploratorios/mds_sin_atip","figuras/taller_666")) dir.create(d, recursive = TRUE, showWarnings = FALSE)
+for (d in c("figuras/exploratorios/kpca_1070","figuras/exploratorios/kpca_sin_atip","figuras/exploratorios/umap_tsne_1070","figuras/exploratorios/umap_tsne_sin_atip","figuras/exploratorios/mds_1070","figuras/exploratorios/mds_sin_atip","figuras/taller_970")) dir.create(d, recursive = TRUE, showWarnings = FALSE)
 ```
 
 > Métodos exploratorios. Ninguno de ellos define grupos. Las figuras se guardan en `figuras/exploratorios/`. El PCA oficial está en `pca_final.Rmd`.
 >
-> **Bases usadas.** `base_1070.rds` (1.070 lotes) y `base_sin_atipicos.rds` (970 lotes: se retiran 100 lotes con distancia de Mahalanobis > χ²(0,975; 8) calculada directamente sobre la matriz estandarizada). Las secciones 2 a 4 usan las matrices de 666 y 627 lotes que produce `depuracion.Rmd`; esas matrices dependen de la cadena de depuración de ese archivo.
+> **Bases usadas.** `base_1070.rds` (1.070 lotes) y `base_sin_atipicos.rds` (970 lotes: se retiran 100 lotes con distancia de Mahalanobis > χ²(0,975; 8) calculada directamente sobre la matriz estandarizada). La sección 2 (métodos del taller) usa `datos_final_970.rds`, la matriz final que produce `depuracion.Rmd`; es la misma de `base_sin_atipicos.rds`, así que el Kernel PCA de 970 lotes de la sección 1 y el de la sección 2 son el mismo cálculo.
 
 # 0. Funciones comunes
 
@@ -100,43 +100,21 @@ for (base in c("../datos/base_1070.rds", "../datos/base_sin_atipicos.rds")) {
 }
 ```
 
-# 2. Kernel PCA: 10 núcleos sobre la matriz final de 627 lotes
+# 2. Métodos del taller sobre 970 lotes
 
-```{r exp2}
-set.seed(2026)
-obj <- readRDS("../datos/datos_final_627.rds")
-X <- as.data.frame(scale(obj$datos_limpio))
-tabla <- kpca_base(X, "figuras/exploratorios/kpca_627")
-write.csv(tabla, "figuras/exploratorios/varianza_kpca_todos_627.csv", row.names = FALSE)
-print(tabla)
-```
-
-# 3. Kernel PCA: 10 núcleos sobre la matriz de 666 lotes
-
-```{r exp3}
-set.seed(2026)
-obj <- readRDS("../datos/datos_final_666.rds")
-X <- as.data.frame(scale(obj$datos_limpio))
-tabla <- kpca_base(X, "figuras/exploratorios/kpca_666")
-write.csv(tabla, "figuras/exploratorios/varianza_kpca_todos_666.csv", row.names = FALSE)
-print(tabla)
-```
-
-# 4. Métodos del taller sobre 666 lotes
-
-PCA, Kernel PCA, t-SNE y UMAP del taller sobre 666 lotes.
+PCA, Kernel PCA, t-SNE y UMAP del taller sobre la matriz final de 970 lotes (sin Yeo-Johnson: ninguna variable supera |asimetría| > 1).
 
 La varianza total y la generalizada se reportan sobre la matriz **estandarizada** (es decir, sobre la
-matriz de correlaciones R). Sobre la matriz solo transformada con Yeo-Johnson las cifras no son
-interpretables: los λ cercanos a 3 elevan los puntajes a potencias altas y la altitud está en metros,
-así que la traza y el determinante quedan dominados por las unidades de cada variable.
+matriz de correlaciones R). Sobre la matriz sin estandarizar las cifras no son interpretables: la altitud está en metros y
+los puntajes en una escala de 0 a 10, así que la traza y el determinante de S quedan dominados por las
+unidades de cada variable.
 
 ```{r exp4}
 library(Rtsne)
 library(uwot)
 
 set.seed(2026)
-obj <- readRDS("../datos/datos_final_666.rds")
+obj <- readRDS("../datos/datos_final_970.rds")
 datos <- obj$datos_limpio
 X <- scale(datos)
 p <- ncol(datos)
@@ -149,21 +127,21 @@ res$varianza_generalizada <- det(R)                # entre 0 (colinealidad) y 1 
 res$varianza_total_media <- res$varianza_total / p
 res$varianza_generalizada_media <- res$varianza_generalizada^(1 / p)
 res$R <- R
-res$S_transformada <- cov(datos)                   # se guarda solo como referencia
+res$S_original <- cov(datos)                        # covarianza en escala original; solo como referencia
 
 pca <- prcomp(datos, center = TRUE, scale. = TRUE)
 res$pca_var <- summary(pca)$importance[2, ] * 100
 res$pca_rot <- pca$rotation
 res$pca_scores <- pca$x
 
-png("figuras/taller_666/pca_pairs.png", width = as.integer(1400*1.6), height = as.integer(1400*1.6), res = 220)
+png("figuras/taller_970/pca_pairs.png", width = as.integer(1400*1.6), height = as.integer(1400*1.6), res = 220)
 pairs(pca$x[, 1:4], pch = 19, cex = 0.4, col = adjustcolor("steelblue", 0.5))
 dev.off()
-png("figuras/taller_666/pca_biplot.png", width = as.integer(1200*1.6), height = as.integer(1000*1.6), res = 220)
+png("figuras/taller_970/pca_biplot.png", width = as.integer(1200*1.6), height = as.integer(1000*1.6), res = 220)
 biplot(pca, scale = 0, cex = 0.5)
 dev.off()
-png("figuras/taller_666/pca_codo.png", width = as.integer(1000*1.6), height = as.integer(700*1.6), res = 220)
-screeplot(pca, main = "Gráfico de codo — PCA 666 lotes")
+png("figuras/taller_970/pca_codo.png", width = as.integer(1000*1.6), height = as.integer(700*1.6), res = 220)
+screeplot(pca, main = "Gráfico de codo — PCA 970 lotes")
 dev.off()
 
 cfg_rbf01 <- list(kernel = "rbfdot", kpar = list(sigma = 0.1))
@@ -175,23 +153,23 @@ res$kpca_rbf_var        <- round(varianza_kernel(X, cfg_rbf01, 5)$frac, 3)
 res$kpca_rbf_sigma1_var <- round(varianza_kernel(X, cfg_rbf1, 5)$frac, 3)
 res$kpca_poly_var       <- round(varianza_kernel(X, cfg_poly, 5)$frac, 3)
 
-png("figuras/taller_666/kpca_rbf_pairs.png", width = as.integer(1400*1.6), height = as.integer(1400*1.6), res = 220)
+png("figuras/taller_970/kpca_rbf_pairs.png", width = as.integer(1400*1.6), height = as.integer(1400*1.6), res = 220)
 pairs(rotated(kp_rbf)[, 1:4], pch = 19, cex = 0.4, col = adjustcolor("firebrick", 0.5))
 dev.off()
-png("figuras/taller_666/kpca_rbf_sigma1_pairs.png", width = as.integer(1400*1.6), height = as.integer(1400*1.6), res = 220)
+png("figuras/taller_970/kpca_rbf_sigma1_pairs.png", width = as.integer(1400*1.6), height = as.integer(1400*1.6), res = 220)
 pairs(rotated(kp_rbf_sigma_alto)[, 1:4], pch = 19, cex = 0.4, col = adjustcolor("firebrick", 0.5))
 dev.off()
 
-# Misma configuración que la sección 5 (pca = FALSE) para que los mapas sean comparables
+# Misma configuración que la sección 3 (pca = FALSE) para que los mapas sean comparables
 set.seed(2026)
 tsne30 <- Rtsne(X, dims = 2, perplexity = 30, theta = 0.5, pca = FALSE, check_duplicates = FALSE)
 set.seed(2026)
 tsne5 <- Rtsne(X, dims = 2, perplexity = 5, theta = 0.5, pca = FALSE, check_duplicates = FALSE)
-png("figuras/taller_666/tsne_perp30.png", width = as.integer(1000*1.6), height = as.integer(1000*1.6), res = 220)
+png("figuras/taller_970/tsne_perp30.png", width = as.integer(1000*1.6), height = as.integer(1000*1.6), res = 220)
 plot(tsne30$Y, pch = 19, cex = 0.5, col = adjustcolor("darkgreen", 0.5),
      xlab = "t-SNE 1", ylab = "t-SNE 2", main = "t-SNE (perplejidad = 30)")
 dev.off()
-png("figuras/taller_666/tsne_perp5.png", width = as.integer(1000*1.6), height = as.integer(1000*1.6), res = 220)
+png("figuras/taller_970/tsne_perp5.png", width = as.integer(1000*1.6), height = as.integer(1000*1.6), res = 220)
 plot(tsne5$Y, pch = 19, cex = 0.5, col = adjustcolor("darkgreen", 0.5),
      xlab = "t-SNE 1", ylab = "t-SNE 2", main = "t-SNE (perplejidad = 5)")
 dev.off()
@@ -200,16 +178,16 @@ set.seed(2026)
 um15 <- umap(X, n_neighbors = 15)
 set.seed(2026)
 um5 <- umap(X, n_neighbors = 5)
-png("figuras/taller_666/umap_vecinos15.png", width = as.integer(1000*1.6), height = as.integer(1000*1.6), res = 220)
+png("figuras/taller_970/umap_vecinos15.png", width = as.integer(1000*1.6), height = as.integer(1000*1.6), res = 220)
 plot(um15[, 1], um15[, 2], pch = 19, cex = 0.5, col = adjustcolor("purple", 0.5),
      xlab = "UMAP1", ylab = "UMAP2", main = "UMAP (vecinos = 15)")
 dev.off()
-png("figuras/taller_666/umap_vecinos5.png", width = as.integer(1000*1.6), height = as.integer(1000*1.6), res = 220)
+png("figuras/taller_970/umap_vecinos5.png", width = as.integer(1000*1.6), height = as.integer(1000*1.6), res = 220)
 plot(um5[, 1], um5[, 2], pch = 19, cex = 0.5, col = adjustcolor("purple", 0.5),
      xlab = "UMAP1", ylab = "UMAP2", main = "UMAP (vecinos = 5)")
 dev.off()
 
-saveRDS(res, "../datos/resultados_taller_666.rds")
+saveRDS(res, "../datos/resultados_taller_970.rds")
 cat("Varianza total (traza de R):", round(res$varianza_total, 3), "\n")
 cat("Varianza generalizada (det R):", signif(res$varianza_generalizada, 3), "\n")
 cat("PCA % varianza:", round(res$pca_var[1:4], 1), "\n")
@@ -218,7 +196,7 @@ cat("Kernel RBF sigma=1 (fracción de la inercia total):", res$kpca_rbf_sigma1_v
 cat("Kernel polinomial grado 2 (fracción de la inercia total):", res$kpca_poly_var, "\n")
 ```
 
-# 5. UMAP y t-SNE sobre 1.070 lotes y 970 lotes sin atípicos
+# 3. UMAP y t-SNE sobre 1.070 lotes y 970 lotes sin atípicos
 
 UMAP con 15 y 5 vecinos; t-SNE con perplejidad 30 y 5.
 
@@ -246,7 +224,7 @@ for (base in c("../datos/base_1070.rds", "../datos/base_sin_atipicos.rds")) {
 }
 ```
 
-# 6. MDS: no métrico y diagrama de Shepard
+# 4. MDS: no métrico y diagrama de Shepard
 
 Escalamiento multidimensional sobre 1.070 lotes y sobre 970 lotes sin atípicos.
 
@@ -273,7 +251,7 @@ for (base in c("../datos/base_1070.rds", "../datos/base_sin_atipicos.rds")) {
 }
 ```
 
-# 7. MDS no métrico con zoom al 98 % central
+# 5. MDS no métrico con zoom al 98 % central
 
 Versión con zoom de la configuración de MDS sobre 1.070 lotes.
 
