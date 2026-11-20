@@ -267,7 +267,7 @@ ui <- fluidPage(
       div(class = "pc-badge",
         div(class = "pc-name", "CP4"),
         div(class = "pc-var",  paste0(var_exp[4], "%")),
-        div(class = "pc-desc", "Contraste sensorial fino")
+        div(class = "pc-desc", "Componente adicional")
       )
     )
   ),
