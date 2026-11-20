@@ -32,7 +32,7 @@ knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE,
 
 # 1. Datos y variable respuesta
 
-Se modela el **puntaje total del catador** (`Total.Cup.Points`) a partir de los
+Se modela el **puntaje total de taza** (`Total.Cup.Points`) a partir de los
 10 atributos sensoriales y la altitud. Dado que el puntaje total se construye con
 los atributos sensoriales, el análisis es principalmente explicativo/descriptivo
 de esa relación y no una predicción independiente.
@@ -55,8 +55,8 @@ vars_originales <- c("Aroma","Flavor","Aftertaste","Acidity","Body","Balance",
 datos <- data_raw %>%
   filter(!is.na(altitude_mean_meters),
          altitude_mean_meters > 0, altitude_mean_meters <= 3000) %>%
-  dplyr::select(all_of(vars_originales)) %>%
-  filter(complete.cases(.)) %>%
+  dplyr::select(all_of(vars_originales), Processing.Method, Country.of.Origin) %>%
+  filter(complete.cases(.[, vars_originales])) %>%
   rename(Sabor=Flavor, Retrogusto=Aftertaste, Acidez=Acidity, Cuerpo=Body,
          Uniformidad=Uniformity, Taza.Limpia=Clean.Cup, Dulzura=Sweetness,
          Puntaje.Catador=Cupper.Points, Humedad=Moisture,
@@ -69,7 +69,28 @@ vars_pred <- c("Aroma","Sabor","Retrogusto","Acidez","Cuerpo","Balance",
 cat("Dimensiones:", nrow(datos), "×", ncol(datos), "\n")
 cat("Variable respuesta: Puntaje.Total\n")
 summary(datos$Puntaje.Total)
+
+# Un lote tiene todos los atributos y el puntaje total en 0: es un registro vacío,
+# no una catación real. Con residuo de −21,5 puntos domina la regresión simple
+# (su intercepto) y los diagnósticos, así que se excluye.
+cat("Lotes con Puntaje.Total = 0:", sum(datos$Puntaje.Total == 0), "\n")
+datos <- datos %>% filter(Puntaje.Total > 0)
+cat("Lotes analizados:", nrow(datos), "\n")
 ```
+
+## 1.1. El puntaje total es la suma de los diez atributos
+
+```{r identidad}
+diferencia <- datos$Puntaje.Total - rowSums(datos[, setdiff(vars_pred, "Altitud")])
+cat("Puntaje.Total − suma de los 10 atributos:\n"); print(summary(round(diferencia, 3)))
+cat("Lotes con diferencia exactamente 0:", sum(abs(diferencia) < 1e-9), "de", nrow(datos), "\n")
+```
+
+Por construcción, el modelo múltiple de las secciones 3 a 6 recupera esta identidad
+contable: los coeficientes de los diez atributos son ≈ 1, la altitud ≈ 0 y R² ≈ 1. Los
+residuos son errores de redondeo del registro, así que los diagnósticos (normalidad,
+homocedasticidad) y los valores p no tienen interpretación sustantiva. La sección 7
+plantea un modelo que sí predice algo que no está en sus entradas.
 
 ---
 
@@ -119,7 +140,7 @@ tidy(modelo_completo, conf.int=TRUE) %>%
   filter(term != "(Intercept)") %>%
   ggplot(aes(x=reorder(term, estimate), y=estimate)) +
   geom_col(aes(fill=estimate > 0), alpha=0.8, width=0.6) +
-  geom_errorbar(aes(ymin=conf.low, ymax=conf.high), width=0.2, color="#333") +
+  geom_errorbar(aes(ymin=conf.low, ymax=conf.high), width=0.2, color="#333333") +
   scale_fill_manual(values=c("TRUE"="#27ae60","FALSE"="#e74c3c"), guide="none") +
   coord_flip() +
   labs(title="Coeficientes estimados — modelo completo",
@@ -217,3 +238,41 @@ data.frame(real=datos_test$Puntaje.Total, pred=pred_vals) %>%
        x="Puntaje real", y="Puntaje predicho") +
   theme_minimal()
 ```
+
+---
+
+# 7. Modelo sin circularidad: puntaje total a partir del origen y del grano verde
+
+Se predice el puntaje total solo con variables que **no** forman parte de la suma:
+altitud, humedad, defectos de categoría 1 y 2, método de procesamiento y país de origen
+(los cinco con más lotes y "Otro"). Se usa la misma partición train/test de la sección 6.
+
+```{r modelo-externo}
+top5 <- names(sort(table(datos_tr$Country.of.Origin), decreasing = TRUE))[1:5]
+prep_ext <- function(d) {
+  d %>% mutate(
+    Proceso = factor(ifelse(is.na(Processing.Method) | trimws(Processing.Method) == "",
+                            "Desconocido", Processing.Method)),
+    Pais    = factor(ifelse(Country.of.Origin %in% top5, Country.of.Origin, "Otro"),
+                     levels = c(top5, "Otro"))
+  )
+}
+tr_ext <- prep_ext(datos_tr); te_ext <- prep_ext(datos_test)
+te_ext$Proceso <- factor(te_ext$Proceso, levels = levels(tr_ext$Proceso))
+
+modelo_ext <- lm(Puntaje.Total ~ Altitud + Humedad + Defectos.Cat1 + Defectos.Cat2 + Proceso + Pais,
+                 data = tr_ext)
+summary(modelo_ext)
+
+pred_ext <- predict(modelo_ext, te_ext)
+r2_ext <- 1 - sum((te_ext$Puntaje.Total - pred_ext)^2) /
+  sum((te_ext$Puntaje.Total - mean(tr_ext$Puntaje.Total))^2)
+cat("RMSE en test:", round(sqrt(mean((te_ext$Puntaje.Total - pred_ext)^2)), 3),
+    " | R² predictivo en test:", round(r2_ext, 3), "\n")
+cat("Referencia: desviación estándar del puntaje en test:", round(sd(te_ext$Puntaje.Total), 3), "\n")
+```
+
+Este modelo responde una pregunta real (¿cuánto del puntaje se explica por el origen y el
+estado del grano verde?) y su R² predictivo es la cifra que conviene presentar; el R² ≈ 1
+del modelo con los atributos sensoriales solo confirma cómo se calcula el puntaje.
+
