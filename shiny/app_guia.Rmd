@@ -1,0 +1,144 @@
+---
+title: "Explorador PCA: guía de la aplicación Shiny"
+subtitle: "Cómo se usa, cómo funciona y cómo se lee · Coffee Quality Institute"
+author: "Juan Sebastián Guayazán · Esteban Valente · Diego Nocua"
+date: "`r format(Sys.Date(), '%d de %B de %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: flatly
+    css: ../estilos_presentacion.css
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE, fig.align = "center")
+suppressMessages({ library(knitr); library(ggplot2); library(car) })
+tabla <- function(x, ...) kable(x, format.args = list(decimal.mark = ",", big.mark = "."), row.names = FALSE, ...)
+fm <- function(x, d = 0) format(round(x, d), nsmall = d, decimal.mark = ",", big.mark = ".")
+
+# Mismo modelo de referencia que app.R
+obj_final <- readRDS("../datos/datos_final_970.rds")
+vars_8 <- c("Aroma", "Sabor", "Retrogusto", "Acidez", "Cuerpo", "Balance", "Puntaje.Catador", "Altitud")
+datos_t <- obj_final$datos_limpio[, vars_8]
+pca <- prcomp(datos_t, center = TRUE, scale. = TRUE)
+scores_df <- as.data.frame(pca$x)
+var_exp <- round(pca$sdev^2 / sum(pca$sdev^2) * 100, 1)
+datos_full <- obj_final$datos_originales[, vars_8]
+
+# Misma regla de proyección y de etiqueta que app.R
+proyectar <- function(x) {
+  nd <- as.data.frame(as.list(x[vars_8]))
+  z <- scale(nd, center = pca$center, scale = pca$scale)
+  s <- as.numeric(z %*% pca$rotation)
+  pct_cal <- 100 - mean(scores_df$PC1 <= s[1]) * 100
+  list(scores = s, pct_cal = pct_cal,
+       etiqueta = if (pct_cal >= 75) "Alta" else if (pct_cal >= 25) "Media" else "Baja")
+}
+```
+
+::: {.resumen}
+**En resumen.** La aplicación toma los puntajes de un lote hipotético (siete atributos sensoriales y la altitud), lo estandariza con el mismo preprocesamiento del PCA final y lo ubica en el plano de componentes de los **970 lotes de referencia**. Devuelve su posición (percentil) en cada componente y una etiqueta orientativa de calidad sensorial. **No clasifica, no asigna grupos y no certifica nada.**
+:::
+
+# Qué es y para qué sirve
+
+**Pregunta que responde:** si un lote tuviera ciertos puntajes y altitud, ¿dónde caería respecto a los 970 lotes con los que se ajustó el PCA?
+
+Es una **demostración interactiva del PCA final**: permite ver, moviendo los controles, que CP1 sube y baja con los siete atributos sensoriales a la vez y que CP2 responde casi solo a la altitud.
+
+# Cómo usarla
+
+La aplicación es interactiva y **no se puede ejecutar desde este HTML** (este documento es solo su guía). Para abrirla, desde la raíz del repositorio:
+
+```r
+shiny::runApp("shiny")
+```
+
+1. **Ajustar los controles.** Hay siete deslizadores sensoriales (escala 0–10) y uno de altitud (metros). Inician en la mediana de los 970 lotes.
+2. **Presionar «Proyectar este lote».** Aparece el punto rojo en el plano CP1–CP2 (o CP1–CP3 si se cambia el eje).
+3. **Leer los paneles de la derecha:** *Scores del nuevo lote* (valor en cada componente y su percentil) e *Interpretación* (etiqueta de calidad, altitud relativa y contraste CP3).
+4. **Restablecer medianas** vuelve todos los controles a su valor inicial.
+
+Debajo, la aplicación muestra además la varianza por componente, las cargas y la distribución de CP1 con la posición del lote.
+
+# Cómo funciona
+
+| Paso | Qué ocurre |
+|---|---|
+| 1. Matriz de referencia | Se leen los 970 lotes de `datos/datos_final_970.rds` (la depuración está en [depuración](../01-pca/depuracion.html)). |
+| 2. Preprocesamiento | Con 970 lotes ninguna variable supera \|asimetría\| 1, así que **no se aplica Yeo-Johnson**; solo se estandariza. |
+| 3. PCA | `prcomp(..., center = TRUE, scale. = TRUE)` sobre las 8 variables. |
+| 4. Proyección del lote nuevo | Se restan las medias y se divide entre las desviaciones **de los 970 lotes**; el resultado se multiplica por las cargas. |
+| 5. Percentil | Se compara el score del lote con los scores de los 970 lotes. |
+
+## El modelo de referencia
+
+```{r var-tab}
+tabla(data.frame(Componente = paste0("CP", 1:4), `Varianza (%)` = var_exp[1:4],
+                 Significado = c("Calidad sensorial general", "Altitud de cultivo", "Contraste sensorial fino (aroma frente a cuerpo)", "Componente adicional (acidez)"),
+                 check.names = FALSE), align = "lrl", caption = "Componentes mostradas en la aplicación")
+```
+
+CP1 y CP2 suman `r fm(var_exp[1] + var_exp[2], 1)` % de la varianza. CP3 y CP4 explican poco y se muestran solo como apoyo.
+
+```{r cargas-tab}
+L <- round(pca$rotation[, 1:4], 2)
+tabla(data.frame(Variable = rownames(L), CP1 = L[, 1], CP2 = L[, 2], CP3 = L[, 3], CP4 = L[, 4]), align = "lrrrr", caption = "Cargas de cada variable (el signo de cada componente es arbitrario)")
+```
+
+**Cómo se lee.** CP1 tiene los siete atributos sensoriales con cargas negativas casi iguales: **un score de CP1 más bajo significa mayor calidad sensorial** (por eso la aplicación usa `100 − percentil de CP1` como «posición en calidad»). CP2 tiene la altitud con carga −0,98: un CP2 más bajo es mayor altitud.
+
+## Rango de los controles
+
+Los deslizadores van del mínimo al máximo **observado** en los 970 lotes, para no pedir valores que ningún lote real tiene.
+
+```{r rangos}
+rg <- t(sapply(vars_8, function(v) { x <- datos_full[[v]]; c(floor(min(x) * 10) / 10, round(median(x), 1), ceiling(max(x) * 10) / 10) }))
+tabla(data.frame(Variable = vars_8, Mínimo = rg[, 1], `Valor inicial (mediana)` = rg[, 2], Máximo = rg[, 3], check.names = FALSE), align = "lrrr", caption = "Rango de cada control")
+```
+
+Por eso, por ejemplo, el máximo de Aroma es `r fm(rg["Aroma", 3], 1)`: **no se puede escribir 9**, porque ningún lote lo alcanza.
+
+# Cómo se lee el resultado
+
+- **Score y percentil.** Cada componente muestra el valor del lote y su percentil entre los 970 lotes (p50 = el lote típico).
+- **Etiqueta de calidad.** Se calcula con la posición en CP1: **Alta** si el lote supera al 75 % o más de los lotes de referencia, **Media** entre 25 % y 75 %, **Baja** por debajo de 25 %.
+- **Altitud (CP2).** Si el score de CP2 es menor que −0,8 se describe como altitud relativamente alta; mayor que +0,8, baja; entre ambos, cercana al centro.
+- **Contraste (CP3).** Si el score de CP3 es mayor que +0,8, pesan más Cuerpo y Balance; menor que −0,8, pesan más Aroma y Acidez; entre ambos, perfil intermedio.
+
+> Los umbrales de 75 %, 25 % y ±0,8 son **reglas orientativas de la aplicación**, no resultados estadísticos. La etiqueta no es una certificación del CQI ni una probabilidad de calidad.
+
+# Ejemplo de demostración
+
+```{r demo}
+alto <- c(Aroma = 8.5, Sabor = 8.5, Retrogusto = 8.3, Acidez = 8.4, Cuerpo = 8.4, Balance = 8.4, Puntaje.Catador = 8.5, Altitud = 1500)
+bajo_aroma <- alto; bajo_aroma["Aroma"] <- 7.5
+r1 <- proyectar(alto); r2 <- proyectar(bajo_aroma)
+tabla(data.frame(
+  Caso = c("Perfil alto (Aroma 8,5)", "Mismo perfil con Aroma 7,5"),
+  CP1 = round(c(r1$scores[1], r2$scores[1]), 2),
+  `Posición en calidad (percentil)` = round(c(r1$pct_cal, r2$pct_cal)),
+  `Etiqueta` = c(r1$etiqueta, r2$etiqueta), check.names = FALSE),
+  align = "lrrl", caption = "Perfil alto y efecto de bajar solo el aroma")
+```
+
+**Cómo se lee.** Se ingresa un perfil alto (Aroma 8,5 · Sabor 8,5 · Retrogusto 8,3 · Acidez 8,4 · Cuerpo 8,4 · Balance 8,4 · Puntaje del catador 8,5 · Altitud 1.500 m) y la aplicación lo ubica en *`r r1$etiqueta`*. Luego se baja el aroma de 8,5 a 7,5, una caída grande para esa variable, y la etiqueta es *`r r2$etiqueta`*. Esto ocurre porque **CP1 es un promedio ponderado de los siete atributos**: una sola nota baja no saca al lote del rango alto mientras las demás siguen altas.
+
+# Limitaciones
+
+- La proyección **no valida grupos**: no asigna el lote a un grupo de K-means ni de HDBSCAN.
+- El percentil dice dónde queda el lote frente a la muestra de referencia; **no es una certificación** ni dice si el café es *Specialty*.
+- El modelo es el de los 970 lotes: si se cambia la matriz de referencia, hay que reiniciar la aplicación.
+- El control de altitud llega hasta 1 m porque la base incluye lotes con la altitud mal digitada (1, 12 o 13 m); son 4 de los 970.
+- Las etiquetas Alta, Media y Baja dependen de reglas de percentiles que elegimos nosotros.
+
+# Código fuente
+
+<details><summary>Ver el código completo de `app.R`</summary>
+
+```{r codigo, echo=FALSE, results="asis"}
+cat("<pre><code class='r'>", htmltools::htmlEscape(paste(readLines("app.R", encoding = "UTF-8", warn = FALSE), collapse = "\n")), "</code></pre>", sep = "")
+```
+
+</details>

@@ -492,7 +492,7 @@ server <- function(input, output, session) {
           div(class = "score-pct", paste0("p", round(pct), "°"))
         )
       }),
-      div(style = "font-size:11px; color:#aaa; margin-top:8px;",
+      div(style = "font-size:14px; color:#777; margin-top:8px;",
           "p = percentil dentro de los 970 lotes de referencia")
     )
   })
@@ -538,7 +538,7 @@ server <- function(input, output, session) {
       div(style = "font-size:15px; color:#444; margin-bottom:6px;",
           sprintf("Posición relativa en el eje CP1: por encima del %.0f%% de los lotes de referencia.",
                   pct_calidad)),
-      div(style = "font-size:11px; color:#888; margin-bottom:10px; line-height:1.4;",
+      div(style = "font-size:14px; color:#666; margin-bottom:10px; line-height:1.4;",
           "La etiqueta alta, media o baja es una regla orientativa de esta aplicación basada en percentiles; no es una certificación CQI ni una probabilidad de calidad."),
       div(class = "interp-item alt",
         div(class = "interp-pc", "CP2 · Altitud de cultivo"),
@@ -548,7 +548,7 @@ server <- function(input, output, session) {
         div(class = "interp-pc", "CP3 · Contraste entre atributos sensoriales"),
         div(class = "interp-val", pc3_txt)
       ),
-      div(style = "font-size:11px; color:#aaa; margin-top:10px; line-height:1.5;",
+      div(style = "font-size:14px; color:#777; margin-top:10px; line-height:1.5;",
         paste0("CP1 captura el ", var_exp[1], "% de la varianza total. ",
                "La lectura de los ejes depende de la orientación de las cargas almacenadas: CP1 resume los atributos sensoriales; CP2 está dominado por Altitud y CP3 contrapone principalmente Aroma/Acidez con Cuerpo/Balance. ",
                "Los umbrales de ±0,8 usados para describir CP2 y CP3 son reglas interpretativas de la interfaz.")

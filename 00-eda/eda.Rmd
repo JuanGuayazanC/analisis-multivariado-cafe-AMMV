@@ -17,6 +17,7 @@ output:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE,
                       fig.align = "center", fig.width = 8, fig.height = 6)
+fm <- function(x, d = 0) format(round(x, d), nsmall = d, decimal.mark = ",", big.mark = ".")
 ```
 
 ::: {.resumen}
@@ -110,6 +111,8 @@ mu <- colMeans(datos[, vars_continuas])
 round(mu, 3)
 ```
 
+**Cómo se lee.** Los siete puntajes sensoriales principales promedian entre `r fm(min(mu[c('Aroma','Sabor','Retrogusto','Acidez','Cuerpo','Balance','Puntaje.Catador')]), 2)` y `r fm(max(mu[c('Aroma','Sabor','Retrogusto','Acidez','Cuerpo','Balance','Puntaje.Catador')]), 2)` (en una escala de 0 a 10): casi todos los lotes puntúan alto. La altitud promedia `r fm(mu['Altitud'])` m, una escala completamente distinta, lo que anticipa la necesidad de estandarizar.
+
 ## 2.2. Matriz de varianzas y covarianzas (S)
 
 La diagonal de S contiene las varianzas de cada variable y los elementos fuera de la diagonal contienen las covarianzas por pares. La traza suma las varianzas individuales; el determinante se presenta como medida de variación generalizada de la matriz.
@@ -120,6 +123,8 @@ round(S, 3)
 cat("\nVarianza total (traza de S):", round(sum(diag(S)), 2), "\n")
 cat("Varianza generalizada (det S):", formatC(det(S), format="e", digits=3), "\n")
 ```
+
+**Cómo se lee.** La varianza de la altitud (`r fm(S["Altitud", "Altitud"])`) representa el `r fm(100 * S["Altitud", "Altitud"] / sum(diag(S)), 2)` % de la varianza total, mientras que cada puntaje sensorial varía unas décimas. La varianza total depende de las unidades: por eso un análisis sobre estas escalas lo dominaría la altitud, y por eso se usa la matriz de correlaciones.
 
 ## 2.3. Matriz de correlaciones (R)
 
@@ -136,6 +141,16 @@ corrplot(R, method="color", type="upper", order="hclust",
          mar=c(0,0,2,0))
 ```
 
+```{r datos-texto, include=FALSE}
+Ru <- R; Ru[lower.tri(Ru, diag = TRUE)] <- NA
+w_max <- which(Ru == max(Ru, na.rm = TRUE), arr.ind = TRUE)[1, ]
+w_min <- which(Ru == min(Ru, na.rm = TRUE), arr.ind = TRUE)[1, ]
+sens <- c("Aroma","Sabor","Retrogusto","Acidez","Cuerpo","Balance","Puntaje.Catador")
+Rs <- R[sens, sens]; rango_sens <- range(Rs[upper.tri(Rs)])
+```
+
+**Cómo se lee.** Los puntajes sensoriales (Aroma, Sabor, Retrogusto, Acidez, Cuerpo, Balance y Puntaje del catador) están correlacionados positivamente entre sí, con valores de `r fm(rango_sens[1], 2)` a `r fm(rango_sens[2], 2)`: un lote bueno en una dimensión tiende a serlo en las demás. La correlación más alta de todo el conjunto es `r fm(max(Ru, na.rm = TRUE), 2)` (`r rownames(R)[w_max[1]]` y `r colnames(R)[w_max[2]]`) y la más baja es `r fm(min(Ru, na.rm = TRUE), 2)` (`r rownames(R)[w_min[1]]` y `r colnames(R)[w_min[2]]`). Esta redundancia es lo que hace útil resumir con componentes principales. Correlación no implica causalidad.
+
 ## 2.4. Varianza generalizada y varianza total
 
 Esta subsección vuelve a presentar la traza, el determinante y la varianza media para resumir la dispersión conjunta de las 11 variables.
@@ -145,6 +160,8 @@ cat("Varianza total       (traza S):", round(sum(diag(S)), 2), "\n")
 cat("Varianza generalizada (det S): ", formatC(det(S), format="e", digits=3), "\n")
 cat("Varianza media                :", round(sum(diag(S))/ncol(S), 4), "\n")
 ```
+
+**Cómo se lee.** La varianza generalizada (det S) es un número muy pequeño: indica que, por la fuerte correlación entre variables, los datos ocupan un «volumen» reducido en el espacio de 11 dimensiones. Es otra señal de redundancia entre variables.
 
 ---
 
@@ -169,6 +186,8 @@ datos[, vars_continuas] %>%
   theme(panel.grid.minor=element_blank())
 ```
 
+**Cómo se lee.** Cada caja resume una variable: la línea central es la mediana y los puntos son valores atípicos según el criterio clásico. Los puntajes sensoriales muestran cajas muy angostas cerca de 7–8 y una cola de puntos hacia abajo: la mayoría de los lotes puntúa alto y unos pocos lotes quedan muy por debajo. Como cada variable conserva su escala original, la altitud y los conteos de defectos se ven en otra magnitud y no son comparables a simple vista.
+
 ## 3.2. Matriz de dispersión (pares)
 
 La matriz de pares se construye con las primeras seis variables del conjunto de 11. La diagonal muestra distribuciones, el triángulo inferior muestra nubes de puntos y el superior resume correlaciones. Es una vista parcial para facilitar la lectura, no una matriz gráfica de las 11 variables completas.
@@ -181,6 +200,8 @@ ggpairs(datos[, vars_continuas[1:6]],
         title="Matriz de dispersión — primeras 6 variables") +
   theme_minimal(base_size=10)
 ```
+
+**Cómo se lee.** Las nubes de puntos de los pares muestran la asociación lineal entre variables (más estrecha cuanto mayor la correlación) y las densidades de la diagonal muestran la forma de cada variable. Los números del triángulo superior son las correlaciones de la sección 2.3.
 
 ---
 
@@ -237,6 +258,8 @@ data.frame(id=seq_along(dm2), dm2=dm2) %>%
   theme_minimal() + theme(panel.grid.minor=element_blank())
 ```
 
+**Cómo se lee.** Con 11 variables el umbral es `r fm(umbral, 2)` y se marcan `r n_atipicos` lotes (`r fm(100 * n_atipicos / nrow(datos), 1)` %). Esta cifra **no es la del PCA final**: allí se usan 8 variables (umbral 17,53) y se retiran 100 lotes de 1.070. Los puntos rojos por encima de la línea punteada son los candidatos a atípicos; los que están muy por encima del umbral son combinaciones de puntajes realmente extrañas.
+
 ## 4.3. Comparación de distancias
 
 El código compara la norma euclídea de cada fila estandarizada respecto al origen con la raíz de la distancia de Mahalanobis. **No calcula aquí todas las distancias euclídeas entre pares de lotes**: la matriz de distancias por pares se ilustra con la muestra de 10 observaciones de la subsección 4.1.
@@ -251,6 +274,15 @@ cat("Correlación euclídea-estandarizada vs Mahalanobis:",
     round(cor(d_std, sqrt(dm2)), 4), "\n")
 cat("(Si correlación < 1: Mahalanobis detecta estructura de covarianza adicional)\n")
 ```
+
+**Cómo se lee.** La correlación entre ambas distancias es `r fm(cor(d_std, sqrt(dm2)), 2)`. Con ese valor, las dos ordenan de forma parecida, pero no idéntica, a los lotes más alejados del centro; la diferencia es la estructura de covarianza que solo Mahalanobis incorpora (un lote puede ser raro por una combinación de variables aunque cada una sea normal por separado).
+
+# Conclusiones
+
+1. **Escalas distintas:** la altitud domina la varianza total; antes de cualquier análisis multivariado hay que estandarizar.
+2. **Redundancia:** los siete puntajes sensoriales están fuertemente correlacionados entre sí, lo que justifica resumirlos con pocas dimensiones.
+3. **Asimetría y extremos:** la mayoría de los lotes puntúa alto y unos pocos quedan muy por debajo; esos lotes generan los «atípicos» del boxplot clásico.
+4. **Atípicos multivariados:** la distancia de Mahalanobis marca `r n_atipicos` lotes con las 11 variables; es solo un diagnóstico del EDA. La depuración que se usa en el PCA está en [depuración](../01-pca/depuracion.html).
 
 
 # Anexo: EDA complementario de las 14 variables cuantitativas

@@ -14,18 +14,39 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, fig.align = "center")
+suppressMessages({ library(knitr); library(ggplot2) })
+options(knitr.kable.NA = "—")
+tabla <- function(x, ...) kable(x, format.args = list(decimal.mark = ",", big.mark = "."), row.names = FALSE, ...)
+fm <- function(x, d = 0) format(round(x, d), nsmall = d, decimal.mark = ",", big.mark = ".")
 ```
 
 ::: {.resumen}
 **En resumen.** Se parte de 1.070 lotes. Con la distancia de Mahalanobis correcta (umbral χ² al 97,5 %, 8 g.l. = 17,53) se marcan 100 atípicos multivariados (9,3 %) y quedan 970. Con esos 970 lotes ninguna variable supera |asimetría| > 1, así que el PCA final solo estandariza. Un error de cálculo anterior marcaba 404 lotes; la cifra correcta es 100.
 :::
 
-> Este documento reúne la cadena de depuración que usan todos los análisis de PCA y métodos posteriores. Para el resultado final del PCA ver `pca_final.Rmd`.
+# Qué responde este informe
 
+**Pregunta:** ¿qué lotes hay que retirar antes del PCA para que unos pocos casos extremos no dominen las componentes, y en qué orden se prepara cada variable?
+
+Este documento reúne la cadena de depuración que usan los análisis de PCA y los métodos posteriores. El resultado final del PCA está en [pca_final](pca_final.html).
+
+| Paso | Qué se hace | Resultado |
+|---|---|---|
+| 1 | Base de 1.070 lotes, Yeo-Johnson solo donde hay asimetría y estandarización | Matriz de partida |
+| 2 | Distancia de Mahalanobis sobre la base | Qué lotes son atípicos multivariados |
+| 3 | Una sola pasada del filtro y comprobación del cálculo | 970 lotes |
+| 4 | Matriz final guardada | `datos/datos_final_970.rds` |
 
 # 1. Base de 1.070 lotes y transformación Yeo-Johnson selectiva
 
-Filtro original (altitud entre 0 y 3.000 m, sin NA), 8 variables, Yeo-Johnson solo en las variables con |asimetría| > 1, y estandarización. Se guardan `base_1070.rds` y `base_sin_atipicos.rds` en `datos/`.
+**Qué hacemos y por qué.** Se aplica el filtro original (altitud entre 0 y 3.000 m y registros completos) y se eligen 8 variables: siete atributos sensoriales y la altitud. El **orden** de las operaciones importa:
+
+1. Medir la asimetría de cada variable.
+2. Transformar con Yeo-Johnson **solo** las que superan |asimetría| > 1.
+3. Estandarizar (centrar en 0 y dividir entre la desviación estándar).
+4. Recién entonces medir qué lotes son atípicos.
+
+Si se estandarizara antes de transformar, los parámetros de la transformación quedarían calculados sobre datos ya centrados y la corrección de asimetría perdería sentido.
 
 ```{r 1-cadena}
 # Preprocesamiento común para todos los métodos.
@@ -63,13 +84,20 @@ psin <- preprocess(X8[keep, ])
 
 saveRDS(p1070, "../datos/base_1070.rds")
 saveRDS(psin, "../datos/base_sin_atipicos.rds")
-cat("1070:", nrow(p1070$Z), " YJ:", p1070$yj, "\n")
-cat("sin atipicos:", nrow(psin$Z), " eliminados:", sum(!keep), " YJ:", psin$yj, "\n")
+
+res1 <- data.frame(
+  Base = c("1.070 lotes (antes de retirar atípicos)", "970 lotes (después de retirar atípicos)"),
+  Lotes = c(nrow(p1070$Z), nrow(psin$Z)),
+  `Variables con Yeo-Johnson` = c(paste(p1070$yj, collapse = ", "), if (length(psin$yj)) paste(psin$yj, collapse = ", ") else "ninguna"),
+  check.names = FALSE)
+tabla(res1, align = "lrl", caption = "Qué se transformó en cada base")
 ```
+
+**Cómo se lee.** En la base de 1.070 lotes, los siete atributos sensoriales tienen asimetría muy negativa (por debajo de −1), así que se transforman con Yeo-Johnson. Una vez retirados los atípicos (sección 3), la misma regla aplicada a los 970 lotes **no marca ninguna variable**: la asimetría que había era causada por esos pocos lotes extremos.
 
 # 2. Distancia de Mahalanobis en la base de 1.070
 
-Umbral χ² al 97,5 % con 8 grados de libertad. Las figuras de este documento se guardan en `figuras/proceso/`.
+**Qué hacemos y por qué.** La distancia de Mahalanobis mide qué tan raro es un lote **considerando todas las variables a la vez y sus correlaciones**: un lote puede tener cada puntaje no muy extremo y aun así ser una combinación improbable. Se compara con el cuantil 97,5 % de una χ² con 8 grados de libertad (una por variable): si los datos fueran normales, solo el 2,5 % de los lotes superaría ese umbral.
 
 ```{r 2-cadena}
 suppressMessages(library(ggplot2))
@@ -80,16 +108,20 @@ g <- ggplot(df, aes(l, fill = out)) + geom_histogram(bins = 45, color = "white")
   geom_vline(xintercept = log10(lim), color = "#c0392b", linewidth = 1) +
   scale_fill_manual(values = c("FALSE" = "#9fc3e6", "TRUE" = "#c0392b"), labels = c("Dentro", "Fuera del umbral")) +
   labs(title = "Distancia de Mahalanobis (escala log)", subtitle = sprintf("Umbral χ² 97,5 %% (8 g.l.) = %.1f · %d lotes fuera", lim, sum(df$out)), x = "log10(d²)", y = "Lotes", fill = NULL) +
-  theme_minimal(base_size = 13) + theme(panel.grid.minor = element_blank(), plot.background = element_rect(fill = NA, color = NA), panel.background = element_rect(fill = NA, color = NA), legend.position = "bottom")
+  theme_minimal(base_size = 15) + theme(panel.grid.minor = element_blank(), plot.background = element_rect(fill = NA, color = NA), panel.background = element_rect(fill = NA, color = NA), legend.position = "bottom")
 ggsave("figuras/proceso/1070_mahalanobis.png", g, width = 8, height = 6.5, dpi = 200, bg = "transparent")
-cat("ok\n")
+g
 ```
+
+**Cómo se lee.** La línea roja es el umbral (`r fm(lim, 2)`). Los lotes a su derecha (en rojo) son los atípicos multivariados: **`r sum(df$out)`** de 1.070, es decir, `r fm(100 * mean(df$out), 1)` %. Se usa escala logarítmica porque las distancias de los lotes más extraños son muchísimo mayores que las del resto.
 
 # 3. Cadena de depuración: 1.070 → 970 (una sola pasada)
 
-> **Corrección (revisión de Diego).** La versión anterior calculaba la distancia como `rowSums((pre$x / pre$sdev)^2)`. En R, dividir una matriz entre un vector recicla el vector **por filas**, no por columnas: cada score quedaba dividido entre la desviación de una componente que no le correspondía. Por eso salían 404 "atípicos" en vez de 100, y la cadena terminaba en 666 y luego en 627 lotes. Lo correcto es dividir cada columna de scores entre su propia desviación con `sweep(pre$x, 2, pre$sdev, "/")`. Con todas las componentes, esa suma es exactamente la distancia de Mahalanobis sobre la matriz estandarizada, la misma de la sección 1.
->
-> El filtro se aplica **una sola vez**. Al quitar los extremos la nube se encoge y otros lotes pasan a parecer lejanos; repetir el filtro seguiría quitando lotes en cada vuelta. Abajo se muestra cuántos marcaría una segunda pasada solo como referencia; no se retiran.
+> **Corrección (revisión de Diego).** La versión anterior calculaba la distancia como `rowSums((pre$x / pre$sdev)^2)`. En R, dividir una matriz entre un vector recicla el vector **por filas**, no por columnas: cada score quedaba dividido entre la desviación de una componente que no le correspondía. Por eso salían 404 «atípicos» en vez de 100, y la cadena terminaba en 666 y luego en 627 lotes. Lo correcto es dividir cada columna de scores entre su propia desviación con `sweep(pre$x, 2, pre$sdev, "/")`. Con todas las componentes, esa suma es exactamente la distancia de Mahalanobis sobre la matriz estandarizada, la misma de la sección 2.
+
+**Qué hacemos y por qué.** Se ajusta un PCA preliminar sobre los 1.070 lotes y se calcula la distancia de cada lote sobre sus scores. Hacemos tres comprobaciones: (a) que la distancia correcta coincide con `mahalanobis()`, (b) cuántos lotes marcaba el cálculo erróneo anterior, y (c) cuántos marcaría una segunda pasada.
+
+El filtro se aplica **una sola vez**. Al quitar los extremos la nube se encoge y otros lotes pasan a parecer lejanos; repetir el filtro seguiría quitando lotes en cada vuelta sin terminar.
 
 ```{r 3-cadena}
 suppressMessages(library(ggplot2))
@@ -101,36 +133,56 @@ lim <- qchisq(0.975, 8)
 # Distancia correcta: cada columna de scores entre su propia desviación
 dm2_pre <- rowSums(sweep(pre$x, 2, pre$sdev, "/")^2)
 out1 <- dm2_pre > lim
-cat("PCA preliminar (1070): varianza", round(summary(pre)$importance[2, 1:3] * 100, 1), " atipicos:", sum(out1), " quedan:", sum(!out1), "\n")
 
-# Comprobación: coincide con la distancia de Mahalanobis de la sección 1
+# Comprobación: coincide con la distancia de Mahalanobis de la sección 2
 md_ref <- mahalanobis(b$Z, colMeans(b$Z), cov(b$Z))
-cat("Máxima diferencia con mahalanobis():", signif(max(abs(dm2_pre - md_ref)), 3), "\n")
+dif_max <- max(abs(dm2_pre - md_ref))
 
 # Lo que daba el código anterior (reciclaje por filas), solo para documentar el error
 dm2_mal <- rowSums((pre$x / pre$sdev)^2)
-cat("Código anterior: marcaba", sum(dm2_mal > lim), "lotes (error de reciclaje)\n")
 
 # PCA sobre los 970 lotes (λ y estandarización re-estimados sobre el subconjunto)
 psin <- readRDS("../datos/base_sin_atipicos.rds")
 stopifnot(nrow(psin$Z) == sum(!out1))
 pf <- prcomp(psin$Z, center = TRUE, scale. = TRUE)
-cat("PCA final (", nrow(psin$Z), " lotes): varianza", round(summary(pf)$importance[2, 1:3] * 100, 1), "\n")
 
 # Solo referencia: una segunda pasada sobre los 970 (no se aplica)
 md_2a <- mahalanobis(psin$Z, colMeans(psin$Z), cov(psin$Z))
-cat("Referencia: una segunda pasada marcaría", sum(md_2a > lim), "lotes más (no se retiran)\n")
 
-th <- theme_minimal(base_size = 13) + theme(panel.grid.minor = element_blank(), plot.background = element_rect(fill = NA, color = NA), panel.background = element_rect(fill = NA, color = NA), legend.position = "bottom")
-ggsave("figuras/proceso/paso1_mahalanobis_pca_prelim.png", ggplot(data.frame(l = log10(dm2_pre), out = out1), aes(l, fill = out)) + geom_histogram(bins = 45, color = "white") +
+comprob <- data.frame(
+  Comprobación = c("Lotes marcados con el cálculo correcto (sweep)",
+                   "Máxima diferencia con mahalanobis() de la sección 2",
+                   "Lotes marcados con el código anterior (error de reciclaje)",
+                   "Lotes que quedan tras la única pasada",
+                   "Lotes que marcaría una segunda pasada (no se retiran)"),
+  Valor = c(as.character(sum(out1)), format(signif(dif_max, 3), scientific = TRUE), as.character(sum(dm2_mal > lim)),
+            as.character(sum(!out1)), as.character(sum(md_2a > lim))))
+tabla(comprob, align = "lr", caption = "Comprobaciones de la depuración")
+
+varianza <- data.frame(
+  Modelo = c("PCA preliminar (1.070 lotes)", "PCA final (970 lotes)"),
+  CP1 = round(summary(pre)$importance[2, 1] * 100, 1), CP2 = round(summary(pre)$importance[2, 2] * 100, 1), CP3 = round(summary(pre)$importance[2, 3] * 100, 1))
+varianza[2, 2:4] <- round(summary(pf)$importance[2, 1:3] * 100, 1)
+tabla(setNames(varianza, c("Modelo", "CP1 (%)", "CP2 (%)", "CP3 (%)")), align = "lrrr", caption = "Varianza explicada antes y después de retirar los atípicos")
+
+th <- theme_minimal(base_size = 15) + theme(panel.grid.minor = element_blank(), plot.background = element_rect(fill = NA, color = NA), panel.background = element_rect(fill = NA, color = NA), legend.position = "bottom")
+g3 <- ggplot(data.frame(l = log10(dm2_pre), out = out1), aes(l, fill = out)) + geom_histogram(bins = 45, color = "white") +
   geom_vline(xintercept = log10(lim), color = "#c0392b", linewidth = 1) + scale_fill_manual(values = c("FALSE" = "#9fc3e6", "TRUE" = "#c0392b"), labels = c("Dentro", "Fuera")) +
-  labs(title = "Distancia de Mahalanobis sobre los scores del PCA preliminar", subtitle = sprintf("%d lotes fuera del umbral χ² (8 g.l.) = %.1f", sum(out1), lim), x = "log10(d²)", y = "Lotes", fill = NULL) + th,
-  width = 8, height = 6.5, dpi = 200, bg = "transparent")
+  labs(title = "Distancia de Mahalanobis sobre los scores del PCA preliminar", subtitle = sprintf("%d lotes fuera del umbral χ² (8 g.l.) = %.1f", sum(out1), lim), x = "log10(d²)", y = "Lotes", fill = NULL) + th
+ggsave("figuras/proceso/paso1_mahalanobis_pca_prelim.png", g3, width = 8, height = 6.5, dpi = 200, bg = "transparent")
+g3
 ```
 
-# 4. Matriz final de 970 lotes (`datos/datos_final_970.rds`)
+**Cómo se lee.**
 
-Se guarda con la estructura que leen `pca_final.Rmd`, `figuras_pca.Rmd`, `metodos_exploratorios.Rmd` y la app de Shiny. Estos documentos y la aplicación ya trabajan sobre los 970 lotes; los archivos `datos_final_666.rds` y `datos_final_627.rds` de versiones anteriores se eliminaron porque provenían del error de Mahalanobis descrito arriba.
+- La distancia calculada con `sweep` coincide con `mahalanobis()` (diferencia del orden de 10⁻¹³, solo error numérico): el cálculo es correcto.
+- El cálculo anterior marcaba **`r sum(dm2_mal > lim)`** lotes por el error de reciclaje; el correcto marca **`r sum(out1)`**.
+- Una segunda pasada marcaría `r sum(md_2a > lim)` lotes más (por azar se esperarían unos 24). No se retiran, por la razón explicada arriba.
+- El PCA preliminar con los 1.070 lotes y el final con los 970 dan porcentajes de varianza explicada parecidos; la diferencia es que el segundo ya no está dominado por los casos extremos y no necesita transformaciones.
+
+# 4. Matriz final de 970 lotes
+
+**Qué hacemos.** Se guarda la matriz final en `datos/datos_final_970.rds`, con la estructura que leen [pca_final](pca_final.html), [figuras_pca](figuras_pca.html), los métodos exploratorios y la app de Shiny: datos limpios, variables transformadas (ninguna), índices de los atípicos y datos originales. Los archivos `datos_final_666.rds` y `datos_final_627.rds` de versiones anteriores se eliminaron porque provenían del error de Mahalanobis descrito arriba.
 
 ```{r final970}
 psin <- readRDS("../datos/base_sin_atipicos.rds")
@@ -143,7 +195,16 @@ saveRDS(list(datos_limpio = psin$trans,
              idx_atipicos = idx_atipicos,
              datos_originales = psin$raw),
         "../datos/datos_final_970.rds")
-cat("Lotes retirados:", length(idx_atipicos), "de", nrow(p1070$Z), "\n")
-cat("Matriz final:", nrow(psin$trans), "x", ncol(psin$trans), "\n")
-cat("Variables transformadas (YJ):", psin$yj, "\n")
+tabla(data.frame(Elemento = c("Lotes retirados", "Matriz final (lotes × variables)", "Variables transformadas con Yeo-Johnson"),
+                 Valor = c(sprintf("%d de %d", length(idx_atipicos), nrow(p1070$Z)),
+                           sprintf("%d × %d", nrow(psin$trans), ncol(psin$trans)),
+                           if (length(psin$yj)) paste(psin$yj, collapse = ", ") else "ninguna")),
+      align = "lr", caption = "Contenido de la matriz final")
 ```
+
+# Conclusiones
+
+1. Se retiran **100 lotes atípicos multivariados** (9,3 % de 1.070) con una sola pasada de Mahalanobis; quedan **970**.
+2. Con los 970 lotes ninguna variable supera |asimetría| 1: **el PCA final solo estandariza**.
+3. El error de reciclaje que daba 404 atípicos (y matrices de 666 y 627 lotes) está corregido y documentado.
+4. Es una limitación declarada que una segunda pasada marcaría más lotes: se decidió no repetir el filtro.

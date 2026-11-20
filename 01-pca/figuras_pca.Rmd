@@ -15,11 +15,29 @@ output:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, fig.align = "center")
 dir.create("figuras/secuencia", showWarnings = FALSE, recursive = TRUE)
+suppressMessages(library(knitr))
+options(knitr.kable.NA = "—")
+tabla <- function(x, ...) kable(x, format.args = list(decimal.mark = ",", big.mark = "."), row.names = FALSE, ...)
+fm <- function(x, d = 0) format(round(x, d), nsmall = d, decimal.mark = ",", big.mark = ".")
 ```
 
 ::: {.resumen}
 **En resumen.** Las figuras muestran, en orden, cómo se pasa de 1.070 a 970 lotes: PCA con los atípicos marcados, diagnósticos de la base (cajas ajustadas, ceros, asimetría, varianzas), distancias de Mahalanobis y la comprobación exploratoria de humedad = 0.
 :::
+
+# Qué responde este informe
+
+**Pregunta:** ¿cómo se ve, paso a paso, la depuración de 1.070 a 970 lotes y qué muestran los diagnósticos descriptivos de la base?
+
+Cada sección presenta: *qué se dibuja y por qué*, *la figura* y *cómo se lee*.
+
+| Sección | Figuras | Mensaje principal |
+|---|---|---|
+| 1 | PCA con atípicos marcados; mapa de cargas | Los atípicos están en los extremos; CP1 = calidad |
+| 2 | Cajas ajustadas, ceros y máximos, asimetría, covarianzas | La asimetría desaparece al retirar los atípicos |
+| 3 | Mahalanobis, correlaciones, biplot | Dos caminos de cálculo dan los mismos atípicos |
+| 4 | Varianzas y correlaciones de los 970 lotes | Los siete atributos están muy correlacionados |
+| 5 | Humedad = 0 y sus vecinos | Comprobación exploratoria; la causa sigue sin confirmar |
 
 > Este documento dibuja la secuencia de figuras de la cadena de depuración **1.070 → 970 lotes**. La cadena y las bases se construyen en [depuracion.Rmd](depuracion.Rmd) (`base_1070.rds`, `base_sin_atipicos.rds` y `datos_final_970.rds`); el PCA final se desarrolla en [pca_final.Rmd](pca_final.Rmd).
 
@@ -30,6 +48,8 @@ El PCA preliminar se ajusta sobre los 1.070 lotes y se marcan como atípicos mul
 La figura final de esta sección es el mapa de calor de las cargas de CP1–CP3 del PCA sobre los 970 lotes. Para la varianza explicada, los scores y el biplot del modelo definitivo se utiliza [PCA final](pca_final.Rmd).
 
 Las figuras de esta sección se guardan en `figuras/secuencia/`.
+
+**Qué se dibuja y por qué.** Primero, los lotes en el plano de las dos primeras componentes del PCA preliminar, con los atípicos en rojo: permite ver *dónde* están los lotes que se retiran. Después, el mapa de calor de las cargas del PCA final: permite ver cuánto pesa cada variable en cada componente.
 
 ```{r fig1}
 # Figuras de la secuencia de depuración, en el orden en que se presentan:
@@ -70,9 +90,16 @@ g4 <- ggplot(L, aes(Componente, Variable, fill = Carga)) + geom_tile(color = "wh
   scale_fill_gradient2(low = "#2166ac", mid = "white", high = "#b2182b", limits = c(-1, 1)) +
   labs(title = "Cargas de CP1, CP2 y CP3 (970 lotes)", x = NULL, y = NULL) + theme_minimal(base_size = 14)
 ggsave("figuras/secuencia/seq4_cargas_mapa.png", g4, width = 6.5, height = 6, dpi = 200)
-cat("n1070", length(out1), "atipicos", sum(out1), "final", nrow(F970), "\n")
-
+g1
 ```
+
+**Cómo se lee la primera figura.** Cada punto es un lote. Los `r sum(out1)` lotes rojos son los que superan el umbral de Mahalanobis; el núcleo azul (`r nrow(F970)` lotes) conserva la estructura principal de la nube.
+
+```{r fig1b, fig.width=6.5, fig.height=6}
+g4
+```
+
+**Cómo se lee el mapa de cargas.** Rojo es carga positiva y azul negativa; cuanto más intenso, más pesa la variable. **CP1** tiene los siete atributos sensoriales en el mismo tono (casi el mismo peso): resume la calidad general. **CP2** es casi solo la altitud. **CP3** contrasta aroma con cuerpo. (El signo global de cada columna es arbitrario.)
 
 # 2. Diagnósticos descriptivos de la base y de la matriz final
 
@@ -157,9 +184,39 @@ dev.off()
 
 ```
 
+```{r fig2-cajas, fig.cap="Cajas ajustadas por medcouple para las 14 variables originales (1.070 lotes)."}
+include_graphics(out("01_cajas_ajustadas_14.png"))
+```
+
+**Cajas ajustadas.** Cada variable se dibuja con su propia escala, usando la caja ajustada de Hubert y Vandervieren, que no castiga a las variables asimétricas. Sirve para ver qué variables tienen colas largas o valores extremos antes de decidir cómo tratarlas.
+
+```{r fig2-ceros, fig.cap="Izquierda: humedad; derecha: porcentaje de lotes con puntaje 10."}
+include_graphics(out("02_ceros_y_maximos.png"))
+```
+
+**Ceros y máximos.** Hay `r sum(datos14$Moisture == 0)` lotes con humedad igual a 0, un valor poco verosímil para café en grano; la fuente no explica la causa, así que se trata como anomalía observada. Además, `Sweetness`, `Uniformity` y `Clean.Cup` tienen una fracción alta de lotes en el máximo (10): `r fm(100 * mean(datos14$Sweetness == 10))` %, `r fm(100 * mean(datos14$Uniformity == 10))` % y `r fm(100 * mean(datos14$Clean.Cup == 10))` % respectivamente. Casi no varían y aportan poca información. Por eso estas seis variables (con los dos conteos de defectos) quedan fuera del PCA.
+
+```{r fig2-asim, fig.cap="Asimetría de las 8 variables: izquierda, 1.070 lotes; derecha, 970 lotes finales. Rojo: |asimetría| > 1."}
+include_graphics(out("03_asimetria_1070_vs_970.png"))
+```
+
+**Asimetría.** En los 1.070 lotes, `r sum(abs(sk_pre) > 1)` variables (rojo) superan |asimetría| 1: la cola larga de lotes muy bajos las vuelve muy asimétricas. En los 970 lotes finales la superan `r sum(abs(sk_post) > 1)`, de modo que no hace falta transformar.
+
+```{r fig2-cov, fig.cap="Matriz de covarianzas (izquierda) y de correlaciones (derecha) de los 970 lotes."}
+include_graphics(out("04_varianzas_covarianzas.png"))
+```
+
+```{r fig2-var, fig.cap="Varianza de cada variable, escala logarítmica."}
+include_graphics(out("05_varianza_por_variable.png"))
+```
+
+**Covarianzas y varianzas.** La altitud tiene una varianza de `r fm(diag(S)["Altitud"])` (escala de metros al cuadrado), más de un millón de veces mayor que la de los puntajes (`r fm(min(diag(S)), 2)` a `r fm(max(diag(S)[1:7]), 2)`). Si no se estandarizara, el PCA se limitaría a reproducir la altitud. Por eso se estandariza antes.
+
 # 3. Distancias de Mahalanobis en los 1.070 lotes
 
 Diagnóstico sobre la base inicial transformada y estandarizada (`base_1070.rds`; ninguna variable de esta base requiere más que la transformación selectiva ya guardada). La distancia se calcula directamente con `mahalanobis()`, y debe coincidir con la de la sección 1: es la misma distancia calculada por dos caminos.
+
+**Qué se dibuja y por qué.** El histograma de las distancias (en escala log) con el umbral en rojo, y el plano PC1–PC2 con los atípicos coloreados; después, las correlaciones con sus valores y un biplot de los 970 lotes. Sirve como comprobación independiente.
 
 ```{r fig2b}
 Z1070 <- readRDS("../datos/base_1070.rds")$Z
@@ -211,6 +268,22 @@ dev.off()
 
 ```
 
+```{r fig2b-maha, fig.cap="Izquierda: distancias de Mahalanobis (log). Derecha: PC1 vs PC2 con los atípicos en rojo."}
+include_graphics(out("06_mahalanobis.png"))
+```
+
+**Cómo se lee.** Se marcan `r sum(atip)` lotes, y la comprobación de arriba indica que `r if (identical(unname(which(atip)), unname(fin$idx_atipicos))) 'son exactamente los mismos' else 'NO son los mismos'` que retira la cadena de [depuración](depuracion.html): el resultado no depende del camino de cálculo.
+
+```{r fig2b-cor, fig.cap="Correlaciones de los 970 lotes (izquierda) y varianza de cada variable (derecha)."}
+include_graphics("figuras/secuencia/04b_correlacion_y_varianza.png")
+```
+
+```{r fig2b-bip, fig.cap="Biplot CP1 vs CP2 de los 970 lotes: puntos = lotes, flechas = variables."}
+include_graphics("figuras/secuencia/07_biplot_limpio.png")
+```
+
+**Correlaciones y biplot.** Los siete atributos sensoriales están fuertemente correlacionados entre sí, por eso apuntan en la misma dirección en el biplot y se resumen en una sola componente. La altitud casi no se correlaciona con ellos y forma su propio eje.
+
 # 4. Matriz original: varianzas y correlaciones de los 970 lotes
 
 Este bloque utiliza `datos_final_970.rds` y toma `datos_originales`: calcula covarianzas y correlaciones en la escala original de las ocho variables. Como el PCA final no aplica Yeo-Johnson, coincide con la matriz que alimenta el PCA antes de estandarizar. Es una descripción de la muestra final; no debe confundirse con las cargas ni con la varianza explicada del PCA.
@@ -233,6 +306,12 @@ dev.off()
 
 ```
 
+```{r fig3-mostrar, fig.cap="Correlaciones (izquierda) y varianza por variable (derecha), escala original de los 970 lotes."}
+include_graphics("figuras/secuencia/varianzas_970.png")
+```
+
+**Cómo se lee.** `tr(S)` es la varianza total (suma de varianzas) y `det(S)` la varianza generalizada. Las correlaciones entre los siete atributos sensoriales van de `r fm(min(Rc[1:7, 1:7][upper.tri(Rc[1:7, 1:7])]), 2)` a `r fm(max(Rc[1:7, 1:7][upper.tri(Rc[1:7, 1:7])]), 2)`: son variables muy redundantes, justo lo que el PCA aprovecha. Es una descripción de la muestra final y no debe confundirse con las cargas ni con la varianza explicada.
+
 # 5. Humedad = 0 y vecindades: comprobación exploratoria
 
 Este bloque compara la proporción de registros con `Moisture = 0` con la proporción observada entre sus 15 vecinos más cercanos en las matrices estandarizadas. La correspondencia entre las filas de `z0` (construida desde la base inicial de 1.070) y las filas de la base de 970 lotes se establece **explícitamente** con `idx_atipicos` de `datos_final_970.rds` (los 100 lotes retirados), y no depende de recalcular ningún umbral.
@@ -245,7 +324,7 @@ vars14 <- c("Aroma","Flavor","Aftertaste","Acidity","Body","Balance","Uniformity
 b <- d[!is.na(d$altitude_mean_meters) & d$altitude_mean_meters > 0 & d$altitude_mean_meters <= 3000, ]
 b <- b[complete.cases(b[, vars14]), ]
 z0 <- b$Moisture == 0
-cat("Humedad=0 en base:", sum(z0), "de", nrow(b), "=", round(mean(z0) * 100, 1), "%\n")
+res_hum <- data.frame()
 conservados <- setdiff(seq_len(nrow(b)), readRDS("../datos/datos_final_970.rds")$idx_atipicos)
 stopifnot(nrow(readRDS("../datos/base_sin_atipicos.rds")$Z) == length(conservados))
 for (base in c("../datos/base_1070.rds", "../datos/base_sin_atipicos.rds")) {
@@ -256,7 +335,13 @@ for (base in c("../datos/base_1070.rds", "../datos/base_sin_atipicos.rds")) {
   diag(D) <- Inf
   nb <- t(apply(D, 1, function(r) order(r)[1:15]))
   frac <- sapply(which(zz), function(i) mean(zz[nb[i, ]]))
-  cat(base, ": lotes con Humedad=0:", sum(zz), " vecinos (k=15) con Humedad=0 en promedio:", round(mean(frac) * 100, 1), "%  base:", round(mean(zz) * 100, 1), "%\n")
+  res_hum <- rbind(res_hum, data.frame(Base = if (base == "../datos/base_1070.rds") "1.070 lotes" else "970 lotes", `Lotes con humedad 0` = sum(zz), `% de la base` = round(mean(zz) * 100, 1), `% de vecinos con humedad 0` = round(mean(frac) * 100, 1), check.names = FALSE))
 }
+tabla(res_hum, align = "lrrr", caption = "Humedad = 0 y sus 15 vecinos más cercanos")
+```
+
+**Cómo se lee.** Si los ceros estuvieran repartidos al azar, entre los 15 vecinos de un lote con humedad 0 habría casi la misma proporción que en toda la base (columna «% de la base»). En los datos, entre los vecinos de un lote con humedad 0 la proporción es de `r fm(res_hum[1, 4], 1)` % (frente a `r fm(res_hum[1, 3], 1)` % en toda la base de 1.070) y de `r fm(res_hum[2, 4], 1)` % (frente a `r fm(res_hum[2, 3], 1)` %) en los 970 lotes. Es **apenas mayor**: los ceros se agrupan muy poco y están casi tan repartidos como si fueran al azar entre lotes parecidos. Eso no explica la causa: la fuente no dice que sean faltantes ni errores.
+
+```{r fig4-fin, include=FALSE}
 
 ```

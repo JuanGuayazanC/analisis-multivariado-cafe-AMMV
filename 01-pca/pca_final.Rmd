@@ -15,39 +15,41 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, fig.align = "center")
+suppressMessages({ library(ggplot2); library(robustbase); library(Rtsne); library(uwot); library(knitr) })
+set.seed(2026)
+out_txt <- character()
+add <- function(...) out_txt <<- c(out_txt, paste0(...))
+# Tablas con coma decimal
+options(knitr.kable.NA = "—")
+tabla <- function(x, ...) kable(x, format.args = list(decimal.mark = ",", big.mark = "."), row.names = FALSE, ...)
+# Formato en texto: coma decimal y punto de miles
+fm <- function(x, d = 0) format(round(x, d), nsmall = d, decimal.mark = ",", big.mark = ".")
 ```
 
 ::: {.resumen}
 **En resumen.** De 1.070 lotes se retiran 100 atípicos multivariados (9,3 %) y quedan 970. Con ellos, CP1 explica 69,3 % de la variación (calidad sensorial general), CP2 11,6 % (altitud) y juntas 80,9 % (IC bootstrap 79,3–82,5 %). La nube de lotes es continua: el PCA resume la calidad, no separa grupos.
 :::
 
-> **Qué contiene:** el PCA final oficial (970 lotes, 8 variables) con la cadena de depuración 1.070 → 970 (una sola pasada de Mahalanobis). Es el análisis que se muestra en la presentación y el que se usa en la demo. Las figuras de cada sección se guardan en `figuras/revision_profesor/`.
+# Qué responde este informe
 
-# Introducción y datos
+**Pregunta:** ¿se pueden resumir ocho medidas de un lote de café (siete atributos sensoriales y la altitud) en pocas dimensiones sin perder lo esencial, y qué tan confiable es ese resumen?
 
-Revisión del PCA según las recomendaciones de la sustentación, sobre la misma cadena de depuración (1.070 → 970). Contenido, en orden:
+**Cómo está organizado.** Cada sección sigue el mismo esquema: *qué hacemos y por qué*, *el resultado* (tabla o figura) y *cómo se lee*. El código está oculto; se despliega con el botón «Code» de cada bloque o el de la parte superior.
 
-1. Simetría de las variables y diagrama de cajas clásico frente a ajustado (robusto a la asimetría).
-2. Justificación de Yeo-Johnson solo en las variables con asimetría.
-3. Supuestos del PCA (centrado y atípicos).
-4. Gráfico del codo con intervalos de confianza bootstrap.
-5. Dispersión de los scores **antes** de las cargas; cargas de CP1–CP3 y biplot.
-6. t-SNE y UMAP exploratorios, coloreados por método de proceso.
+| Sección | Qué se hace | Qué se concluye |
+|---|---|---|
+| 1 | Datos y depuración 1.070 → 970 | 100 lotes atípicos retirados |
+| 2 | Simetría y tipo de diagrama de cajas | Caja robusta (MAD) para los atributos sensoriales |
+| 3 | Yeo-Johnson solo si hace falta | En los 970 lotes ninguna variable lo necesita |
+| 4 | Supuestos del PCA | Estandarizar es necesario; quedan atípicos leves |
+| 5 | Codo con intervalos de confianza | CP1 + CP2 = 80,9 % |
+| 6 | Dispersión de los lotes | Una sola nube continua |
+| 7 | Cargas y biplot | CP1 = calidad general; CP2 = altitud |
+| 8 | t-SNE y UMAP | Exploratorios: no revelan grupos |
 
-Salida: `figuras/revision_profesor/` y `resultados_revision_profesor.txt`.
+# 1. Datos y depuración: de 1.070 a 970 lotes
 
-# 1. Preparación de datos
-
-```{r sec1}
-
-suppressMessages({ library(ggplot2); library(robustbase); library(Rtsne); library(uwot) })
-set.seed(2026)
-out_txt <- character()
-add <- function(...) out_txt <<- c(out_txt, paste0(...))
-
-```
-
-# 2. Datos y cadena de depuración (idéntica a depuracion.Rmd)
+**Qué hacemos.** Partimos de la base limpia del Coffee Quality Institute, conservamos los lotes con altitud registrada y menor o igual a 3.000 m, y trabajamos con ocho variables: siete atributos sensoriales (Aroma, Sabor, Retrogusto, Acidez, Cuerpo, Balance y Puntaje del catador) y la altitud. Luego se retiran los atípicos multivariados con la distancia de Mahalanobis, **una sola vez**, con el umbral χ² al 97,5 % y 8 grados de libertad. La cadena completa está en [depuración](depuracion.html).
 
 ```{r sec2}
 d <- read.csv("../data/arabica_data_cleaned.csv")
@@ -74,9 +76,24 @@ meta970 <- meta[keep_idx, ]
 raw970 <- X8[keep_idx, ]
 add("n inicial 1070 = ", nrow(X8), "; atipicos (una pasada) = ", sum(out1), "; n final = ", nrow(F970))
 
+etapas <- data.frame(
+  Etapa = c("Base original del CQI", "Tras filtrar por altitud (0–3.000 m) y registros completos",
+            "Tras retirar atípicos multivariados (Mahalanobis, una pasada)"),
+  Lotes = c(nrow(d), nrow(X8), nrow(F970)),
+  Retirados = c(NA, nrow(d) - nrow(X8), sum(out1)))
+tabla(etapas, align = "lrr", caption = "Cadena de depuración")
 ```
 
-# 3. Simetría y diagrama de cajas (clásico vs ajustado)
+**Cómo se lee.** Se retiran `r nrow(d) - nrow(X8)` lotes por no tener altitud registrada o tener una mayor a 3.000 m, y luego `r sum(out1)` lotes (`r fm(100 * sum(out1) / nrow(X8), 1)` %) por tener combinaciones de puntajes muy poco habituales; quedan **`r nrow(F970)`**. El umbral de Mahalanobis es `r fm(lim, 2)`: si los datos fueran normales, solo el 2,5 % de los lotes lo superaría.
+
+> **Corrección de cálculo.** Una versión anterior dividía los scores entre la desviación equivocada (R recicla el vector por filas, no por columnas) y marcaba 404 lotes en lugar de 100. El detalle está en [depuración, sección 3](depuracion.html).
+
+# 2. Simetría y diagrama de cajas
+
+**Qué hacemos y por qué.** Un diagrama de cajas clásico marca como «atípico» todo lo que sale de 1,5 veces el rango intercuartílico, y eso presupone una distribución simétrica. Antes de decidir qué atípicos mirar, medimos la simetría con el **medcouple** (MC), una medida robusta que va de −1 a 1. La regla es:
+
+- si |MC| ≤ 0,1 la variable se trata como simétrica y se usa la caja **robusta** (mediana ± 3 MAD);
+- si |MC| > 0,1 se usa la caja **ajustada** de Hubert y Vandervieren, que corrige los bigotes por la asimetría.
 
 ```{r sec3}
 mc <- sapply(X8, function(x) mc(x))
@@ -94,23 +111,35 @@ write.csv(tab_sim, "figuras/revision_profesor/tabla_simetria_boxplot.csv", row.n
 add("\n== Simetria (medcouple) y tipo de diagrama de cajas ==")
 add(paste(capture.output(print(tab_sim, row.names = FALSE)), collapse = "\n"))
 
-png("figuras/revision_profesor/boxplot_clasico_vs_ajustado.png", width = 2000, height = 1100, res = 180)
-par(mfrow = c(2, 4), mar = c(4, 4, 3, 1))
-for (v in names(X8)) {
-  x <- X8[[v]]
-  boxplot(x, main = paste0(v, " (MC=", round(mc[v], 2), ")"), col = if (abs(mc[v]) > 0.1) "#f5cba7" else "#aed6f1", outcol = "#c0392b")
-  if (abs(mc[v]) > 0.1) {
-    st <- adjboxStats(x)$stats
-  } else {
-    st <- median(x) + c(-3, 3) * 1.4826 * mad(x)
+dibujar_cajas <- function() {
+  par(mfrow = c(2, 4), mar = c(4, 4, 3, 1), cex.main = 1.2)
+  for (v in names(X8)) {
+    x <- X8[[v]]
+    boxplot(x, main = paste0(v, " (MC=", round(mc[v], 2), ")"), col = if (abs(mc[v]) > 0.1) "#f5cba7" else "#aed6f1", outcol = "#c0392b")
+    if (abs(mc[v]) > 0.1) {
+      st <- adjboxStats(x)$stats
+    } else {
+      st <- median(x) + c(-3, 3) * 1.4826 * mad(x)
+    }
+    abline(h = st[c(1, length(st))], lty = 3, col = "#117a65")
   }
-  abline(h = st[c(1, length(st))], lty = 3, col = "#117a65")
 }
-dev.off()
+png("figuras/revision_profesor/boxplot_clasico_vs_ajustado.png", width = 2000, height = 1100, res = 180)
+dibujar_cajas(); invisible(dev.off())
 
+nombres_tab <- c("Variable", "Medcouple", "Asimetría clásica", "Caja usada", "Atípicos (caja clásica)", "Atípicos (caja usada)")
+tabla(setNames(tab_sim, nombres_tab), align = "lrrlrr", caption = "Simetría y tipo de caja (1.070 lotes)")
 ```
 
-# 4. Justificación de Yeo-Johnson
+```{r fig-cajas, fig.width=11, fig.height=6, fig.cap="Cajas por variable. Azul: caja robusta (simétrica); naranja: caja ajustada (asimétrica); puntos rojos: atípicos de la caja clásica; líneas verdes: límites usados."}
+dibujar_cajas()
+```
+
+**Cómo se lee.** Los siete atributos sensoriales tienen medcouple cercano a 0: el grueso de los lotes es simétrico y se usa la caja robusta. Aun así su asimetría clásica es muy negativa (de −3,8 a −8,2): la producen unos pocos lotes con puntajes extremadamente bajos, no la forma general de la distribución. Por eso la caja clásica marca entre 19 y 63 atípicos por variable, mientras la caja robusta marca solo entre 1 y 9. La **altitud** (MC = 0,112) está justo sobre el umbral y se trata con la caja ajustada.
+
+# 3. Yeo-Johnson solo donde hace falta
+
+**Qué hacemos y por qué.** La transformación Yeo-Johnson corrige asimetrías fuertes, pero transformar variables que ya son razonablemente simétricas solo complica la interpretación. Por eso se aplica **únicamente a las variables con |asimetría| > 1**.
 
 ```{r sec4}
 add("\n== Yeo-Johnson: solo variables con |asimetria| > 1 en la base de 1.070 ==")
@@ -122,9 +151,21 @@ skew_970_trans <- sapply(F970, function(x) mean((x - mean(x))^3) / sd(x)^3)
 add("Asimetria antes (raw, 970): ", paste(names(skew_970_raw), round(skew_970_raw, 2), collapse = " | "))
 add("Asimetria despues (transformada, 970): ", paste(names(skew_970_trans), round(skew_970_trans, 2), collapse = " | "))
 
+tab_yj <- data.frame(
+  Variable = names(X8),
+  `Asimetría en 1.070 lotes` = round(sk, 2),
+  `¿Se transformó en la base de 1.070?` = ifelse(names(X8) %in% names(base$lambdas), "Sí", "No"),
+  `Asimetría en los 970 lotes finales` = round(skew_970_trans, 2),
+  `¿Supera 1 en valor absoluto?` = ifelse(abs(skew_970_trans) > 1, "Sí", "No"),
+  check.names = FALSE)
+tabla(tab_yj, align = "lrcrc", caption = "Asimetría antes y después de retirar los atípicos")
 ```
 
-# 5. Supuestos del PCA
+**Cómo se lee.** En la base de 1.070 lotes los siete atributos sensoriales superaban |asimetría| 1, así que allí sí se aplicó Yeo-Johnson (λ entre 2,2 y 3,6). Pero al retirar los 100 atípicos la asimetría de **todas** las variables cae por debajo de 1 (la mayor es la altitud, −0,69). Conclusión: el PCA final de 970 lotes **no usa Yeo-Johnson**; solo estandariza.
+
+# 4. Supuestos del PCA
+
+**Qué hacemos y por qué.** Dos supuestos prácticos importan: (1) las variables deben estar en una escala comparable y centradas, y (2) no deben quedar atípicos muy fuertes que dominen las componentes.
 
 ```{r sec5}
 Zf <- scale(F970, center = TRUE, scale = TRUE)
@@ -133,9 +174,18 @@ add("prcomp centra internamente (center = TRUE); Altitud tiene media ~", round(m
 md970 <- mahalanobis(Zf, colMeans(Zf), cov(Zf))
 add("Atipicos multivariados restantes (d2 > chi2 0.975, 8 g.l.): ", sum(md970 > lim), " de ", nrow(Zf), " (esperados por azar ~", round(0.025 * nrow(Zf)), ")")
 
+resumen_escala <- data.frame(Variable = names(F970), Media = round(colMeans(F970), 2), `Desviación estándar` = round(apply(F970, 2, sd), 2), check.names = FALSE)
+tabla(resumen_escala, align = "lrr", caption = "Escala original de cada variable (970 lotes)")
 ```
 
-# 6. PCA final, codo con IC bootstrap
+**Cómo se lee.**
+
+- **Estandarizar es necesario.** La altitud promedia unos `r fm(mean(F970[, 8]))` m con desviación de cientos de metros, mientras los puntajes se mueven en una escala de 0 a 10. Sin estandarizar, la altitud dominaría el PCA solo por su escala. Estandarizar centra cada variable en 0 y la divide entre su desviación estándar.
+- **Atípicos restantes.** Al repetir la regla sobre los 970 lotes aparecen `r sum(md970 > lim)` marcados (por azar se esperarían unos `r fm(0.025 * nrow(Zf))`). No se retiran: al quitar los extremos la nube se encoge y otros lotes pasan a parecer lejanos, así que el filtro no terminaría nunca. Es una limitación que se declara.
+
+# 5. PCA final y gráfico del codo con intervalos de confianza
+
+**Qué hacemos y por qué.** Ajustamos el PCA sobre los 970 lotes estandarizados. Para saber qué tan estable es la varianza explicada, repetimos el cálculo en 2.000 remuestras (bootstrap) y tomamos el rango central del 95 %.
 
 ```{r sec6}
 pca <- prcomp(F970, center = TRUE, scale. = TRUE)
@@ -154,61 +204,118 @@ tab_var$acum_CP1_CP2 <- round(sum(prop[1:2]) * 100, 1)
 write.csv(tab_var, "figuras/revision_profesor/tabla_varianza_IC.csv", row.names = FALSE)
 add("\n== Varianza por componente con IC 95 % (bootstrap B = 2000) ==")
 add(paste(capture.output(print(tab_var, row.names = FALSE)), collapse = "\n"))
-add("IC acumulado CP1+CP2: ", paste(round(quantile(rowSums(boot_prop[, 1:2]), c(0.025, 0.975)) * 100, 1), collapse = " a "), " %")
+ic_acum <- quantile(rowSums(boot_prop[, 1:2]), c(0.025, 0.975)) * 100
+add("IC acumulado CP1+CP2: ", paste(round(ic_acum, 1), collapse = " a "), " %")
 
+dibujar_codo <- function() {
+  par(mar = c(4.5, 4.5, 3, 1), cex.main = 1.3, cex.lab = 1.2, cex.axis = 1.1)
+  bp <- barplot(prop[1:6] * 100, names.arg = paste0("CP", 1:6), col = "#1f4e79", ylim = c(0, 65), ylab = "Varianza explicada (%)", main = "Codo con IC 95 % (bootstrap)")
+  arrows(bp, ci[1:6, 1] * 100, bp, ci[1:6, 2] * 100, angle = 90, code = 3, length = 0.05, col = "#c0392b")
+  text(bp, prop[1:6] * 100 + 3, paste0(round(prop[1:6] * 100, 1), "%"))
+}
 png("figuras/revision_profesor/codo_IC.png", width = 1800, height = 1100, res = 180)
-bp <- barplot(prop[1:6] * 100, names.arg = paste0("CP", 1:6), col = "#1f4e79", ylim = c(0, 65), ylab = "Varianza explicada (%)", main = "Codo con IC 95 % (bootstrap)")
-arrows(bp, ci[1:6, 1] * 100, bp, ci[1:6, 2] * 100, angle = 90, code = 3, length = 0.05, col = "#c0392b")
-text(bp, prop[1:6] * 100 + 3, paste0(round(prop[1:6] * 100, 1), "%"))
-dev.off()
+dibujar_codo(); invisible(dev.off())
 
+tabla(data.frame(Componente = tab_var$componente, `Varianza (%)` = tab_var$varianza,
+                 `IC 95 % inferior` = tab_var$ic_inf, `IC 95 % superior` = tab_var$ic_sup,
+                 `Valor propio` = round(pca$sdev^2, 2), check.names = FALSE),
+      align = "lrrrr", caption = "Varianza explicada por componente")
 ```
 
-# 7. Dispersión de scores ANTES de las cargas
+```{r fig-codo, fig.width=8, fig.height=5, fig.cap="Varianza explicada por cada componente, con su intervalo de confianza bootstrap del 95 % (barras rojas)."}
+dibujar_codo()
+```
+
+**Cómo se lee.**
+
+- **CP1 explica `r fm(prop[1] * 100, 1)` %** (IC `r fm(ci[1, 1] * 100, 1)`–`r fm(ci[1, 2] * 100, 1)` %) y **CP2 `r fm(prop[2] * 100, 1)` %** (IC `r fm(ci[2, 1] * 100, 1)`–`r fm(ci[2, 2] * 100, 1)` %). Juntas: **`r fm(sum(prop[1:2]) * 100, 1)` %** (IC `r fm(ic_acum[1], 1)`–`r fm(ic_acum[2], 1)` %).
+- Los intervalos son estrechos: el resumen es estable y no depende de la muestra particular.
+- Hay un **codo claro después de CP2**: cada componente siguiente aporta menos de 6 %.
+- **Criterio de Kaiser** (conservar componentes con valor propio mayor que 1): CP1 pasa con holgura; CP2 queda en `r fm(pca$sdev[2]^2, 2)`, casi 1. La conservamos porque el codo la respalda y tiene una interpretación clara (altitud). CP3 queda por debajo (`r fm(pca$sdev[3]^2, 2)`).
+
+# 6. Dispersión de los lotes en CP1 y CP2 (antes de ver las cargas)
+
+**Qué hacemos y por qué.** Antes de interpretar los pesos de cada variable, miramos dónde caen los lotes en las dos primeras componentes. Cada punto es un lote; el color es su método de proceso. Si hubiera grupos naturales, se verían como nubes separadas.
 
 ```{r sec7}
 sc <- data.frame(CP1 = pca$x[, 1], CP2 = pca$x[, 2], CP3 = pca$x[, 3], Proceso = meta970$Processing.Method)
 sc$Proceso[is.na(sc$Proceso) | sc$Proceso == ""] <- "Sin dato"
 top <- names(sort(table(sc$Proceso), decreasing = TRUE))[1:5]
 sc$Proceso[!(sc$Proceso %in% top)] <- "Otro"
-p_sc <- ggplot(sc, aes(CP1, CP2, color = Proceso)) + geom_point(alpha = 0.7, size = 1.6) +
-  labs(title = "Dispersión de los lotes en CP1 y CP2 (970 lotes)", x = sprintf("CP1 (%.1f %%)", prop[1] * 100), y = sprintf("CP2 (%.1f %%)", prop[2] * 100), color = "Método de proceso") +
-  theme_minimal(base_size = 13)
+p_sc <- ggplot(sc, aes(-CP1, -CP2, color = Proceso)) + geom_point(alpha = 0.7, size = 1.6) +
+  labs(title = "Dispersión de los lotes en CP1 y CP2 (970 lotes)", x = sprintf("CP1 (%.1f %%): mejor calidad hacia la derecha", prop[1] * 100), y = sprintf("CP2 (%.1f %%): mayor altitud hacia arriba", prop[2] * 100), color = "Método de proceso") +
+  theme_minimal(base_size = 15)
 ggsave("figuras/revision_profesor/dispersion_CP1_CP2.png", p_sc, width = 8, height = 6, dpi = 200)
-
+p_sc
 ```
 
-# 8. Cargas de CP1-CP3 y biplot
+**Cómo se lee.**
+
+- **Hacia la derecha** (CP1 alto) mejora la calidad en taza; **hacia arriba** (CP2 alto) sube la altitud. El 0 de cada eje es el lote promedio. (El signo de una componente en `prcomp` es arbitrario. Aquí se invierte el de CP1 y CP2 solo para que la figura se lea así; por eso las cargas de la sección 7 aparecen con signo negativo.)
+- La nube es **continua**: no hay grupos separados, ni siquiera al colorear por método de proceso.
+- Es más ancha que alta porque la calidad explica mucha más variación que la altitud.
+- Las franjas de puntos en la parte baja son lotes con altitud mal digitada en la base original (1, 12 o 13 m): afectan sobre todo a CP2.
+
+# 7. Cargas de CP1–CP3 y biplot
+
+**Qué hacemos y por qué.** Las cargas dicen cuánto pesa cada variable en cada componente: cuanto más lejos de 0, más contribuye. Nos permiten ponerle nombre a las componentes.
 
 ```{r sec8}
 L <- round(pca$rotation[, 1:3], 2)
 write.csv(L, "figuras/revision_profesor/cargas_CP1_CP3.csv")
 add("\n== Cargas CP1-CP3 ==")
 add(paste(capture.output(print(L)), collapse = "\n"))
+dibujar_biplot <- function() {
+  biplot(pca, choices = 1:2, cex = c(0.4, 1), col = c("grey40", "#c0392b"), xlab = sprintf("CP1 (%.1f %%)", prop[1] * 100), ylab = sprintf("CP2 (%.1f %%)", prop[2] * 100), main = "Biplot (970 lotes)")
+}
 png("figuras/revision_profesor/biplot.png", width = 1800, height = 1400, res = 180)
-biplot(pca, choices = 1:2, cex = c(0.4, 0.9), col = c("grey40", "#c0392b"), xlab = sprintf("CP1 (%.1f %%)", prop[1] * 100), ylab = sprintf("CP2 (%.1f %%)", prop[2] * 100), main = "Biplot (970 lotes)")
-dev.off()
+dibujar_biplot(); invisible(dev.off())
 
+tabla(data.frame(Variable = rownames(L), CP1 = L[, 1], CP2 = L[, 2], CP3 = L[, 3]), align = "lrrr", caption = "Cargas de las tres primeras componentes")
 ```
 
-# 9. t-SNE y UMAP exploratorios
+```{r fig-biplot, fig.width=8, fig.height=6.5, fig.cap="Biplot: puntos grises = lotes; flechas rojas = variables. Flechas juntas indican variables que se mueven juntas."}
+dibujar_biplot()
+```
+
+**Cómo se lee.**
+
+- **CP1 = calidad sensorial general.** Los siete atributos pesan casi lo mismo (entre −0,35 y −0,39; el signo es arbitrario) y la altitud casi nada. Un lote con CP1 alto tiene buenos puntajes en todo a la vez.
+- **CP2 = altitud.** La altitud pesa −0,98 y los atributos sensoriales casi 0: la altitud va por su lado y no por el de la calidad.
+- **CP3 = contraste pequeño entre aroma y cuerpo.** Aroma pesa −0,64 y Cuerpo +0,68. Explica solo `r fm(prop[3] * 100, 1)` % y su valor propio está bajo 1, así que no lo interpretamos más allá de eso.
+- En el biplot, las flechas de los siete atributos apuntan casi en la misma dirección (están muy correlacionados; hacia la izquierda porque el signo es arbitrario) y la de altitud es casi perpendicular a ellas.
+
+# 8. t-SNE y UMAP exploratorios
+
+**Qué hacemos y por qué.** Son dos métodos no lineales que buscan conservar vecindades entre lotes. Los usamos solo como mirada exploratoria complementaria al PCA: **sus ejes no se interpretan** y la forma depende de parámetros (perplejidad 30 en t-SNE; 15 vecinos en UMAP).
 
 ```{r sec9}
 set.seed(2026)
 ts <- Rtsne(Zf, perplexity = 30, check_duplicates = FALSE, verbose = FALSE, max_iter = 1000)
 dt <- data.frame(X = ts$Y[, 1], Y = ts$Y[, 2], Proceso = sc$Proceso)
-ggsave("figuras/revision_profesor/tsne_perp30.png", ggplot(dt, aes(X, Y, color = Proceso)) + geom_point(alpha = 0.7, size = 1.4) +
-  labs(title = "t-SNE (perplejidad 30), exploratorio", subtitle = "Ejes no interpretables; no son PC1 ni PC2", x = "Dim 1", y = "Dim 2", color = "Método de proceso") + theme_minimal(base_size = 13),
-  width = 8, height = 6, dpi = 200)
+p_ts <- ggplot(dt, aes(X, Y, color = Proceso)) + geom_point(alpha = 0.7, size = 1.4) +
+  labs(title = "t-SNE (perplejidad 30), exploratorio", subtitle = "Ejes no interpretables; no son PC1 ni PC2", x = "Dim 1", y = "Dim 2", color = "Método de proceso") + theme_minimal(base_size = 15)
+ggsave("figuras/revision_profesor/tsne_perp30.png", p_ts, width = 8, height = 6, dpi = 200)
 set.seed(2026)
 um <- umap(Zf, n_neighbors = 15, min_dist = 0.1, n_components = 2)
 du <- data.frame(X = um[, 1], Y = um[, 2], Proceso = sc$Proceso)
-ggsave("figuras/revision_profesor/umap_vecinos15.png", ggplot(du, aes(X, Y, color = Proceso)) + geom_point(alpha = 0.7, size = 1.4) +
-  labs(title = "UMAP (15 vecinos), exploratorio", subtitle = "Ejes no interpretables; la estructura depende de los parámetros", x = "UMAP1", y = "UMAP2", color = "Método de proceso") + theme_minimal(base_size = 13),
-  width = 8, height = 6, dpi = 200)
+p_um <- ggplot(du, aes(X, Y, color = Proceso)) + geom_point(alpha = 0.7, size = 1.4) +
+  labs(title = "UMAP (15 vecinos), exploratorio", subtitle = "Ejes no interpretables; la estructura depende de los parámetros", x = "UMAP1", y = "UMAP2", color = "Método de proceso") + theme_minimal(base_size = 15)
+ggsave("figuras/revision_profesor/umap_vecinos15.png", p_um, width = 8, height = 6, dpi = 200)
 add("\nt-SNE: perplejidad 30, semilla 2026. UMAP: 15 vecinos, min_dist 0.1, semilla 2026. Exploratorios.")
-
 writeLines(out_txt, "resultados_revision_profesor.txt")
-cat(out_txt, sep = "\n")
+p_ts
+p_um
 ```
 
+**Cómo se lee.** Ninguno de los dos mapas muestra grupos claramente separados, y el color por método de proceso no coincide con regiones propias. Esto concuerda con el PCA: la estructura es un continuo. Si aparecen pequeñas islas, dependen de los parámetros y no deben leerse como categorías de café.
+
+# Conclusiones
+
+1. **Depuración:** de 1.070 lotes se retiran 100 atípicos multivariados (9,3 %) con una sola pasada de Mahalanobis; quedan 970. Una segunda pasada marcaría `r sum(md970 > lim)` lotes más, que no se retiran.
+2. **Transformación:** con los 970 lotes ninguna variable necesita Yeo-Johnson; el PCA solo estandariza.
+3. **Resumen en dos dimensiones:** CP1 (calidad sensorial general, `r fm(prop[1] * 100, 1)` %) y CP2 (altitud, `r fm(prop[2] * 100, 1)` %) explican `r fm(sum(prop[1:2]) * 100, 1)` % de la variación, con IC bootstrap de `r fm(ic_acum[1], 1)` a `r fm(ic_acum[2], 1)` %.
+4. **No hay grupos naturales:** la nube es continua, tanto en el PCA como en t-SNE y UMAP. El PCA resume variación; no demuestra ni separa grupos.
+5. **Limitaciones:** quedan algunos atípicos leves, hay lotes con altitud mal digitada (1, 12 o 13 m) y CP3 está por debajo del criterio de Kaiser.
+
+*Salidas de este informe:* `figuras/revision_profesor/` (figuras y tablas) y `resultados_revision_profesor.txt`.

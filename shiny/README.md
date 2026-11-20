@@ -5,7 +5,8 @@ Esta carpeta contiene la aplicación Shiny que permite modificar los valores de 
 ## Archivos
 
 - [app.R](./app.R): código fuente de la aplicación Shiny.
-- [app.html](./app.html): representación HTML estática del archivo de código. **No es la aplicación interactiva en ejecución.**
+- [app_guia.Rmd](./app_guia.Rmd): guía explicada de la aplicación (qué es, cómo se usa, cómo funciona, cómo se lee el resultado y un ejemplo de demostración, con el código completo al final).
+- [app.html](./app.html): resultado de renderizar `app_guia.Rmd`. **Es la guía, no la aplicación interactiva en ejecución.**
 
 ## Ejecutar localmente
 
@@ -25,7 +26,7 @@ shiny::runApp("shiny")
 
 Si la aplicación no encuentra el archivo RDS, verifica que el directorio de trabajo sea la raíz del repositorio y que exista `datos/datos_final_970.rds`. No cambies la ruta relativa del código sin ajustar también la estructura de ejecución.
 
-La aplicación carga la matriz de referencia desde ../datos/datos_final_970.rds, por lo que debe conservarse esa estructura relativa de carpetas. El archivo `app.html` es una representación estática y debe actualizarse por separado cuando se regenere o publique una nueva versión de la aplicación.
+La aplicación carga la matriz de referencia desde ../datos/datos_final_970.rds, por lo que debe conservarse esa estructura relativa de carpetas. El archivo `app.html` es una guía estática: se regenera con `rmarkdown::render("shiny/app_guia.Rmd", output_file = "app.html")` cuando cambie la aplicación.
 
 ## Qué representa la clasificación
 
