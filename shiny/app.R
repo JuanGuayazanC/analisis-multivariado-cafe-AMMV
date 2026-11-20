@@ -75,7 +75,7 @@ body {
   font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif;
   background: #f0f2f5;
   color: #1a1a2e;
-  font-size: 14px;
+  font-size: 17px;
 }
 
 .app-header {
@@ -85,15 +85,15 @@ body {
   margin: -15px -15px 20px -15px;
   border-radius: 0 0 12px 12px;
 }
-.app-header h2 { margin: 0 0 4px; font-size: 20px; font-weight: 700; }
-.app-header .subtitle { font-size: 13px; opacity: 0.75; margin: 0; }
+.app-header h2 { margin: 0 0 4px; font-size: 28px; font-weight: 700; }
+.app-header .subtitle { font-size: 16px; opacity: 0.75; margin: 0; }
 .stat-chips { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
 .chip {
   background: rgba(255,255,255,0.15);
   border: 1px solid rgba(255,255,255,0.25);
   border-radius: 20px;
   padding: 3px 10px;
-  font-size: 12px;
+  font-size: 15px;
   font-weight: 500;
 }
 
@@ -116,19 +116,19 @@ body {
 }
 .group-label:first-child { margin-top: 0; }
 .slider-wrap { margin-bottom: 2px; }
-.slider-desc { font-size: 11px; color: #999; margin: -8px 0 4px; line-height: 1.3; }
+.slider-desc { font-size: 14px; color: #666; margin: -8px 0 4px; line-height: 1.3; }
 
 .btn-proyectar {
   background: #1a4a7a; color: white; border: none;
   width: 100%; padding: 10px; border-radius: 8px;
-  font-size: 14px; font-weight: 600; cursor: pointer;
+  font-size: 18px; font-weight: 600; cursor: pointer;
   margin-top: 14px; transition: background 0.2s;
 }
 .btn-proyectar:hover { background: #0d2137; }
 .btn-reset {
   background: white; color: #666; border: 1px solid #ddd;
   width: 100%; padding: 8px; border-radius: 8px;
-  font-size: 13px; cursor: pointer; margin-top: 6px;
+  font-size: 16px; cursor: pointer; margin-top: 6px;
   transition: all 0.2s;
 }
 .btn-reset:hover { border-color: #999; color: #333; }
@@ -141,11 +141,11 @@ body {
   margin-bottom: 14px;
 }
 .card-title {
-  font-size: 12px; font-weight: 700; text-transform: uppercase;
+  font-size: 15px; font-weight: 700; text-transform: uppercase;
   letter-spacing: 0.8px; color: #888; margin: 0 0 12px;
 }
 
-.radio-ejes label { font-size: 13px; color: #444; }
+.radio-ejes label { font-size: 16px; color: #444; }
 .radio-ejes .radio { margin: 3px 0; }
 
 .pc-strip {
@@ -156,24 +156,24 @@ body {
   border: 1px solid #e8edf3; border-radius: 8px;
   padding: 8px 10px; text-align: center;
 }
-.pc-badge .pc-name { font-size: 11px; font-weight: 700; color: #888; }
-.pc-badge .pc-var  { font-size: 18px; font-weight: 700; color: #1a4a7a; }
-.pc-badge .pc-desc { font-size: 10px; color: #666; margin-top: 2px; line-height: 1.3; }
+.pc-badge .pc-name { font-size: 14px; font-weight: 700; color: #888; }
+.pc-badge .pc-var  { font-size: 26px; font-weight: 700; color: #1a4a7a; }
+.pc-badge .pc-desc { font-size: 14px; color: #444; margin-top: 2px; line-height: 1.3; }
 
 .score-row {
   display: flex; align-items: center; gap: 10px;
   padding: 8px 0; border-bottom: 1px solid #f0f0f0;
 }
 .score-row:last-child { border-bottom: none; }
-.score-label { font-size: 12px; font-weight: 600; color: #555; width: 34px; }
+.score-label { font-size: 16px; font-weight: 600; color: #555; width: 44px; }
 .score-bar-wrap { flex: 1; background: #f0f2f5; border-radius: 4px; height: 6px; overflow: hidden; }
 .score-bar { height: 6px; border-radius: 4px; transition: width 0.4s; }
-.score-val { font-size: 13px; font-weight: 700; width: 46px; text-align: right; }
-.score-pct { font-size: 11px; color: #aaa; width: 40px; text-align: right; }
+.score-val { font-size: 17px; font-weight: 700; width: 46px; text-align: right; }
+.score-pct { font-size: 14px; color: #777; width: 40px; text-align: right; }
 
 .quality-badge {
   display: inline-block; border-radius: 20px;
-  padding: 4px 12px; font-size: 12px; font-weight: 700;
+  padding: 5px 14px; font-size: 16px; font-weight: 700;
   margin-bottom: 10px;
 }
 .q-alta  { background: #d4edda; color: #155724; }
@@ -187,13 +187,13 @@ body {
 }
 .interp-item.alt { border-left-color: #6c8ebf; }
 .interp-item.con { border-left-color: #27ae60; }
-.interp-pc  { font-size: 11px; font-weight: 700; color: #888; margin-bottom: 2px; }
-.interp-val { font-size: 13px; color: #222; line-height: 1.4; }
+.interp-pc  { font-size: 14px; font-weight: 700; color: #888; margin-bottom: 2px; }
+.interp-val { font-size: 17px; color: #222; line-height: 1.4; }
 
 .info-box {
   background: #eef4fb; border: 1px solid #c8ddf2;
   border-radius: 8px; padding: 10px 14px;
-  font-size: 12px; color: #2c5f8a; line-height: 1.5;
+  font-size: 15px; color: #2c5f8a; line-height: 1.5;
   margin-bottom: 14px;
 }
 .info-box b { font-weight: 600; }
@@ -323,7 +323,7 @@ ui <- fluidPage(
           div(class = "card",
             div(class = "card-title", "Varianza por componente"),
             plotOutput("scree", height = "320px"),
-            div(style = "font-size:12px; color:#666;",
+            div(style = "font-size:15px; color:#444;",
               paste0("Cada barra es el porcentaje de varianza que explica el componente. CP1 y CP2 suman ", round(var_exp[1] + var_exp[2], 1), " %."))
           )
         ),
@@ -331,7 +331,7 @@ ui <- fluidPage(
           div(class = "card",
             div(class = "card-title", "Cargas de las variables (CP1–CP4)"),
             plotOutput("cargas", height = "320px"),
-            div(style = "font-size:12px; color:#666;",
+            div(style = "font-size:15px; color:#444;",
               "CP1 agrupa los puntajes sensoriales; CP2 es principalmente altitud.")
           )
         ),
@@ -339,7 +339,7 @@ ui <- fluidPage(
           div(class = "card",
             div(class = "card-title", "Distribución de CP1 y tu lote"),
             plotOutput("dens", height = "320px"),
-            div(style = "font-size:12px; color:#666;",
+            div(style = "font-size:15px; color:#444;",
               "La línea roja marca la posición de tu lote dentro de los 970 de referencia.")
           )
         )
@@ -386,7 +386,7 @@ server <- function(input, output, session) {
         y = paste0("CP", e[2], "  (", var_exp[e[2]], " % de la varianza)"),
         caption = "Cada punto es uno de los 970 lotes del Coffee Quality Institute (CQI)"
       ) +
-      theme_minimal(base_size = 13) +
+      theme_minimal(base_size = 16) +
       theme(
         panel.grid.minor   = element_blank(),
         panel.grid.major   = element_line(color = "#f0f0f0"),
@@ -425,7 +425,7 @@ server <- function(input, output, session) {
       geom_col(fill = "#2563a8", width = 0.7) +
       geom_text(aes(label = paste0(pct, " %")), vjust = -0.4, size = 3.4, color = "#333") +
       labs(x = NULL, y = "Varianza explicada (%)") +
-      theme_minimal(base_size = 12) +
+      theme_minimal(base_size = 15) +
       theme(panel.grid.minor = element_blank(),
             plot.background = element_rect(fill = "white", color = NA))
   }, bg = "white")
@@ -444,7 +444,7 @@ server <- function(input, output, session) {
       scale_fill_gradient2(low = "#2563a8", mid = "white", high = "#c0392b",
                            limits = c(-1, 1), name = "Carga") +
       labs(x = NULL, y = NULL) +
-      theme_minimal(base_size = 12) +
+      theme_minimal(base_size = 15) +
       theme(panel.grid = element_blank(),
             plot.background = element_rect(fill = "white", color = NA))
   }, bg = "white")
@@ -454,7 +454,7 @@ server <- function(input, output, session) {
     p <- ggplot(scores_df, aes(x = PC1)) +
       geom_density(fill = "#9fc3e6", alpha = 0.6, color = "#2563a8") +
       labs(x = paste0("CP1 (", var_exp[1], " %)  ·  más bajo = mayor calidad sensorial"), y = "Densidad") +
-      theme_minimal(base_size = 12) +
+      theme_minimal(base_size = 15) +
       theme(panel.grid.minor = element_blank(),
             plot.background = element_rect(fill = "white", color = NA))
     if (!is.null(ns)) {
@@ -535,7 +535,7 @@ server <- function(input, output, session) {
 
     tagList(
       div(class = badge_class, badge_text),
-      div(style = "font-size:12px; color:#666; margin-bottom:6px;",
+      div(style = "font-size:15px; color:#444; margin-bottom:6px;",
           sprintf("Posición relativa en el eje CP1: por encima del %.0f%% de los lotes de referencia.",
                   pct_calidad)),
       div(style = "font-size:11px; color:#888; margin-bottom:10px; line-height:1.4;",
