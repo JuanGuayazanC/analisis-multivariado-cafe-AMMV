@@ -8,24 +8,21 @@ output:
     toc: true
     toc_float: true
     toc_depth: 3
-    code_folding: show
+    code_folding: hide
     theme: flatly
     df_print: paged
+    css: ../estilos_presentacion.css
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE,
                       fig.align = "center", fig.width = 8, fig.height = 6)
+fm <- function(x, d = 0) format(round(x, d), nsmall = d, decimal.mark = ",", big.mark = ".")
 ```
 
-> **Semana 7 del programa:** Análisis factorial y análisis de correspondencias —
-> representación de variables, individuos y categorías; interpretación de mapas factoriales.
+> **Semana 7 del programa:** análisis factorial y análisis de correspondencias: representación de variables, individuos y categorías; interpretación de mapas factoriales.
 
----
-
-# 1. Datos
-
-```{r datos}
+```{r datos, include=FALSE}
 library(dplyr)
 library(ggplot2)
 library(psych)        # fa(), fa.parallel()
@@ -56,15 +53,54 @@ vars_11 <- c("Aroma","Sabor","Retrogusto","Acidez","Cuerpo","Balance",
 datos_t <- datos[, vars_11]
 ```
 
----
+```{r calculos-previos, include=FALSE}
+# Cálculos usados en el resumen (se repiten más abajo, donde se muestran)
+kmo_result <- KMO(cor(datos_t))
+n_factores <- 3
+modelo_fa <- fa(datos_t, nfactors = n_factores, rotate = "varimax", fm = "ml")
+cat_data <- data_raw %>%
+  filter(!is.na(altitude_mean_meters), altitude_mean_meters > 0,
+         altitude_mean_meters <= 3000,
+         complete.cases(select(., all_of(vars_originales)))) %>%
+  mutate(Proceso = ifelse(Processing.Method=="" | is.na(Processing.Method), "Desconocido", Processing.Method),
+         Pais = Country.of.Origin)
+top5 <- names(sort(table(cat_data$Pais), decreasing=TRUE)[1:5])
+cat_data <- cat_data %>% mutate(Pais = ifelse(Pais %in% top5, Pais, "Otro"))
+tabla <- table(cat_data$Proceso, cat_data$Pais)
+chi2 <- chisq.test(tabla)
+```
+
+::: {.resumen}
+**En resumen.** Con las 11 variables continuas el análisis factorial es adecuado (KMO global `r fm(kmo_result$MSA, 2)`) y resume la información en `r n_factores` factores. Con las variables categóricas (método de proceso, color del grano y país), el análisis de correspondencias muestra asociaciones claras entre proceso y país (chi² = `r fm(chi2$statistic, 1)`, p < 0,001), pero los dos primeros ejes del ACM explican una parte moderada de la inercia: es una mirada de **asociación entre categorías, no de causa**.
+:::
+
+# Qué responde este informe
+
+**Preguntas:** (1) ¿hay pocos factores latentes que expliquen las correlaciones entre los puntajes sensoriales? (2) ¿cómo se asocian entre sí el método de proceso, el color del grano y el país de origen?
+
+Cada sección sigue el mismo esquema: *qué se hace y por qué*, *el resultado* y *cómo se lee*.
+
+| Sección | Técnica | Variables | Para qué sirve |
+|---|---|---|---|
+| 1 | Datos | 11 continuas | Definir la base de trabajo |
+| 2 | Análisis factorial (AFE) | 11 continuas | Encontrar factores latentes |
+| 3 | Correspondencias simple (ACS) | Proceso × país | Asociación entre dos categorías |
+| 4 | Correspondencias múltiple (ACM) | Proceso, color, país | Asociación entre varias categorías |
+| 5 | ACM en detalle | Proceso, color, país | Inercia, coordenadas y contribuciones |
+
+# 1. Datos
+
+**Qué hacemos.** Se toma la base limpia del Coffee Quality Institute, se conservan los lotes con altitud entre 0 y 3.000 m y registros completos, y se trabaja con 11 variables continuas (los diez puntajes sensoriales sin Moisture ni defectos, más la altitud). Las variables categóricas se usan en las secciones 3 a 5.
+
+**Resultado.** `r nrow(datos_t)` lotes y `r ncol(datos_t)` variables continuas.
 
 # 2. Análisis Factorial Exploratorio (AFE)
 
-El análisis factorial busca **factores latentes** (no observables) que explican la
-correlación entre las variables. A diferencia de PCA, el AF modela la varianza
-*compartida* (comunalidades), no la varianza total.
+**Qué hacemos y por qué.** El análisis factorial busca **factores latentes** (no observables) que expliquen la correlación entre las variables. A diferencia del PCA, que resume la varianza **total**, el análisis factorial modela la varianza **compartida** entre variables (las comunalidades). Antes de ajustarlo hay que comprobar que los datos son aptos para factorizarse.
 
 ## 2.1. Prueba de adecuación muestral
+
+El **KMO** compara las correlaciones entre pares de variables con las correlaciones parciales; valores mayores de 0,6 se consideran aceptables. La **prueba de Bartlett** contrasta si la matriz de correlaciones es distinta de la identidad (si no lo fuera, las variables no estarían relacionadas y no habría nada que resumir).
 
 ```{r kmo-bartlett}
 # KMO: Kaiser-Meyer-Olkin — valores > 0.6 son aceptables
@@ -76,14 +112,22 @@ bart <- cortest.bartlett(cor(datos_t), n=nrow(datos_t))
 cat("Bartlett — chi²:", round(bart$chisq, 1), "  p-valor:", bart$p.value, "\n")
 ```
 
-## 2.2. Número de factores — análisis paralelo
+**Cómo se lee.** El KMO global es `r fm(kmo_result$MSA, 2)`: `r if (kmo_result$MSA >= 0.8) "muy bueno, hay mucha correlación compartida entre las variables" else if (kmo_result$MSA >= 0.6) "aceptable" else "bajo, el análisis factorial sería poco recomendable"`. Bartlett rechaza que la matriz sea la identidad (p `r if (bart$p.value < 0.001) "< 0,001" else paste("=", fm(bart$p.value, 3))`): las variables están correlacionadas, lo que justifica factorizar.
+
+## 2.2. Número de factores: análisis paralelo
+
+**Qué hacemos y por qué.** El análisis paralelo compara los valores propios de los datos con los de datos aleatorios del mismo tamaño y conserva los factores que los superan. Es una forma objetiva de elegir cuántos factores usar.
 
 ```{r factores-paralelo, fig.width=8, fig.height=5}
-fa.parallel(datos_t, fm="ml", fa="fa",
+pa <- fa.parallel(datos_t, fm="ml", fa="fa",
             main="Análisis paralelo — número de factores sugerido")
 ```
 
+**Cómo se lee.** Los factores cuyos valores propios (línea azul) quedan por encima de la línea de datos simulados son los que valen la pena. El análisis sugiere `r pa$nfact` factores; en el modelo se usan `r n_factores` por interpretabilidad.
+
 ## 2.3. Ajuste del modelo factorial
+
+**Qué hacemos y por qué.** Se ajusta un modelo de `r n_factores` factores por máxima verosimilitud con rotación **Varimax**, que gira los ejes (de forma ortogonal) para que cada variable cargue fuerte en un solo factor y sea más fácil nombrar los factores.
 
 ```{r modelo-factorial}
 n_factores <- 3   # ajustar según análisis paralelo
@@ -98,7 +142,23 @@ cat("\nComunalidades:\n")
 round(modelo_fa$communality, 3)
 ```
 
+```{r lectura-fa, include=FALSE}
+Lf <- unclass(modelo_fa$loadings)
+vars_factor <- sapply(1:n_factores, function(k) paste(rownames(Lf)[abs(Lf[, k]) >= 0.5], collapse = ", "))
+var_acum <- modelo_fa$Vaccounted["Cumulative Var", n_factores]
+```
+
+**Cómo se lee.** Una carga es la correlación entre una variable y un factor; solo se muestran las mayores de 0,3. Las variables con carga de 0,5 o más en cada factor son:
+
+- **Factor 1:** `r vars_factor[1]`.
+- **Factor 2:** `r vars_factor[2]`.
+- **Factor 3:** `r vars_factor[3]`.
+
+Los tres factores explican en conjunto el `r fm(100 * var_acum, 1)` % de la varianza. La **comunalidad** de una variable es la parte de su varianza que explican los factores: cerca de 1, bien representada; cerca de 0, la variable va sola (por ejemplo, la altitud, que no se relaciona con los puntajes).
+
 ## 2.4. Mapa factorial
+
+**Qué se dibuja.** Cada variable es un punto con sus cargas en los factores 1 y 2; las flechas parten del origen. Variables cercanas en el mapa se comportan de forma parecida.
 
 ```{r mapa-factorial, fig.width=9, fig.height=7}
 cargas <- as.data.frame(unclass(modelo_fa$loadings)[, 1:2])
@@ -116,19 +176,16 @@ ggplot(cargas, aes(x=Factor1, y=Factor2, label=variable)) +
        x=paste0("Factor 1 (", round(modelo_fa$Vaccounted[2,1]*100,1), "% var. compartida)"),
        y=paste0("Factor 2 (", round(modelo_fa$Vaccounted[2,2]*100,1), "% var. compartida)")) +
   xlim(-1.1, 1.1) + ylim(-1.1, 1.1) +
-  theme_minimal(base_size=12) + theme(panel.grid.minor=element_blank())
+  theme_minimal(base_size=14) + theme(panel.grid.minor=element_blank())
 ```
 
----
+**Cómo se lee.** Los puntos agrupados indican variables que cargan en el mismo factor; los que quedan cerca del origen aportan poco a estos dos factores. El mapa confirma la agrupación de la tabla de cargas.
 
 # 3. Análisis de Correspondencias Simple (ACS)
 
-El ACS trabaja exclusivamente con **tablas de contingencia** (frecuencias cruzadas
-entre dos variables categóricas). Representa en un mapa conjunto la asociación
-entre filas y columnas.
+**Qué hacemos y por qué.** El ACS trabaja con **tablas de contingencia** (frecuencias cruzadas entre dos variables categóricas) y representa en un mapa conjunto la asociación entre filas y columnas. Aquí se cruzan el **método de proceso** y el **país de origen** (los 5 países con más lotes y «Otro»).
 
-> **Importante:** el ACS no aplica a PCA ni a variables continuas directamente.
-> Requiere variables dummy o categóricas. (Referencia: indicación del docente.)
+> **Importante:** el ACS no aplica a variables continuas. Requiere variables categóricas (referencia: indicación del docente).
 
 ## 3.1. Tabla de contingencia
 
@@ -152,7 +209,11 @@ tabla <- table(cat_data$Proceso, cat_data$Pais)
 addmargins(tabla)
 ```
 
+**Cómo se lee.** Cada celda cuenta los lotes con un proceso y un país. Los totales (márgenes) muestran qué procesos y países dominan la muestra: `r names(sort(rowSums(tabla), decreasing = TRUE))[1]` es el proceso más frecuente (`r max(rowSums(tabla))` lotes) y `r names(sort(colSums(tabla), decreasing = TRUE))[1]` el país con más lotes (`r max(colSums(tabla))`).
+
 ## 3.2. Prueba chi² de independencia
+
+**Qué hacemos y por qué.** Antes de mirar el mapa, se prueba si proceso y país son independientes. Si lo fueran, no habría asociación que representar.
 
 ```{r chi2}
 chi2 <- chisq.test(tabla)
@@ -164,7 +225,16 @@ cat("Conclusión:", ifelse(chi2$p.value < 0.05,
     "No se rechaza independencia entre proceso y país."), "\n")
 ```
 
+```{r chi2-texto, include=FALSE}
+res_est <- chi2$stdres
+imax <- which(res_est == max(res_est), arr.ind = TRUE)[1, ]
+```
+
+**Cómo se lee.** `r if (chi2$p.value < 0.05) "Se rechaza la independencia" else "No se rechaza la independencia"` (chi² = `r fm(chi2$statistic, 1)`, `r chi2$parameter` g.l.). La combinación con el mayor residuo estandarizado positivo (más lotes de los esperados por azar) es **`r rownames(res_est)[imax[1]]` en `r colnames(res_est)[imax[2]]`** (residuo `r fm(max(res_est), 1)`). Con tantas celdas con pocos lotes, la aproximación chi² es solo orientativa.
+
 ## 3.3. Mapa de correspondencias
+
+**Qué se dibuja.** Las filas (procesos, en rojo) y las columnas (países, en azul) se representan en el mismo plano. Un proceso cercano a un país indica que esa combinación es más frecuente de lo esperado; cerca del origen, un perfil promedio.
 
 ```{r correspondencias, fig.width=9, fig.height=7}
 ca_result <- CA(tabla, graph=FALSE)
@@ -175,15 +245,14 @@ fviz_ca_biplot(ca_result,
                col.row = "#e74c3c",
                col.col = "#2563a8",
                title   = "Mapa de correspondencias — Proceso × País de origen") +
-  theme_minimal()
+  theme_minimal(base_size = 14)
 ```
 
----
+**Cómo se lee.** La primera dimensión explica el `r fm(ca_result$eig[1, 2], 1)` % de la inercia y la segunda el `r fm(ca_result$eig[2, 2], 1)` %. La distancia entre puntos de la misma clase (dos países, dos procesos) indica qué tan parecidos son sus perfiles; la proximidad entre un proceso y un país indica asociación. Es una asociación entre categorías, no una causa.
 
 # 4. Análisis de Correspondencias Múltiple (ACM)
 
-El ACM extiende el ACS a más de dos variables categóricas simultáneamente.
-Equivale a hacer ACS sobre la matriz de indicadores (dummies).
+**Qué hacemos y por qué.** El ACM extiende el ACS a **más de dos variables categóricas** a la vez; equivale a hacer un ACS sobre la matriz de indicadores (dummies). Aquí se usan proceso, color del grano y país. Cada punto del mapa es una categoría; el color de los lotes indica qué tan bien representados están (cos²).
 
 ```{r acm, fig.width=9, fig.height=7}
 # Variables categóricas: Proceso + Color + Pais
@@ -200,15 +269,16 @@ fviz_mca_biplot(mca_result,
                 gradient.cols = c("#f7f9fc","#2563a8","#0d2137"),
                 col.var     = "#e74c3c",
                 title       = "Mapa ACM — Proceso · Color · País") +
-  theme_minimal()
+  theme_minimal(base_size = 14)
 ```
 
+**Cómo se lee.** Las categorías que aparecen juntas tienden a darse en los mismos lotes. Las dos primeras dimensiones explican el `r fm(mca_result$eig[1, 2], 1)` % y el `r fm(mca_result$eig[2, 2], 1)` % de la inercia. En el ACM los porcentajes de inercia son bajos por construcción (hay una columna por categoría), así que no se espera que sumen mucho: se interpreta el patrón de cercanías, con cautela.
 
----
+# 5. ACM en detalle
 
-## Análisis de Correspondencias Múltiples (ACM)
+**Qué hacemos y por qué.** Se repite el ACM con las tres variables categóricas ya depuradas (valores vacíos como «Desconocido», 5 países principales y «Otro») y se revisan por separado los valores propios, las coordenadas, las contribuciones y la calidad de representación, para decidir qué dimensiones y categorías interpretar.
 
-A continuación se realiza el análisis de las variables categóricas.
+## 5.1. Carga y preparación de datos
 
 ```{r acm-configuracion, echo=TRUE, eval=TRUE}
 library(dplyr)
@@ -217,15 +287,11 @@ library(factoextra)
 library(ggplot2)
 ```
 
-## 1. Carga de datos
-
 ```{r acm-carga-datos, echo=TRUE, eval=TRUE}
 data_raw <- read.csv("../data/arabica_data_cleaned.csv")
 
 cat("Registros originales:", nrow(data_raw), "\n")
 ```
-
-## 2. Preparación de datos
 
 ```{r acm-preparacion, echo=TRUE, eval=TRUE}
 datos_cat <- data_raw %>%
@@ -278,7 +344,9 @@ cat("Observaciones finales:", nrow(datos_cat), "\n")
 str(datos_cat)
 ```
 
-## 3. Ejecución del ACM
+**Cómo se lee.** Quedan `r nrow(datos_cat)` lotes con tres variables categóricas: proceso (`r nlevels(datos_cat$Proceso)` niveles), color (`r nlevels(datos_cat$Color)` niveles) y país (`r nlevels(datos_cat$Pais)` niveles).
+
+## 5.2. Ejecución del ACM y valores propios
 
 ```{r acm-ejecucion-acm, echo=TRUE, eval=TRUE}
 res_mca <- FactoMineR::MCA(
@@ -290,8 +358,6 @@ res_mca <- FactoMineR::MCA(
 print(res_mca$eig)
 ```
 
-## 4. Valores propios e inercia
-
 ```{r acm-inercia, echo=TRUE, eval=TRUE}
 eig <- factoextra::get_eigenvalue(res_mca)
 
@@ -301,7 +367,23 @@ knitr::kable(
 )
 ```
 
-## 5. Coordenadas de las categorías
+**Cómo se lee.** Cada dimensión tiene un valor propio (inercia) y un porcentaje de la inercia total. La primera explica el `r fm(eig[1, 2], 1)` % y la segunda el `r fm(eig[2, 2], 1)` %; juntas, `r fm(eig[1, 2] + eig[2, 2], 1)` %. Es una proporción moderada: el mapa resume solo una parte de la información, así que las conclusiones deben ser prudentes. Ninguna de las dos primeras dimensiones domina: las siguientes (3, 4 y 5) aportan entre `r fm(eig[5, 2], 1)` % y `r fm(eig[3, 2], 1)` % cada una.
+
+## 5.3. Gráfico de sedimentación
+
+```{r acm-grafico-inercia, echo=TRUE, eval=TRUE}
+factoextra::fviz_screeplot(
+  res_mca,
+  addlabels = TRUE
+) +
+  ggplot2::theme_minimal(base_size = 14)
+```
+
+**Cómo se lee.** Cada barra es el porcentaje de inercia de una dimensión. Si no hay un salto claro, la información se reparte entre varias dimensiones y no basta con las dos primeras.
+
+## 5.4. Coordenadas, contribuciones y calidad de representación
+
+Son tres tablas complementarias: las **coordenadas** ubican cada categoría en cada dimensión; las **contribuciones** dicen cuánto aporta cada categoría a la construcción de una dimensión (las de mayor contribución son las que le dan nombre); y el **cos²** dice qué tan bien representada queda la categoría en esa dimensión (cerca de 1, bien).
 
 ```{r acm-coordenadas, echo=TRUE, eval=TRUE}
 knitr::kable(
@@ -310,16 +392,12 @@ knitr::kable(
 )
 ```
 
-## 6. Contribuciones de las categorías
-
 ```{r acm-contribuciones, echo=TRUE, eval=TRUE}
 knitr::kable(
   round(as.data.frame(res_mca$var$contrib), 4),
   caption = "Contribuciones de las categorías"
 )
 ```
-
-## 7. Calidad de representación
 
 ```{r acm-calidad, echo=TRUE, eval=TRUE}
 knitr::kable(
@@ -328,17 +406,18 @@ knitr::kable(
 )
 ```
 
-## 8. Gráfico de sedimentación
-
-```{r acm-grafico-inercia, echo=TRUE, eval=TRUE}
-factoextra::fviz_screeplot(
-  res_mca,
-  addlabels = TRUE
-) +
-  ggplot2::theme_minimal()
+```{r acm-texto, include=FALSE}
+ct <- res_mca$var$contrib
+top_d1 <- names(sort(ct[, 1], decreasing = TRUE))[1:4]
+top_d2 <- names(sort(ct[, 2], decreasing = TRUE))[1:4]
 ```
 
-## 9. Mapa factorial
+**Cómo se lee.** Las categorías que más contribuyen a la **dimensión 1** son `r paste(top_d1, collapse = ", ")`: ellas le dan su significado. Las de la **dimensión 2** son `r paste(top_d2, collapse = ", ")`. Una categoría poco frecuente puede tener coordenadas extremas y aun así contribuir poco; por eso se mira la contribución, no solo la posición.
+
+- **Dimensión 1: información faltante.** `Proceso_Desconocido` y `Color_Desconocido` aportan juntas el `r fm(ct['Proceso_Desconocido', 1] + ct['Color_Desconocido', 1])` % de esta dimensión (`r sum(datos_cat$Proceso == 'Desconocido')` lotes sin proceso y `r sum(datos_cat$Color == 'Desconocido')` sin color registrados). Es decir, el eje 1 separa los lotes con datos categóricos incompletos del resto; no es un eje de «tipo de café».
+- **Dimensión 2: proceso y país.** Contrapone **Brazil** y el proceso **Natural / Dry** (coordenadas positivas) a **Washed / Wet**, Guatemala y México (negativas). Es la dimensión que describe la relación entre método de proceso y origen.
+
+## 5.5. Mapa factorial de las categorías
 
 ```{r acm-mapa-factorial, echo=TRUE, eval=TRUE}
 factoextra::fviz_mca_var(
@@ -348,5 +427,14 @@ factoextra::fviz_mca_var(
   gradient.cols = c("#2563a8", "#f39c12", "#e74c3c"),
   title = "ACM: Asociación entre País, Proceso y Color"
 ) +
-  ggplot2::theme_minimal()
+  ggplot2::theme_minimal(base_size = 14)
 ```
+
+**Cómo se lee.** Cada punto es una categoría y su color indica cuánto contribuye a los ejes (más rojo, más contribuye). Categorías cercanas aparecen juntas en muchos lotes: por ejemplo, un proceso y un país que se encuentran cerca indican que ese proceso es característico de ese país. Es una **asociación entre categorías, no una relación causal**, y el mapa solo representa el `r fm(eig[1, 2] + eig[2, 2], 1)` % de la inercia.
+
+# Conclusiones
+
+1. **Análisis factorial:** las 11 variables continuas son aptas para factorizar (KMO `r fm(kmo_result$MSA, 2)`; Bartlett significativo) y se resumen en `r n_factores` factores que explican el `r fm(100 * var_acum, 1)` % de la varianza.
+2. **Correspondencias simple:** proceso y país están asociados (chi² significativa); la combinación más sobrerrepresentada es `r rownames(res_est)[imax[1]]` en `r colnames(res_est)[imax[2]]`.
+3. **Correspondencias múltiple:** al sumar el color del grano, las dos primeras dimensiones explican el `r fm(eig[1, 2] + eig[2, 2], 1)` % de la inercia. La **dimensión 1** separa los lotes con proceso y color sin registrar; la **dimensión 2** contrapone Brasil y el proceso natural al proceso lavado (Guatemala, México). El mapa describe asociaciones entre categorías y debe leerse con prudencia.
+4. **Alcance:** estas técnicas muestran asociaciones, no causas, y no usan los puntajes sensoriales en el ACM.
