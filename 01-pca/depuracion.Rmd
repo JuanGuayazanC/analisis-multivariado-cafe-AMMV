@@ -8,11 +8,17 @@ output:
     toc: true
     toc_float: true
     theme: flatly
+    code_folding: hide
+    css: ../estilos_presentacion.css
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, fig.align = "center")
 ```
+
+::: {.resumen}
+**En resumen.** Se parte de 1.070 lotes. Con la distancia de Mahalanobis correcta (umbral χ² al 97,5 %, 8 g.l. = 17,53) se marcan 100 atípicos multivariados (9,3 %) y quedan 970. Con esos 970 lotes ninguna variable supera |asimetría| > 1, así que el PCA final solo estandariza. Un error de cálculo anterior marcaba 404 lotes; la cifra correcta es 100.
+:::
 
 > Este documento reúne la cadena de depuración que usan todos los análisis de PCA y métodos posteriores. Para el resultado final del PCA ver `pca_final.Rmd`.
 

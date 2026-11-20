@@ -1294,6 +1294,83 @@ window.buildTabsets = function(tocID) {
 };
 
 </script>
+<script>
+window.initializeCodeFolding = function(show) {
+
+  // handlers for show-all and hide all
+  $("#rmd-show-all-code").click(function() {
+    $('div.r-code-collapse').each(function() {
+      $(this).collapse('show');
+    });
+  });
+  $("#rmd-hide-all-code").click(function() {
+    $('div.r-code-collapse').each(function() {
+      $(this).collapse('hide');
+    });
+  });
+
+  // index for unique code element ids
+  var currentIndex = 1;
+
+  // select all R code blocks
+  var rCodeBlocks = $('pre.r, pre.python, pre.bash, pre.sql, pre.cpp, pre.stan, pre.julia, pre.foldable');
+  rCodeBlocks.each(function() {
+    // skip if the block has fold-none class
+    if ($(this).hasClass('fold-none')) return;
+
+    // create a collapsable div to wrap the code in
+    var div = $('<div class="collapse r-code-collapse"></div>');
+    var showThis = (show || $(this).hasClass('fold-show')) && !$(this).hasClass('fold-hide');
+    var id = 'rcode-643E0F36' + currentIndex++;
+    div.attr('id', id);
+    $(this).before(div);
+    $(this).detach().appendTo(div);
+
+    // add a show code button right above
+    var showCodeText = $('<span>' + (showThis ? 'Hide' : 'Show') + '</span>');
+    var showCodeButton = $('<button type="button" class="btn btn-default btn-xs btn-secondary btn-sm code-folding-btn pull-right float-right"></button>');
+    showCodeButton.append(showCodeText);
+    showCodeButton
+        .attr('data-toggle', 'collapse')
+        .attr('data-bs-toggle', 'collapse') // BS5
+        .attr('data-target', '#' + id)
+        .attr('data-bs-target', '#' + id)   // BS5
+        .attr('aria-expanded', showThis)
+        .attr('aria-controls', id);
+
+    var buttonRow = $('<div class="row"></div>');
+    var buttonCol = $('<div class="col-md-12"></div>');
+
+    buttonCol.append(showCodeButton);
+    buttonRow.append(buttonCol);
+
+    div.before(buttonRow);
+
+    // show the div if necessary
+    if (showThis) div.collapse('show');
+
+    // update state of button on show/hide
+    //   * Change text
+    //   * add a class for intermediate states styling
+    div.on('hide.bs.collapse', function () {
+      showCodeText.text('Show');
+      showCodeButton.addClass('btn-collapsing');
+    });
+    div.on('hidden.bs.collapse', function () {
+      showCodeButton.removeClass('btn-collapsing');
+    });
+    div.on('show.bs.collapse', function () {
+      showCodeText.text('Hide');
+      showCodeButton.addClass('btn-expanding');
+    });
+    div.on('shown.bs.collapse', function () {
+      showCodeButton.removeClass('btn-expanding');
+    });
+
+  });
+
+}
+</script>
 <style type="text/css">.hljs-literal {
 color: #990073;
 }
@@ -1339,6 +1416,41 @@ if (window.hljs) {
 
 
 
+<style type="text/css">
+body { font-size: 18px; line-height: 1.6; }
+
+.main-container { max-width: 1280px !important; }
+h1 { font-size: 2.1rem; font-weight: 700; margin-top: 2.4rem; padding-bottom: .35rem; border-bottom: 3px solid #2c3e50; }
+h2 { font-size: 1.65rem; font-weight: 700; margin-top: 1.9rem; }
+h3 { font-size: 1.35rem; font-weight: 600; }
+h1.title { border-bottom: none; font-size: 2.6rem; }
+.subtitle { font-size: 1.3rem; color: #555; }
+.author, .date { font-size: 1rem; }
+
+#TOC, .tocify { font-size: 15px; }
+.tocify .list-group-item { padding: 8px 12px; }
+
+.resumen {
+background: #eef6ee; border: 1px solid #b7d7b9; border-radius: 8px;
+padding: 14px 20px; margin: 1.2rem 0 1.8rem; font-size: 1.05rem;
+}
+.resumen p:last-child, .resumen ul:last-child { margin-bottom: 0; }
+.resumen strong:first-child { color: #1b5e20; }
+blockquote { font-size: 1.02rem; border-left: 5px solid #95a5a6; background: #f6f8f9; padding: 12px 18px; }
+
+img, .figure img { max-width: 100%; height: auto; display: block; margin-left: auto; margin-right: auto; }
+p.caption, .caption { font-size: .95rem; color: #555; text-align: center; }
+
+pre { font-size: 14px; line-height: 1.45; }
+pre.r, pre code { max-height: 420px; overflow: auto; }
+.btn-default.btn-xs, .code-folding-btn { font-size: 13px; }
+
+table { font-size: 16px; }
+table th { background: #ecf0f1; }
+.table > thead > tr > th { border-bottom: 2px solid #2c3e50; }
+
+pre:not(.r) { font-size: 14px; background: #fafafa; }
+</style>
 
 
 
@@ -1417,6 +1529,9 @@ display: none;
 </style>
 
 <!-- code folding -->
+<style type="text/css">
+.code-folding-btn { margin-bottom: 4px; }
+</style>
 
 
 
@@ -1494,6 +1609,14 @@ border-radius: 0px;
 
 <div id="header">
 
+<div class="btn-group pull-right float-right">
+<button type="button" class="btn btn-default btn-xs btn-secondary btn-sm dropdown-toggle" data-toggle="dropdown" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><span>Code</span> <span class="caret"></span></button>
+<ul class="dropdown-menu dropdown-menu-right" style="min-width: 50px;">
+<li><a id="rmd-show-all-code" href="#">Show All Code</a></li>
+<li><a id="rmd-hide-all-code" href="#">Hide All Code</a></li>
+</ul>
+</div>
+
 
 
 <h1 class="title toc-ignore">Figuras de la secuencia PCA</h1>
@@ -1501,11 +1624,17 @@ border-radius: 0px;
 Quality Institute</h3>
 <h4 class="author">Juan Sebastián Guayazán · Esteban Valente · Diego
 Nocua</h4>
-<h4 class="date">19 de noviembre de 2026</h4>
+<h4 class="date">20 de noviembre de 2026</h4>
 
 </div>
 
 
+<div class="resumen">
+<p><strong>En resumen.</strong> Las figuras muestran, en orden, cómo se
+pasa de 1.070 a 970 lotes: PCA con los atípicos marcados, diagnósticos
+de la base (cajas ajustadas, ceros, asimetría, varianzas), distancias de
+Mahalanobis y la comprobación exploratoria de humedad = 0.</p>
+</div>
 <blockquote>
 <p>Este documento dibuja la secuencia de figuras de la cadena de
 depuración <strong>1.070 → 970 lotes</strong>. La cadena y las bases se
@@ -1819,6 +1948,11 @@ $(document).ready(function () {
 </script>
 
 <!-- code folding -->
+<script>
+$(document).ready(function () {
+  window.initializeCodeFolding("hide" === "show");
+});
+</script>
 
 <script>
 $(document).ready(function ()  {

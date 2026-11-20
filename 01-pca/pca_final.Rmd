@@ -9,25 +9,32 @@ output:
     toc_float: true
     toc_depth: 3
     theme: flatly
+    code_folding: hide
+    css: ../estilos_presentacion.css
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, fig.align = "center")
 ```
 
+::: {.resumen}
+**En resumen.** De 1.070 lotes se retiran 100 atípicos multivariados (9,3 %) y quedan 970. Con ellos, CP1 explica 69,3 % de la variación (calidad sensorial general), CP2 11,6 % (altitud) y juntas 80,9 % (IC bootstrap 79,3–82,5 %). La nube de lotes es continua: el PCA resume la calidad, no separa grupos.
+:::
+
 > **Qué contiene:** el PCA final oficial (970 lotes, 8 variables) con la cadena de depuración 1.070 → 970 (una sola pasada de Mahalanobis). Es el análisis que se muestra en la presentación y el que se usa en la demo. Las figuras de cada sección se guardan en `figuras/revision_profesor/`.
 
 # Introducción y datos
 
-- Revisión PCA según recomendaciones de la sustentación.
-- Trabaja sobre la misma cadena de depuración (1.070 -> 970) y produce:
-- - medcouple y diagrama de cajas clásico vs ajustado (robusto para asimetría)
-- - justificación de Yeo-Johnson solo en las variables con asimetría
-- - supuestos del PCA (centrado, atípicos)
-- - gráfico del codo con intervalos de confianza bootstrap
-- - dispersión de scores ANTES de las cargas, cargas de CP1-CP3 y biplot
-- - t-SNE y UMAP exploratorios coloreados por método de proceso
-- Salida: figuras/revision_profesor/ y resultados_revision_profesor.txt
+Revisión del PCA según las recomendaciones de la sustentación, sobre la misma cadena de depuración (1.070 → 970). Contenido, en orden:
+
+1. Simetría de las variables y diagrama de cajas clásico frente a ajustado (robusto a la asimetría).
+2. Justificación de Yeo-Johnson solo en las variables con asimetría.
+3. Supuestos del PCA (centrado y atípicos).
+4. Gráfico del codo con intervalos de confianza bootstrap.
+5. Dispersión de los scores **antes** de las cargas; cargas de CP1–CP3 y biplot.
+6. t-SNE y UMAP exploratorios, coloreados por método de proceso.
+
+Salida: `figuras/revision_profesor/` y `resultados_revision_profesor.txt`.
 
 # 1. Preparación de datos
 

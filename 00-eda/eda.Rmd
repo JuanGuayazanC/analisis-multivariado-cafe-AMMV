@@ -8,15 +8,20 @@ output:
     toc: true
     toc_float: true
     toc_depth: 3
-    code_folding: show
+    code_folding: hide
     theme: flatly
     df_print: paged
+    css: ../estilos_presentacion.css
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE,
                       fig.align = "center", fig.width = 8, fig.height = 6)
 ```
+
+::: {.resumen}
+**En resumen.** Exploración previa a los métodos multivariados: tipos de variables, medias, covarianzas y correlaciones, boxplots (clásicos y ajustados), matriz de dispersión y distancias (euclídea, estandarizada y de Mahalanobis). Es un análisis independiente de la cadena 1.070 → 970 del PCA.
+:::
 
 > **Semanas 2–3 del programa:** matriz de datos, tipos de variables, preparación, escalamiento, estandarización y visualización exploratoria. Se estudian medidas de localización y dispersión multivariada mediante medias, covarianzas, correlaciones, varianza total y varianza generalizada.
 

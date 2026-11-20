@@ -1,0 +1,45 @@
+/* Estilos para proyectar los informes HTML (tema flatly de base).
+   Se cargan con `css: ../estilos_presentacion.css` en el encabezado de cada Rmd. */
+
+body { font-size: 18px; line-height: 1.6; }
+
+/* Contenido más ancho para aprovechar la pantalla del proyector */
+.main-container { max-width: 1280px !important; }
+
+h1 { font-size: 2.1rem; font-weight: 700; margin-top: 2.4rem; padding-bottom: .35rem; border-bottom: 3px solid #2c3e50; }
+h2 { font-size: 1.65rem; font-weight: 700; margin-top: 1.9rem; }
+h3 { font-size: 1.35rem; font-weight: 600; }
+h1.title { border-bottom: none; font-size: 2.6rem; }
+.subtitle { font-size: 1.3rem; color: #555; }
+.author, .date { font-size: 1rem; }
+
+/* Índice flotante legible */
+#TOC, .tocify { font-size: 15px; }
+.tocify .list-group-item { padding: 8px 12px; }
+
+/* Cuadro de resumen al inicio de cada informe */
+.resumen {
+  background: #eef6ee; border: 1px solid #b7d7b9; border-radius: 8px;
+  padding: 14px 20px; margin: 1.2rem 0 1.8rem; font-size: 1.05rem;
+}
+.resumen p:last-child, .resumen ul:last-child { margin-bottom: 0; }
+.resumen strong:first-child { color: #1b5e20; }
+
+blockquote { font-size: 1.02rem; border-left: 5px solid #95a5a6; background: #f6f8f9; padding: 12px 18px; }
+
+/* Figuras: al ancho del contenedor, centradas y sin desbordar */
+img, .figure img { max-width: 100%; height: auto; display: block; margin-left: auto; margin-right: auto; }
+p.caption, .caption { font-size: .95rem; color: #555; text-align: center; }
+
+/* Código: más pequeño que el texto, para que no compita con las figuras */
+pre { font-size: 14px; line-height: 1.45; }
+pre.r, pre code { max-height: 420px; overflow: auto; }
+.btn-default.btn-xs, .code-folding-btn { font-size: 13px; }
+
+/* Tablas legibles */
+table { font-size: 16px; }
+table th { background: #ecf0f1; }
+.table > thead > tr > th { border-bottom: 2px solid #2c3e50; }
+
+/* Salida de consola: más compacta, para que no domine la pantalla */
+pre:not(.r) { font-size: 14px; background: #fafafa; }

@@ -8,12 +8,18 @@ output:
     toc: true
     toc_float: true
     theme: flatly
+    code_folding: hide
+    css: ../estilos_presentacion.css
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, fig.align = "center")
 dir.create("figuras/secuencia", showWarnings = FALSE, recursive = TRUE)
 ```
+
+::: {.resumen}
+**En resumen.** Las figuras muestran, en orden, cómo se pasa de 1.070 a 970 lotes: PCA con los atípicos marcados, diagnósticos de la base (cajas ajustadas, ceros, asimetría, varianzas), distancias de Mahalanobis y la comprobación exploratoria de humedad = 0.
+:::
 
 > Este documento dibuja la secuencia de figuras de la cadena de depuración **1.070 → 970 lotes**. La cadena y las bases se construyen en [depuracion.Rmd](depuracion.Rmd) (`base_1070.rds`, `base_sin_atipicos.rds` y `datos_final_970.rds`); el PCA final se desarrolla en [pca_final.Rmd](pca_final.Rmd).
 
