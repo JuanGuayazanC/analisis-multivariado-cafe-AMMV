@@ -31,7 +31,7 @@ Además, 174 de los 1.070 registros tienen humedad igual a cero, y ese cero apar
 
 ## Diapositiva 3 - Metodología
 
-*Tiempo: 1:15 · Presenta: Diego*
+*Tiempo: 1:15 · Presenta: Juan*
 
 Primero exploramos distribuciones, valores extremos y asimetría. Para los extremos usamos la caja robusta si la variable es simétrica y la caja ajustada si es asimétrica, y solo transformamos donde hubo evidencia.
 
@@ -67,7 +67,7 @@ La silueta promedio es 0,116 y 104 lotes tienen valor negativo: la separación e
 
 ## Diapositiva 6 - HDBSCAN
 
-*Tiempo: 0:40 · Presenta: Esteban*
+*Tiempo: 0:40 · Presenta: Diego*
 
 HDBSCAN busca regiones densas y no obliga a asignar todos los lotes. Con tamaño mínimo de clúster 10 encontró seis grupos, de 30, 11, 57, 106, 135 y 105 lotes, y dejó 626, el 58,5 por ciento, como ruido. Aquí ruido significa que el método no los asignó a una zona densa, no que sean cafés de mala calidad. Esta matriz no incluye humedad y difiere de la de K-means, así que no comparamos sus etiquetas.
 
@@ -75,7 +75,7 @@ HDBSCAN busca regiones densas y no obliga a asignar todos los lotes. Con tamaño
 
 ## Diapositiva 7 - Ward.D2 — Clustering Jerárquico
 
-*Tiempo: 0:55 · Presenta: Diego*
+*Tiempo: 0:55 · Presenta: Esteban*
 
 Ward.D2 va uniendo lotes y no necesita fijar k al inicio. El dendrograma usa una muestra de 80 lotes. Cortando en tres obtenemos grupos de 15, 42 y 23. El árbol también admite cuatro: con cuatro, el grupo de 42 se parte en 27 y 15.
 
@@ -85,7 +85,7 @@ Mantuvimos tres porque la silueta de Ward es mayor, 0,128 frente a 0,113; pero l
 
 ## Diapositiva 8 - Perfiles de grupos — Ward.D2
 
-*Tiempo: 0:40 · Presenta: Diego*
+*Tiempo: 0:40 · Presenta: Esteban*
 
 En la muestra de 80 lotes, el grupo 1, de 15 lotes, destaca solo en aroma, 7,71, con 82,86 puntos. El grupo 2, de 42, tiene 82,72 y supera al 1 en acidez, balance y puntaje del catador: son casi idénticos. El grupo 3, de 23, tiene los promedios más bajos en los siete atributos, con 79,90 puntos.
 
@@ -95,7 +95,7 @@ Es una interpretación exploratoria: las distribuciones se traslapan y, sin un c
 
 ## Diapositiva 9 - Demostración de Shiny
 
-*Tiempo: 1:10 · Presenta: Juan*
+*Tiempo: 1:10 · Presenta: Esteban*
 
 Esta aplicación proyecta un lote hipotético en un PCA de referencia ajustado con los 970 lotes. Voy a ingresar un perfil sensorial alto; ojo, el máximo real en los datos es 8,5 en casi todos los atributos, no se puede escribir 9.
 
@@ -129,17 +129,17 @@ Muchas gracias. Los métodos nos permiten mirar los datos desde ángulos distint
 |---|---|---:|---:|
 | 1 | Juan | 0:30 | 0:30 |
 | 2 | Juan | 0:50 | 1:20 |
-| 3 | Diego | 1:15 | 2:35 |
+| 3 | Juan | 1:15 | 2:35 |
 | 4 | Diego | 1:40 | 4:15 |
 | 5 | Diego | 1:10 | 5:25 |
-| 6 | Esteban | 0:40 | 6:05 |
-| 7 | Diego | 0:55 | 7:00 |
-| 8 | Diego | 0:40 | 7:40 |
-| 9 | Juan | 1:10 | 8:50 |
+| 6 | Diego | 0:40 | 6:05 |
+| 7 | Esteban | 0:55 | 7:00 |
+| 8 | Esteban | 0:40 | 7:40 |
+| 9 | Esteban | 1:10 | 8:50 |
 | 10 | Esteban | 0:50 | 9:40 |
 | 11 | Juan | 0:20 | 10:00 |
 
-*El texto a leer ronda las 1.150 palabras (unos 8 minutos y medio a ritmo normal), lo que deja margen para las acciones de la demostración y las transiciones. Por persona: Juan 2:50 · Diego 5:40 · Esteban 1:30; si quieren repartir mejor, la diapositiva 7 u 8 puede pasar a Esteban.*
+*El texto a leer ronda las 1.150 palabras (unos 8 minutos y medio a ritmo normal), lo que deja margen para las acciones de la demostración y las transiciones. Por persona: Juan 2:55 (1, 2, 3 y 11) · Diego 3:30 (4, 5 y 6) · Esteban 3:35 (7, 8, 9 y 10). Los relevos son en bloque: Juan abre y presenta la metodología, Diego lleva PCA, K-means y HDBSCAN, y Esteban lleva Ward, la demostración de Shiny y las conclusiones; Juan cierra.*
 
 ---
 
