@@ -330,7 +330,7 @@ ui <- fluidPage(
             div(class = "card-title", "Varianza por componente"),
             plotOutput("scree", height = "320px"),
             div(style = "font-size:12px; color:#666;",
-              "Cada barra es el porcentaje de varianza que explica el componente. CP1 y CP2 suman 66,8 %.")
+              paste0("Cada barra es el porcentaje de varianza que explica el componente. CP1 y CP2 suman ", round(var_exp[1] + var_exp[2], 1), " %."))
           )
         ),
         column(4,
