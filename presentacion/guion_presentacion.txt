@@ -164,13 +164,11 @@ Muchas gracias. Quedamos atentos a sus preguntas.
 
 *Por persona: Juan 3:30 (1 a 4, 13 y 14) · Diego 3:05 (5 a 8) · Esteban 3:25 (9 a 12). Los relevos son en bloque: Juan abre y presenta los datos, Diego lleva PCA, ACM y selección de k, Esteban lleva K-means, HDBSCAN, Ward y la demostración, y Juan cierra con las conclusiones. El texto a leer ronda las 1.000 palabras (unos 8 minutos a ritmo normal), lo que deja margen para las acciones de la demostración y los cambios de diapositiva.*
 
-## Ajustes pendientes en el deck antes de ensayar
+## Antes de ensayar
 
-- **Diapositiva 8:** el texto visible dice que la suma de cuadrados "desciende más hasta k = 3"; la curva baja sin quiebre. Conviene reemplazarlo y mencionar la silueta con k = 2 y el gap.
-- **Diapositiva 10:** "Concentran la mayor densidad de lotes de país y método de proceso" no tiene un cálculo que lo respalde; verificarlo o quitarlo.
-- **Diapositiva 11:** la justificación de k = 3 frente a los 4 grupos del dendrograma solo está en este guion y en las notas.
-- **Demo (diapositiva 12):** hay que correr la app de 970 lotes (`shiny::runApp("shiny")` desde la raíz del repositorio actualizado).
-
+- **Demo (diapositiva 12):** correr la app de 970 lotes desde la raíz del repositorio actualizado (`shiny::runApp("shiny")`) y dejarla abierta en el navegador antes de llegar a la diapositiva.
+- **Perfil alto de la demo:** la aplicación marcará el panel de regresión como extrapolación (el CP1 de ese perfil queda fuera del rango de los lotes reales); es esperable y sirve para explicar los límites de la recta.
+- **Orden de la presentación:** el deck sigue el orden de este guion (la nube de dispersión del PCA es la diapositiva 5 y la varianza con cargas la 6).
 ---
 
 # Apoyo para preguntas (no se lee)
